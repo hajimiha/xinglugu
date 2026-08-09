@@ -251,6 +251,7 @@ export interface GameState {
   machines: Record<MachineId, FarmMachineState>
   battle?: BattleState
   tools: { hoe: number; rod: number; pickaxe: number }
+  equipment: { sword: number; armor: number }
   fishing: { active: boolean; lastCatch?: string }
   activeModal: ModalType
   selectedNpcId?: string
@@ -285,6 +286,7 @@ export type GameAction =
   | { type: 'BUILD_MACHINE'; machine: MachineId }
   | { type: 'START_MACHINE_JOB'; recipeId: string; batches: number }
   | { type: 'CRAFT_ITEM'; recipeId: 'berry-tart'; quantity: number }
+  | { type: 'FORGE_EQUIPMENT'; recipeId: string }
   | { type: 'LEARN_SPELL'; spellId: string }
   | { type: 'ENTER_MINE_FLOOR'; floor: number }
   | { type: 'MINE_ORE'; floor: number }
@@ -293,7 +295,6 @@ export type GameAction =
   | { type: 'START_FISHING' }
   | { type: 'CATCH_FISH'; result: 'silver-carp' | 'water-grass' | 'empty' }
   | { type: 'UPGRADE_TOOL'; tool: 'hoe' | 'rod' | 'pickaxe'; price: number }
-  | { type: 'REFINE_ORE' }
   | { type: 'BUY_PERMANENT_UPGRADE'; upgrade: 'energy' | 'mana'; price: number }
   | { type: 'PLAYER_DEFEATED' }
   | { type: 'UPDATE_GAME_RULES'; rules: Partial<GameRuleSettings> }

@@ -1,4 +1,4 @@
-import { BUILD_RECIPES, CRAFT_RECIPES, MACHINE_RECIPES, MONSTER_PARTNERS, createInitialPlots, crops, getFarmExpansion, npcs, quests, shopItems, spells } from './data'
+import { BUILD_RECIPES, CRAFT_RECIPES, FORGE_RECIPES, MACHINE_RECIPES, MINE_MAX_FLOOR, MONSTER_PARTNERS, createInitialPlots, crops, getFarmExpansion, getMineYield, npcs, quests, shopItems, spells } from './data'
 import { advanceCalendarClock, formatGameDate, getSeasonForDay, getWeekday, isNpcBirthday } from './calendar'
 import {
   DEFAULT_GAME_RULES,
@@ -92,6 +92,7 @@ export const initialGameState: GameState = {
   ranch: { owned: false, residents: [], dragonStatus: 'wild' },
   machines: { furnace: { built: false }, mill: { built: false } },
   tools: { hoe: 1, rod: 1, pickaxe: 1 },
+  equipment: { sword: 1, armor: 1 },
   fishing: { active: false },
   activeModal: null,
   toasts: [],
@@ -482,22 +483,30 @@ function reduceGameState(state: GameState, action: GameAction): GameState {
     }
     case 'ENTER_MINE_FLOOR': {
       const cost = getEnergyCost(1, state.rules.energyCostMode)
-      if (state.energy < cost || action.floor < 1 || action.floor > state.mine.highestFloor + 1) return state
+      if (state.energy < cost || action.floor < 1 || action.floor > MINE_MAX_FLOOR || action.floor > state.mine.highestFloor + 1) return state
       const highestFloor = Math.max(state.mine.highestFloor, action.floor)
-      const unlockedElevators = action.floor % 5 === 0 && !state.mine.unlockedElevators.includes(action.floor) ? [...state.mine.unlockedElevators, action.floor] : state.mine.unlockedElevators
-      return { ...state, energy: state.energy - cost, mine: { currentFloor: action.floor, highestFloor, unlockedElevators }, toasts: [...state.toasts, makeToast({ tone: 'info', title: `抵达第 ${action.floor} 层`, message: action.floor % 5 === 0 ? '这里是安全电梯层，没有魔物，但仍可挖矿。' : '黑暗里传来魔物移动的回声。' })] }
+      const elevatorFloor = action.floor < MINE_MAX_FLOOR && action.floor % 5 === 0
+      const unlockedElevators = elevatorFloor && !state.mine.unlockedElevators.includes(action.floor) ? [...state.mine.unlockedElevators, action.floor] : state.mine.unlockedElevators
+      const message = action.floor === MINE_MAX_FLOOR ? '最深处的龙巢传来灼热吐息，龙娘正在等待挑战。' : elevatorFloor ? '这里是安全电梯层，没有魔物，但仍可挖矿。' : '黑暗里传来魔物移动的回声。'
+      return { ...state, energy: state.energy - cost, mine: { currentFloor: action.floor, highestFloor, unlockedElevators }, toasts: [...state.toasts, makeToast({ tone: 'info', title: `抵达第 ${action.floor} 层`, message })] }
     }
     case 'MINE_ORE': {
       const cost = getEnergyCost(1, state.rules.energyCostMode)
       if (state.energy < cost) return { ...state, toasts: [...state.toasts, makeToast({ tone: 'warning', title: '精力不足', message: `需要 ${cost} 点精力才能开采矿脉。` })] }
-      const copper = scaleReward(1 + Math.floor(action.floor / 3), state.rules.dropMultiplier)
-      const baseIron = action.floor >= 5 ? Math.floor(action.floor / 5) : 0
-      const iron = baseIron > 0 ? scaleReward(baseIron, state.rules.dropMultiplier) : 0
+      const yieldResult = getMineYield(action.floor, state.tools.pickaxe, state.rules.dropMultiplier, state.ranch.dragonStatus === 'resident')
       const experience = scaleReward(12 + action.floor, state.rules.experienceMultiplier)
-      return { ...state, energy: state.energy - cost, inventory: { ...state.inventory, 'copper-ore': (state.inventory['copper-ore'] ?? 0) + copper, 'iron-ore': (state.inventory['iron-ore'] ?? 0) + iron }, skills: { ...state.skills, mining: { ...state.skills.mining, experience: state.skills.mining.experience + experience } }, toasts: [...state.toasts, makeToast({ tone: 'success', title: '矿脉开采完成', message: `获得铜矿石 ${copper}${iron ? `、铁矿石 ${iron}` : ''}。` })] }
+      const inventory = { ...state.inventory }
+      for (const [itemId, amount] of Object.entries(yieldResult)) inventory[itemId] = (inventory[itemId] ?? 0) + amount
+      const rewards = [`铜矿石 ${yieldResult['copper-ore']}`, `石头 ${yieldResult.stone}`]
+      if (yieldResult['iron-ore']) rewards.push(`铁矿石 ${yieldResult['iron-ore']}`)
+      if (yieldResult['diamond-ore']) rewards.push(`钻石矿 ${yieldResult['diamond-ore']}`)
+      return { ...state, energy: state.energy - cost, inventory, skills: { ...state.skills, mining: { ...state.skills.mining, experience: state.skills.mining.experience + experience } }, toasts: [...state.toasts, makeToast({ tone: 'success', title: '矿脉开采完成', message: `获得${rewards.join('、')}。` })] }
     }
     case 'START_BATTLE': {
-      if (action.floor % 5 === 0) return state
+      if (action.floor % 5 === 0 && action.floor !== MINE_MAX_FLOOR) return state
+      if (action.floor === MINE_MAX_FLOOR) {
+        return { ...state, activeModal: 'battle', battle: { floor: action.floor, enemyName: '龙娘', enemyElement: 'fire', enemyHealth: 90, enemyMaxHealth: 90, turn: 1, log: ['矿洞最深处，龙娘展开双翼守住晶脉。'] } }
+      }
       const elements = ['earth', 'wood', 'water', 'fire', 'metal'] as const
       const names = ['岩壳史莱姆', '蔓影獾', '潮穴水灵', '烬角蜥', '白铁蝠']
       const index = (action.floor - 1) % elements.length
@@ -533,7 +542,15 @@ function reduceGameState(state: GameState, action: GameAction): GameState {
       enemyHealth = Math.max(0, enemyHealth - damage)
       if (enemyHealth <= 0) {
         const experience = scaleReward(14 + battle.floor, state.rules.experienceMultiplier)
-        return { ...state, stats: { ...state.stats, health: playerHealth, mana: playerMana }, inventory, battle: { ...battle, enemyHealth: 0, ended: 'victory', log: [...log, `${battle.enemyName}化作散落的灵光，战斗胜利。`] }, skills: { ...state.skills, combat: { ...state.skills.combat, experience: state.skills.combat.experience + experience } } }
+        const defeatedDragon = battle.floor === MINE_MAX_FLOOR && battle.enemyName === '龙娘'
+        const dragonResident = defeatedDragon && state.ranch.owned
+        const ranch = defeatedDragon && state.ranch.dragonStatus === 'wild' ? {
+          ...state.ranch,
+          residents: dragonResident ? [...state.ranch.residents, 'dragon-girl' as const] : state.ranch.residents,
+          dragonStatus: dragonResident ? 'resident' as const : 'promised' as const,
+        } : state.ranch
+        const victoryText = defeatedDragon ? dragonResident ? '龙娘认可了你的实力，决定立即入住牧场。' : '龙娘认可了你的实力，答应在牧场建成后入住。' : `${battle.enemyName}化作散落的灵光，战斗胜利。`
+        return { ...state, stats: { ...state.stats, health: playerHealth, mana: playerMana }, inventory, ranch, battle: { ...battle, enemyHealth: 0, ended: 'victory', log: [...log, victoryText] }, skills: { ...state.skills, combat: { ...state.skills.combat, experience: state.skills.combat.experience + experience } } }
       }
       const baseEnemyDamage = action.action === 'defend' ? 2 : 5 + Math.floor(battle.floor / 4)
       const enemyDamage = scaleDamage(baseEnemyDamage, state.rules.enemyDamageMultiplier)
@@ -565,9 +582,21 @@ function reduceGameState(state: GameState, action: GameAction): GameState {
       if (state.money < action.price || state.tools[action.tool] >= 4) return state
       return { ...state, money: state.money - action.price, tools: { ...state.tools, [action.tool]: state.tools[action.tool] + 1 }, toasts: [...state.toasts, makeToast({ tone: 'success', title: '工具升级完成', message: '羽纹火花沿着新刃口亮起。' })] }
     }
-    case 'REFINE_ORE':
-      if ((state.inventory['copper-ore'] ?? 0) < 3) return state
-      return { ...state, inventory: { ...state.inventory, 'copper-ore': state.inventory['copper-ore'] - 3, 'iron-ore': (state.inventory['iron-ore'] ?? 0) + 1 }, toasts: [...state.toasts, makeToast({ tone: 'success', title: '精炼完成', message: '3 块铜矿石精炼为 1 块铁矿石。' })] }
+    case 'FORGE_EQUIPMENT': {
+      const recipe = FORGE_RECIPES[action.recipeId]
+      if (!recipe || state.money < recipe.money || (state.inventory[recipe.ingotId] ?? 0) < recipe.ingotQuantity) return state
+      const currentLevel = recipe.kind === 'hoe' || recipe.kind === 'pickaxe' ? state.tools[recipe.kind] : state.equipment[recipe.kind]
+      if (recipe.targetLevel !== currentLevel + 1) return state
+      const inventory = { ...state.inventory, [recipe.ingotId]: state.inventory[recipe.ingotId] - recipe.ingotQuantity }
+      if (recipe.kind === 'hoe' || recipe.kind === 'pickaxe') {
+        return { ...state, money: state.money - recipe.money, inventory, tools: { ...state.tools, [recipe.kind]: recipe.targetLevel }, toasts: [...state.toasts, makeToast({ tone: 'success', title: '工具锻造完成', message: `${recipe.name}已经可以使用。` })] }
+      }
+      const previousBonus = currentLevel <= 1 ? 0 : FORGE_RECIPES[`${recipe.kind}-${currentLevel}`].bonus
+      const bonusDelta = recipe.bonus - previousBonus
+      return recipe.kind === 'sword'
+        ? { ...state, money: state.money - recipe.money, inventory, equipment: { ...state.equipment, sword: recipe.targetLevel }, stats: { ...state.stats, attack: state.stats.attack + bonusDelta }, toasts: [...state.toasts, makeToast({ tone: 'success', title: '武器锻造完成', message: `物理攻击提升 ${bonusDelta} 点。` })] }
+        : { ...state, money: state.money - recipe.money, inventory, equipment: { ...state.equipment, armor: recipe.targetLevel }, stats: { ...state.stats, health: state.stats.health + bonusDelta, maxHealth: state.stats.maxHealth + bonusDelta }, toasts: [...state.toasts, makeToast({ tone: 'success', title: '护甲锻造完成', message: `生命上限提升 ${bonusDelta} 点。` })] }
+    }
     case 'BUY_PERMANENT_UPGRADE':
       if (state.money < action.price) return state
       return action.upgrade === 'energy'

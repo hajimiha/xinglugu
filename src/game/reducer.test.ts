@@ -379,4 +379,66 @@ describe('游戏状态变更', () => {
     const cooked = gameReducer(pantry, { type: 'CRAFT_ITEM', recipeId: 'berry-tart', quantity: 2 } as never)
     expect(cooked.inventory).toMatchObject({ 'ember-berry': 0, honey: 0, flour: 0, milk: 0, 'berry-tart': 2 })
   })
+
+  it('矿洞产出石头并从第十层起产出钻石矿，镐等级提高收益', () => {
+    const floorNine = gameReducer({ ...initialGameState, energy: 5 }, { type: 'MINE_ORE', floor: 9 })
+    expect(floorNine.inventory).toMatchObject({ 'copper-ore': 4, 'iron-ore': 1, stone: 4 })
+    expect(floorNine.inventory['diamond-ore'] ?? 0).toBe(0)
+
+    const floorTen = gameReducer({ ...initialGameState, energy: 5, tools: { ...initialGameState.tools, pickaxe: 4 } }, { type: 'MINE_ORE', floor: 10 })
+    expect(floorTen.inventory).toMatchObject({ 'copper-ore': 7, 'iron-ore': 4, stone: 7, 'diamond-ore': 2 })
+
+    const withDragon = gameReducer({ ...initialGameState, energy: 5, ranch: { owned: true, residents: ['dragon-girl'], dragonStatus: 'resident' } }, { type: 'MINE_ORE', floor: 20 })
+    expect(withDragon.inventory['diamond-ore']).toBe(4)
+  })
+
+  it('矿洞最深为二十层且龙巢不是安全电梯层', () => {
+    const beforeDragon = { ...initialGameState, energy: 5, mine: { currentFloor: 19, highestFloor: 19, unlockedElevators: [5, 10, 15] } }
+    const dragonFloor = gameReducer(beforeDragon, { type: 'ENTER_MINE_FLOOR', floor: 20 })
+    expect(dragonFloor.mine).toEqual({ currentFloor: 20, highestFloor: 20, unlockedElevators: [5, 10, 15] })
+    expect(dragonFloor.toasts.at(-1)?.message).toContain('龙巢')
+    expect(gameReducer(dragonFloor, { type: 'ENTER_MINE_FLOOR', floor: 21 })).toBe(dragonFloor)
+    const battle = gameReducer(dragonFloor, { type: 'START_BATTLE', floor: 20 })
+    expect(battle.battle).toMatchObject({ enemyName: '龙娘', floor: 20 })
+  })
+
+  it('铁匠按铜铁钻石顺序打造锄头、镐、长剑和护甲', () => {
+    const stock: GameState = {
+      ...initialGameState,
+      money: 20000,
+      inventory: { 'copper-ingot': 30, 'iron-ingot': 30, 'diamond-ingot': 30 },
+      equipment: { sword: 1, armor: 1 },
+    }
+    const hoe2 = gameReducer(stock, { type: 'FORGE_EQUIPMENT', recipeId: 'hoe-2' } as never)
+    expect(hoe2.tools.hoe).toBe(2)
+    expect(hoe2.inventory['copper-ingot']).toBe(26)
+    expect(hoe2.money).toBe(19500)
+    expect(gameReducer(hoe2, { type: 'FORGE_EQUIPMENT', recipeId: 'hoe-4' } as never)).toBe(hoe2)
+
+    const pickaxe2 = gameReducer(stock, { type: 'FORGE_EQUIPMENT', recipeId: 'pickaxe-2' } as never)
+    expect(pickaxe2.tools.pickaxe).toBe(2)
+
+    const sword2 = gameReducer(stock, { type: 'FORGE_EQUIPMENT', recipeId: 'sword-2' } as never)
+    expect(sword2.equipment.sword).toBe(2)
+    expect(sword2.stats.attack).toBe(6)
+    const sword3 = gameReducer({ ...sword2, inventory: { ...sword2.inventory, 'iron-ingot': 30 } }, { type: 'FORGE_EQUIPMENT', recipeId: 'sword-3' } as never)
+    expect(sword3.stats.attack).toBe(9)
+
+    const armor2 = gameReducer(stock, { type: 'FORGE_EQUIPMENT', recipeId: 'armor-2' } as never)
+    expect(armor2.equipment.armor).toBe(2)
+    expect(armor2.stats).toMatchObject({ health: 26, maxHealth: 26 })
+  })
+
+  it('击败第20层龙娘后按牧场状态入住或建立约定', () => {
+    const battleState: GameState = {
+      ...initialGameState,
+      battle: { floor: 20, enemyName: '龙娘', enemyElement: 'fire', enemyHealth: 1, enemyMaxHealth: 90, turn: 1, log: [] },
+    }
+    const promised = gameReducer(battleState, { type: 'BATTLE_ACTION', action: 'physical' })
+    expect(promised.battle?.ended).toBe('victory')
+    expect(promised.ranch.dragonStatus).toBe('promised')
+
+    const resident = gameReducer({ ...battleState, ranch: { owned: true, residents: [], dragonStatus: 'wild' } }, { type: 'BATTLE_ACTION', action: 'physical' })
+    expect(resident.ranch).toMatchObject({ dragonStatus: 'resident', residents: ['dragon-girl'] })
+  })
 })
