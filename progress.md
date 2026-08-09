@@ -1,5 +1,14 @@
 # Progress Log
 
+## 2026-08-09 · Phase 16 开始
+- 完整读取已安装的 `ariespo/tavernlike` skill，确认其要求活动预设提示词经装配后直接进入 API `messages`，并提供世界书、变量、六标签和思维内容折叠的完整 React 路径。
+- 已读取系统化调试、测试驱动、文件化规划与 UI/UX Pro Max 规范；下一步先做请求链根因调查和参考仓库研究，不在证据不足时修改生产代码。
+- 运行 planning-with-files 会话恢复，确认工作区无未同步代码修改；修正 Phase 15 计划状态并建立 Phase 16 的七项验收清单。
+- 完成当前请求链第一轮静态取证：确认实际会话优先绑定旧 `session.presetId`，全局启用新预设不会迁移旧会话；同时确认当前装配器没有来源追踪/最终请求预览，协议层也没有独立推理字段支持。
+- 网络恢复后尝试以 `--depth 1 --filter=blob:none` 拉取参考仓库，因仓库体量在 120 秒内仍未完成；已切换为 GitHub 目录树与 raw 文件的定向研究，不重复同一失败方法。
+- 已完成参考仓库相关模块研究、真实预设宏统计与 UI/UX Pro Max 设计检索；确认真实文件有 140 条提示词、默认组 55 项/启用 28 项，并依赖 setvar/getvar/trim/注释/random/roll 等宏。
+- 已写入并自检严格酒馆核心设计规格与六任务 TDD 实施计划；占位词扫描为空，预设绑定、宏、正则、变量、供应商推理、请求检查、迁移和桌面/手机验收均有对应任务。
+
 ## 2026-08-09 · Phase 12
 - 运行 planning-with-files session catch-up，确认 `main`、`origin/main` 均位于 `b9b38d7`，工作区无未提交改动。
 - 完整读取 brainstorming、planning-with-files、writing-plans、TDD（含 writing-good-tests）、parallel dispatch、sillytavern-web 与 UI/UX Pro Max 约束。

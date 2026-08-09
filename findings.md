@@ -1,5 +1,24 @@
 # Findings & Decisions
 
+## 2026-08-09 · Phase 16 严格酒馆核心重构
+- 用户实测认为导入预设未进入模型请求；本轮验收边界必须是捕获真实 `fetch` 请求体并逐条证明预设提示词、角色、顺序、采样参数和变量替换结果，而不是只验证编辑器中可见。
+- `ariespo/tavernlike` skill 已安装于 `C:/Users/qixin/.codex/skills/tavernlike`，其 React 工作流明确要求活动预设参与 `assemblePrompt`，装配后的 `promptMessages` 直接作为 API `messages`，并应用预设采样参数。
+- 用户此前明确授权前端设计无需再询问、按推荐方案执行；本轮据此选择“单一可审计提示词编译器 + 四个管理中心 + 出站请求检查器”的推荐方案并直接执行。
+- 当前持久计划的 Phase 15 状态落后于已推送提交 `ee9dee0`；已依据 48 文件/230 测试、生产构建和浏览器验收记录将其纠正为完成。
+- 当前真实链路为 `TavernContext.sendTurn → createRemoteTurn → assemblePrompt → api.prepare → buildProviderRequest`；装配结果确实被交给供应商请求构造器，但系统没有保存或展示最终编译产物，用户无法判断哪一条预设实际发送。
+- 已发现首个高概率根因：`sendTurn` 优先使用 `session.presetId`，而“设为当前”只更新全局 `settings.activePresetId`。旧会话仍永久绑定创建时的旧预设，因此用户导入并启用新预设后继续既有 NPC 会话，实际请求仍使用旧预设。
+- `prompt-assembler` 只返回三项结果且会把相邻 system 条目合并，完全丢失条目来源、identifier、启用状态、宏替换结果和裁剪信息；即使文本发送，也没有可审计证据，无法可靠排查预设顺序或上下文裁剪。
+- 供应商适配器只提取正文 `content`，没有归一化 OpenAI/DeepSeek `reasoning_content`、Anthropic thinking block 或 Gemini thought part；现有 `<thinking>` 仅是模型正文标签，不等于供应商返回的独立推理字段。
+- GitHub 参考仓库实际项目位于两层同名目录内，采用 React 18 + TypeScript + Zustand；结构化状态用 Zustand persist/localStorage，大块会话、存档、图片与世界书用 IndexedDB，AI 调用统一经过可回退的 API 链而非组件直接 `fetch`。
+- 已从参考仓库树定位核心实现：`PromptCenterPanel.tsx`、`promptOverrideStore.ts`、`stPresetExport.ts`、`regexEngine.ts`、`VariableManager.tsx`、`variableStore.ts`、`apiChat.ts`、`apiDebugLog.ts` 与 `thinkSplit.test.ts`；后续只完整读取这些相关模块，不宣称复制整仓业务代码。
+- 参考项目的“预设中心”不是只编辑一个正文框，而是由稳定键注册表驱动：每项显示默认/已自定义状态，支持单项恢复、宏提示、导入合并和导出；实际拼接点必须统一调用 `getPrompt/renderPrompt`，否则仅有编辑 UI 不代表生效。
+- 参考项目的宏策略支持 `{{user}}`、`{{char}}`、`{{getvar::名}}`、`${变量}`、随机/骰子等，并对未知变量保留原文；变量分为有类型/范围/状态栏可见性/说明的定义，而不是当前项目仅有的无模式键值表。
+- 参考项目的正则引擎严格区分显示阶段与提示词阶段、用户输入与 AI 输出、历史深度、`promptOnly/markdownOnly`，兼容 `/pattern/flags`、命名/编号捕获、`{{match}}`、`trimStrings` 和替换模板宏；导出时映射回 SillyTavern `extensions.regex_scripts`。
+- 可借鉴但不会照抄参考项目的 Emoji/浏览器原生 confirm：本项目继续遵循 Phosphor 图标与应用内确认条；借鉴重点是稳定注册表、执行阶段、可测试预览和导入导出协议。
+- 用户的真实“夏瑾 天琴座 Beta 1.0”文件包含 140 条 prompt、2 个角色顺序组；默认 100001 组有 55 个顺序项、28 个启用项。启用内容同时使用 system/user 角色、marker 与大量 SillyTavern 宏，不能退化为单一 system 文本框。
+- 真实预设的关键前置条目使用 `{{setvar::...}}`、`{{getvar::...}}`、`{{trim}}` 和 `{{//...}}` 注释；当前项目宏引擎完全不支持这些。即便原始提示词字符串进入请求，变量初始化、变量读取、注释剥离与空白控制均不会执行，导致预设语义严重失真。
+- 参考项目对 `reasoning_content` 的处理主要是当 `content` 为空时回退为正文；本项目将改进为始终分离“模型返回推理内容”和“最终正文”，避免把推理草稿误当 NPC 对话，同时保留正文内 `<thinking>/<think>` 的兼容解析。
+
 ## 2026-08-09 · Phase 12 农场生产链与魔物娘生态
 - 用户明确要求删除月影菇、蘑菇娘与苔藓药草，并同步改写 NPC 礼物偏好；本轮必须从物品目录、掉落、商店、礼物、世界书、存档和 UI 全链路移除旧引用。
 - 新生产闭环包含田地扩建、木石/月铃花掉落、矿洞石头与第十层后钻石矿、熔炉冶炼、磨粉机加工、料理制造、铁匠装备锻造以及装备对扩建/采矿的真实加成。
