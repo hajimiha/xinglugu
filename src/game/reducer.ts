@@ -365,7 +365,8 @@ function reduceGameState(state: GameState, action: GameAction): GameState {
       return { ...state, quests: state.quests.map((quest) => quest.id === action.questId && quest.status === 'available' ? { ...quest, status: 'active' } : quest) }
     case 'BUY_ITEM': {
       if (action.quantity < 1 || state.money < action.total) return { ...state, toasts: [...state.toasts, makeToast({ tone: 'warning', title: '交易未完成', message: '金币不足，无法购买所选商品。' })] }
-      return { ...state, money: state.money - action.total, inventory: { ...state.inventory, [action.itemId]: (state.inventory[action.itemId] ?? 0) + action.quantity }, toasts: [...state.toasts, makeToast({ tone: 'success', title: '购买完成', message: '商品已经放入背包。' })] }
+      const tools = action.itemId === 'tide-rod' ? { ...state.tools, rod: Math.max(2, state.tools.rod) } : state.tools
+      return { ...state, money: state.money - action.total, inventory: { ...state.inventory, [action.itemId]: (state.inventory[action.itemId] ?? 0) + action.quantity }, tools, toasts: [...state.toasts, makeToast({ tone: 'success', title: '购买完成', message: action.itemId === 'tide-rod' ? '潮汐钓竿已经装备，银鳞鲫收获提高。' : '商品已经放入背包。' })] }
     }
     case 'SELL_ITEM': {
       const protectedByQuest = state.quests.some((quest) => quest.status === 'active' && quest.requiredItemId === action.itemId)
@@ -533,11 +534,25 @@ function reduceGameState(state: GameState, action: GameAction): GameState {
         log.push(`你施放「${spell.name}」，五行倍率 ${multiplier}，造成 ${damage} 点伤害。`)
       }
       if (action.action === 'item') {
-        if ((inventory['energy-tonic'] ?? 0) < 1) return { ...state, toasts: [...state.toasts, makeToast({ tone: 'warning', title: '道具不足', message: '背包里没有金盏恢复剂。' })] }
-        const recovery = scaleReward(10, state.rules.recoveryMultiplier)
-        playerHealth = Math.min(state.stats.maxHealth, playerHealth + recovery)
-        inventory = { ...inventory, 'energy-tonic': inventory['energy-tonic'] - 1 }
-        log.push(`你使用金盏恢复剂，恢复 ${recovery} 点生命。`)
+        const itemId = action.itemId ?? 'energy-tonic'
+        const itemNames = { 'energy-tonic': '金盏恢复剂', 'mana-potion': '蓝雾魔力剂', 'fire-potion': '流火瓶' } as const
+        if ((inventory[itemId] ?? 0) < 1) return { ...state, toasts: [...state.toasts, makeToast({ tone: 'warning', title: '道具不足', message: `背包里没有${itemNames[itemId]}。` })] }
+        inventory = { ...inventory, [itemId]: inventory[itemId] - 1 }
+        if (itemId === 'energy-tonic') {
+          const recovery = scaleReward(10, state.rules.recoveryMultiplier)
+          playerHealth = Math.min(state.stats.maxHealth, playerHealth + recovery)
+          log.push(`你使用金盏恢复剂，恢复 ${recovery} 点生命。`)
+        }
+        if (itemId === 'mana-potion') {
+          const recovery = scaleReward(8, state.rules.recoveryMultiplier)
+          playerMana = Math.min(state.stats.maxMana, playerMana + recovery)
+          log.push(`你使用蓝雾魔力剂，恢复 ${recovery} 点魔力。`)
+        }
+        if (itemId === 'fire-potion') {
+          const multiplier = elementAdvantage('fire', battle.enemyElement)
+          damage = scaleDamage(14 * multiplier, state.rules.playerDamageMultiplier)
+          log.push(`你投出流火瓶，五行倍率 ${multiplier}，造成 ${damage} 点火属性伤害。`)
+        }
       }
       enemyHealth = Math.max(0, enemyHealth - damage)
       if (enemyHealth <= 0) {
@@ -568,8 +583,9 @@ function reduceGameState(state: GameState, action: GameAction): GameState {
     case 'CATCH_FISH': {
       if (!state.fishing.active) return state
       if (action.result === 'silver-carp') {
-        const amount = scaleReward(1, state.rules.dropMultiplier)
-        const experience = scaleReward(16, state.rules.experienceMultiplier)
+        const rodLevel = Math.max(1, state.tools.rod)
+        const amount = scaleReward(rodLevel, state.rules.dropMultiplier)
+        const experience = scaleReward(16 + (rodLevel - 1) * 4, state.rules.experienceMultiplier)
         return { ...state, fishing: { active: false, lastCatch: 'silver-carp' }, inventory: { ...state.inventory, 'silver-carp': (state.inventory['silver-carp'] ?? 0) + amount, 'reed-bait': Math.max(0, (state.inventory['reed-bait'] ?? 0) - 1) }, skills: { ...state.skills, fishing: { ...state.skills.fishing, experience: state.skills.fishing.experience + experience } }, toasts: [...state.toasts, makeToast({ tone: 'success', title: '钓到银鳞鲫', message: `钓鱼经验 +${experience}，获得鱼获 ${amount} 份。` })] }
       }
       if (action.result === 'water-grass') {

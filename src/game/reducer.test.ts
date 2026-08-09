@@ -126,6 +126,43 @@ describe('游戏状态变更', () => {
     expect(hospital.energy).toBe(4)
   })
 
+  it('在战斗中使用生命、魔力与火焰三种药剂并消耗对应物品', () => {
+    const configured = {
+      ...initialGameState,
+      stats: { ...initialGameState.stats, health: 8, mana: 1 },
+      inventory: { ...initialGameState.inventory, 'energy-tonic': 1, 'mana-potion': 1, 'fire-potion': 1 },
+    }
+    const battleState = gameReducer(configured, { type: 'START_BATTLE', floor: 4 })
+    const healed = gameReducer(battleState, { type: 'BATTLE_ACTION', action: 'item', itemId: 'energy-tonic' })
+    expect(healed.stats.health).toBeGreaterThan(8)
+    expect(healed.inventory['energy-tonic']).toBe(0)
+
+    const restored = gameReducer(battleState, { type: 'BATTLE_ACTION', action: 'item', itemId: 'mana-potion' })
+    expect(restored.stats.mana).toBe(9)
+    expect(restored.inventory['mana-potion']).toBe(0)
+    expect(restored.battle?.log.join('')).toContain('蓝雾魔力剂')
+
+    const burned = gameReducer(battleState, { type: 'BATTLE_ACTION', action: 'item', itemId: 'fire-potion' })
+    expect(burned.inventory['fire-potion']).toBe(0)
+    expect(burned.battle?.enemyHealth).toBeLessThan(battleState.battle!.enemyHealth)
+    expect(burned.battle?.log.join('')).toContain('流火瓶')
+  })
+
+  it('购买潮汐钓竿后升级钓具并提高银鳞鲫收获', () => {
+    const purchased = gameReducer({ ...initialGameState, money: 2000 }, {
+      type: 'BUY_ITEM', itemId: 'tide-rod', quantity: 1, total: 980,
+    })
+    expect(purchased.tools.rod).toBe(2)
+
+    const caught = gameReducer({
+      ...purchased,
+      fishing: { active: true },
+      inventory: { ...purchased.inventory, 'reed-bait': 1 },
+    }, { type: 'CATCH_FISH', result: 'silver-carp' })
+    expect(caught.inventory['silver-carp']).toBe(2)
+    expect(caught.inventory['reed-bait']).toBe(0)
+  })
+
   it('在空地播下当季种子并按生长倍率计算成熟时间', () => {
     const configured = gameReducer(initialGameState, {
       type: 'UPDATE_GAME_RULES', rules: { cropGrowthMultiplier: 2 },

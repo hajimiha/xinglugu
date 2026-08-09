@@ -23,4 +23,20 @@ describe('回合制五行战斗', () => {
     await user.click(screen.getByRole('button', { name: /物理攻击/ }))
     expect(screen.getByText(/龙娘已答应在牧场建成后入住/)).toBeVisible()
   })
+
+  it('展开战斗道具栏并提供三种药剂的独立入口', async () => {
+    const user = userEvent.setup()
+    const battle = { floor: 2, enemyName: '岩壳史莱姆', enemyElement: 'earth' as const, enemyHealth: 20, enemyMaxHealth: 20, turn: 1, log: ['战斗开始。'] }
+    render(<GameProvider initialState={{
+      ...initialGameState,
+      activeModal: 'battle',
+      battle,
+      inventory: { ...initialGameState.inventory, 'energy-tonic': 1, 'mana-potion': 2, 'fire-potion': 3 },
+    }}><ModalHost /></GameProvider>)
+
+    await user.click(screen.getByRole('button', { name: /战斗道具/ }))
+    expect(screen.getByRole('button', { name: /金盏恢复剂.*1/ })).toBeVisible()
+    expect(screen.getByRole('button', { name: /蓝雾魔力剂.*2/ })).toBeVisible()
+    expect(screen.getByRole('button', { name: /流火瓶.*3/ })).toBeVisible()
+  })
 })

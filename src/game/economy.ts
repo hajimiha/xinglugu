@@ -58,7 +58,7 @@ export const ITEM_CATALOG = defineCatalog({
 
   'moss-fertilizer': { id: 'moss-fertilizer', name: '苔肥', category: 'material', retailCategory: 'material', price: 80, sellPrice: 35, description: '令作物提前八小时成熟。', sources: ['杂货店材料柜'], uses: ['缩短田地作物成熟时间'] },
   'reed-bait': { id: 'reed-bait', name: '苇心鱼饵', category: 'bait', retailCategory: 'bait', price: 25, sellPrice: 10, description: '适合河湾常见鱼类。', sources: ['渔家购买'], uses: ['钓鱼时作为消耗品'] },
-  'tide-rod': { id: 'tide-rod', name: '潮汐钓竿', category: 'tool', retailCategory: 'tool', price: 980, sellPrice: 420, description: '扩大钓鱼时机判定区域。', sources: ['渔家购买'], uses: ['提高钓鱼体验与收益'] },
+  'tide-rod': { id: 'tide-rod', name: '潮汐钓竿', category: 'tool', retailCategory: 'tool', price: 980, sellPrice: 420, description: '装备后提高银鳞鲫收获数量与钓鱼经验。', sources: ['渔家购买'], uses: ['提高银鳞鲫收获数量与钓鱼经验'] },
   'energy-tonic': { id: 'energy-tonic', name: '金盏恢复剂', category: 'potion', retailCategory: 'potion', price: 260, sellPrice: 110, description: '战斗中恢复生命。', sources: ['魔女之家购买'], uses: ['战斗中恢复生命值'] },
   'mana-potion': { id: 'mana-potion', name: '蓝雾魔力剂', category: 'potion', retailCategory: 'potion', price: 320, sellPrice: 140, element: 'water', description: '战斗中恢复魔力。', sources: ['魔女之家购买'], uses: ['战斗中恢复魔力值'] },
   'fire-potion': { id: 'fire-potion', name: '流火瓶', category: 'potion', retailCategory: 'potion', price: 380, sellPrice: 165, element: 'fire', description: '造成火属性伤害。', sources: ['魔女之家购买'], uses: ['战斗中造成火属性伤害', '赠送给偏爱火焰的角色'] },

@@ -291,7 +291,7 @@ export type GameAction =
   | { type: 'ENTER_MINE_FLOOR'; floor: number }
   | { type: 'MINE_ORE'; floor: number }
   | { type: 'START_BATTLE'; floor: number }
-  | { type: 'BATTLE_ACTION'; action: 'physical' | 'spell' | 'defend' | 'item' | 'flee'; spellId?: string }
+  | { type: 'BATTLE_ACTION'; action: 'physical' | 'spell' | 'defend' | 'item' | 'flee'; spellId?: string; itemId?: 'energy-tonic' | 'mana-potion' | 'fire-potion' }
   | { type: 'START_FISHING' }
   | { type: 'CATCH_FISH'; result: 'silver-carp' | 'water-grass' | 'empty' }
   | { type: 'UPGRADE_TOOL'; tool: 'hoe' | 'rod' | 'pickaxe'; price: number }
