@@ -19,7 +19,7 @@ afterEach(async () => {
 })
 
 describe('酒馆中枢', () => {
-  it('提供六个可键盘切换的酒馆管理标签与真实接口入口', async () => {
+  it('提供八个可键盘切换的酒馆管理标签与真实接口入口', async () => {
     const user = userEvent.setup()
     database = createTavernDatabase(`mistvale-hub-${crypto.randomUUID()}`)
     render(
@@ -31,7 +31,7 @@ describe('酒馆中枢', () => {
     )
 
     const tabs = screen.getAllByRole('tab')
-    expect(tabs).toHaveLength(7)
+    expect(tabs).toHaveLength(8)
     expect(screen.getByRole('tab', { name: '接口' })).toHaveAttribute('id', 'tavern-tab-api')
     expect(await screen.findByText('浏览器直连提醒')).toBeVisible()
     expect(screen.getByLabelText('API 密钥')).toBeVisible()
@@ -45,6 +45,7 @@ describe('酒馆中枢', () => {
     await user.click(screen.getByRole('tab', { name: '预设' }))
     expect(await screen.findByRole('button', { name: '导入预设' })).toBeVisible()
     expect(screen.getByRole('button', { name: '导出当前预设' })).toBeVisible()
+    expect(screen.getByRole('heading', { name: '预设生成参数' })).toBeVisible()
 
     await user.click(screen.getByRole('tab', { name: '角色卡' }))
     await waitFor(() => expect(screen.getAllByRole('button', { name: /编辑角色卡/ })).toHaveLength(21))
@@ -52,6 +53,10 @@ describe('酒馆中枢', () => {
     expect(screen.getAllByText(/苔灯农场·共生牧场/).length).toBeGreaterThan(0)
     expect(screen.getByRole('button', { name: '导出仓库内容包' })).toBeVisible()
     expect(screen.getByText(/public\/content\/mistvale-content-pack\.json/)).toBeVisible()
+
+    await user.click(screen.getByRole('tab', { name: '检查器' }))
+    expect(await screen.findByRole('heading', { name: '请求检查器' })).toBeVisible()
+    expect(screen.getByText(/不会保存 API 密钥/)).toBeVisible()
   })
 
   it('通过文件输入导入并展示 SillyTavern 分组预设', async () => {
@@ -163,6 +168,52 @@ describe('酒馆中枢', () => {
     await user.type(screen.getByLabelText('正则测试输入'), '<box>雾灯</box>')
 
     expect(screen.getByLabelText('正则测试输出')).toHaveValue('雾灯')
+  })
+
+  it('会话页可以显式选择跟随活动预设或固定指定预设', async () => {
+    const user = userEvent.setup()
+    database = createTavernDatabase(`mistvale-session-binding-${crypto.randomUUID()}`)
+    const repository = createTavernRepository(database)
+    await repository.initialize()
+    const now = Date.now()
+    await repository.saveSession({
+      id: 'binding-session', name: '绑定测试会话', characterName: '洛岚', userName: '旅行者', presetId: null,
+      presetBinding: { mode: 'follow-active' }, lorebookIds: [], variables: {}, messages: [], createdAt: now, updatedAt: now,
+    })
+    render(<GameProvider><TavernProvider repository={repository}><TavernHubModal onClose={() => undefined} /></TavernProvider></GameProvider>)
+
+    await screen.findByText('浏览器直连提醒')
+    await user.click(screen.getByRole('tab', { name: '会话' }))
+    await user.selectOptions(await screen.findByLabelText('会话预设绑定方式'), 'pinned')
+
+    expect(await screen.findByLabelText('会话固定预设')).toBeVisible()
+    expect((await repository.getSession('binding-session'))?.presetBinding).toMatchObject({ mode: 'pinned' })
+  })
+
+  it('请求检查器展示实际消息与脱敏后的供应商 JSON', async () => {
+    const user = userEvent.setup()
+    database = createTavernDatabase(`mistvale-request-inspector-${crypto.randomUUID()}`)
+    const repository = createTavernRepository(database)
+    await repository.initialize()
+    await repository.saveRequestAudit({
+      id: 'audit-ui', createdAt: Date.now(), status: 'succeeded', sessionId: 'session', characterName: '洛岚',
+      presetId: 'preset', presetName: '当前测试预设', presetBinding: 'follow-active', provider: 'deepseek', model: 'deepseek-v4-flash',
+      preparedRequest: { task: 'story', messages: [{ role: 'system', content: 'CURRENT-PRESET-SENTINEL' }, { role: 'user', content: '继续' }] },
+      providerRequest: { url: 'https://api.deepseek.com/chat/completions', method: 'POST', headers: { Authorization: '[已隐藏]' }, body: { model: 'deepseek-v4-flash', messages: [{ role: 'system', content: 'CURRENT-PRESET-SENTINEL' }] } },
+      segments: [{ id: 'segment', source: 'preset', identifier: 'main', role: 'system', raw: 'CURRENT-PRESET-SENTINEL', compiled: 'CURRENT-PRESET-SENTINEL', sent: true, tokenEstimate: 6, diagnostics: [] }],
+      macroOperations: [], matchedLorebookEntries: [], diagnostics: [],
+    })
+    render(<GameProvider><TavernProvider repository={repository}><TavernHubModal onClose={() => undefined} /></TavernProvider></GameProvider>)
+
+    await screen.findByText('浏览器直连提醒')
+    await user.click(screen.getByRole('tab', { name: '检查器' }))
+    expect(await screen.findByText('当前测试预设')).toBeVisible()
+    await user.click(screen.getByText('查看编译后正文'))
+    expect(screen.getByText('CURRENT-PRESET-SENTINEL')).toBeVisible()
+    await user.click(screen.getByRole('tab', { name: '供应商 JSON' }))
+    expect(screen.getAllByText(/CURRENT-PRESET-SENTINEL/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/已隐藏/).some((element) => element.tagName === 'PRE')).toBe(true)
+    expect(screen.queryByText(/session-secret/)).not.toBeInTheDocument()
   })
 
   it('点击关闭按钮后卸载角色卡编辑器', async () => {

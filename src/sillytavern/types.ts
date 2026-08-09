@@ -14,6 +14,13 @@ export interface TavernPreparedRequest {
   createdAt: number
 }
 
+export interface TavernProviderRequestInspection {
+  url: string
+  method: string
+  headers: Record<string, string>
+  body: Record<string, unknown>
+}
+
 export type TavernStreamEvent =
   | { type: 'content-delta'; text: string }
   | { type: 'reasoning-delta'; text: string }
@@ -23,7 +30,30 @@ export interface TavernApiAdapter {
   readonly mode: 'disabled' | 'remote'
   readonly label: string
   prepare(request: TavernRequest): TavernPreparedRequest
+  inspect(request: TavernPreparedRequest): TavernProviderRequestInspection
   stream(request: TavernPreparedRequest, signal?: AbortSignal): AsyncIterable<TavernStreamEvent>
+}
+
+export interface TavernRequestAudit {
+  id: string
+  createdAt: number
+  status: 'succeeded' | 'failed'
+  sessionId: string
+  characterName: string
+  presetId: string
+  presetName: string
+  presetBinding: 'follow-active' | 'pinned'
+  provider: TavernApiProvider
+  model: string
+  preparedRequest: TavernRequest
+  providerRequest: TavernProviderRequestInspection
+  segments: PromptTraceSegment[]
+  macroOperations: MacroOperation[]
+  matchedLorebookEntries: string[]
+  diagnostics: string[]
+  providerReasoning?: string
+  responsePreview?: string
+  error?: string
 }
 
 export interface LorebookEntry {

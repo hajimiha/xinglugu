@@ -4,6 +4,7 @@ import { validateTavernApiConfig } from '../sillytavern/api-config'
 import { resolveApiKey } from '../sillytavern/api-credentials'
 import { getTavernProvider } from '../sillytavern/provider-registry'
 import { resolveSessionPreset } from '../sillytavern/prompt-compiler'
+import { applyPresetGenerationSettings } from '../sillytavern/preset-generation'
 import { tavernRepository, type TavernRepository } from '../sillytavern/repository'
 import type {
   CharacterCard,
@@ -11,12 +12,12 @@ import type {
   ChatPreset,
   ChatSession,
   Lorebook,
-  ParsedTags,
   TavernSettings,
+  TavernRequestAudit,
 } from '../sillytavern/types'
 import { variableDefinitionsToRecord } from '../sillytavern/variable-definitions'
 import { branchChat, truncateChatAt } from '../sillytavern/variables'
-import { createRemoteTurn } from './remote-story-engine'
+import { createRemoteTurn, type RemoteTurnInspection, type RemoteTurnResult } from './remote-story-engine'
 
 type TavernStatus = 'loading' | 'ready' | 'error'
 
@@ -42,6 +43,7 @@ interface TavernContextValue {
   presets: ChatPreset[]
   characters: CharacterCard[]
   sessions: ChatSession[]
+  requestAudits: TavernRequestAudit[]
   settings: TavernSettings | null
   activeSession: ChatSession | null
   openNpcSession(npcId: string, variables?: Record<string, unknown>): Promise<ChatSession>
@@ -58,6 +60,7 @@ interface TavernContextValue {
   branchSession(sessionId: string, messageIndex: number, name: string): Promise<ChatSession>
   truncateSession(sessionId: string, messageIndex: number): Promise<ChatSession>
   updateVariables(sessionId: string, variables: Record<string, unknown>): Promise<ChatSession>
+  clearRequestAudits(): Promise<void>
 }
 
 const TavernContext = createContext<TavernContextValue | null>(null)
@@ -75,18 +78,20 @@ export function TavernProvider({ children, repository = tavernRepository }: { ch
   const [characters, setCharacters] = useState<CharacterCard[]>([])
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const [settings, setSettings] = useState<TavernSettings | null>(null)
+  const [requestAudits, setRequestAudits] = useState<TavernRequestAudit[]>([])
 
   useEffect(() => {
     let cancelled = false
     const initialize = async () => {
       try {
         await repository.initialize()
-        const [nextLorebooks, nextPresets, nextCharacters, nextSessions, nextSettings] = await Promise.all([
+        const [nextLorebooks, nextPresets, nextCharacters, nextSessions, nextSettings, nextAudits] = await Promise.all([
           repository.listLorebooks(),
           repository.listPresets(),
           repository.listCharacters(),
           repository.listSessions(),
           repository.getSettings(),
+          repository.listRequestAudits(),
         ])
         if (cancelled) return
         setLorebooks(nextLorebooks)
@@ -94,6 +99,7 @@ export function TavernProvider({ children, repository = tavernRepository }: { ch
         setCharacters(nextCharacters)
         setSessions(nextSessions)
         setSettings(nextSettings)
+        setRequestAudits(nextAudits)
         setStatus('ready')
       } catch (caught) {
         if (cancelled) return
@@ -170,27 +176,58 @@ export function TavernProvider({ children, repository = tavernRepository }: { ch
     if (!preset) throw new Error('尚未选择可用的酒馆提示词预设。')
     const sessionLorebookIds = session.lorebookIds.length ? session.lorebookIds : currentSettings.activeLorebookIds
     const activeLorebooks = lorebooks.filter((book) => sessionLorebookIds.includes(book.id))
-    const api = createRemoteTavernApi(currentSettings.api, resolveApiKey(currentSettings))
-    const turn: {
-      parsed: ParsedTags
-      variablesAfter: Record<string, unknown>
-      matchedEntryIds?: string[]
-      providerReasoning: string
-    } = await createRemoteTurn({
-      api,
-      playerText: input.playerText,
-      history: session.messages,
-      preset,
-      lorebooks: activeLorebooks,
-      character,
-      userName: session.userName,
-      variables,
-      formatPrompt: currentSettings.formatPromptTemplate,
-      regexScripts: currentSettings.regexScripts,
-      signal: input.signal,
-      onDelta: input.onDelta,
-      onReasoningDelta: input.onReasoningDelta,
+    const effectiveApiConfig = applyPresetGenerationSettings(currentSettings.api, preset.settings)
+    const api = createRemoteTavernApi(effectiveApiConfig, resolveApiKey(currentSettings))
+    let requestInspection: RemoteTurnInspection | null = null
+    let turn: RemoteTurnResult
+    const auditBase = (inspection: RemoteTurnInspection, status: TavernRequestAudit['status']): TavernRequestAudit => ({
+      id: inspection.preparedRequest.id,
+      createdAt: inspection.preparedRequest.createdAt,
+      status,
+      sessionId: session.id,
+      characterName: character.name,
+      presetId: preset.id,
+      presetName: preset.name,
+      presetBinding: session.presetBinding?.mode ?? 'follow-active',
+      provider: effectiveApiConfig.provider,
+      model: effectiveApiConfig.model,
+      preparedRequest: inspection.preparedRequest.request,
+      providerRequest: inspection.providerRequest,
+      segments: inspection.compilation.segments,
+      macroOperations: inspection.compilation.macroOperations,
+      matchedLorebookEntries: inspection.compilation.matchedEntries.map((match) => match.entry.id),
+      diagnostics: inspection.compilation.diagnostics,
     })
+    try {
+      turn = await createRemoteTurn({
+        api,
+        playerText: input.playerText,
+        history: session.messages,
+        preset,
+        lorebooks: activeLorebooks,
+        character,
+        userName: session.userName,
+        variables,
+        formatPrompt: currentSettings.formatPromptTemplate,
+        regexScripts: currentSettings.regexScripts,
+        signal: input.signal,
+        onDelta: input.onDelta,
+        onReasoningDelta: input.onReasoningDelta,
+        onInspection: (value) => { requestInspection = value },
+      })
+    } catch (caught) {
+      if (requestInspection) {
+        const failed = { ...auditBase(requestInspection, 'failed'), error: caught instanceof Error ? caught.message : '请求失败' }
+        await repository.saveRequestAudit(failed)
+        setRequestAudits(await repository.listRequestAudits())
+      }
+      throw caught
+    }
+    const succeeded = {
+      ...auditBase(turn.inspection, 'succeeded'),
+      providerReasoning: turn.providerReasoning || undefined,
+      responsePreview: turn.parsed.maintext.slice(0, 500),
+    }
     const now = Date.now()
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
@@ -220,8 +257,15 @@ export function TavernProvider({ children, repository = tavernRepository }: { ch
       updatedAt: now + 1,
     }
     await saveSession(next)
+    await repository.saveRequestAudit(succeeded)
+    setRequestAudits(await repository.listRequestAudits())
     return next
   }, [sessions, repository, settings, characters, presets, lorebooks, saveSession])
+
+  const clearRequestAudits = useCallback(async () => {
+    await repository.clearRequestAudits()
+    setRequestAudits([])
+  }, [repository])
 
   const selectSession = useCallback(async (id: string | null) => {
     await persistSettings({ activeSessionId: id })
@@ -303,6 +347,7 @@ export function TavernProvider({ children, repository = tavernRepository }: { ch
     presets,
     characters,
     sessions,
+    requestAudits,
     settings,
     activeSession,
     openNpcSession,
@@ -319,7 +364,8 @@ export function TavernProvider({ children, repository = tavernRepository }: { ch
     branchSession,
     truncateSession,
     updateVariables,
-  }), [status, error, apiLabel, apiReady, apiReadinessError, lorebooks, presets, characters, sessions, settings, activeSession, openNpcSession, sendTurn, selectSession, persistSettings, saveLorebook, deleteLorebook, savePreset, deletePreset, saveCharacter, saveSession, deleteSession, branchSession, truncateSession, updateVariables])
+    clearRequestAudits,
+  }), [status, error, apiLabel, apiReady, apiReadinessError, lorebooks, presets, characters, sessions, requestAudits, settings, activeSession, openNpcSession, sendTurn, selectSession, persistSettings, saveLorebook, deleteLorebook, savePreset, deletePreset, saveCharacter, saveSession, deleteSession, branchSession, truncateSession, updateVariables, clearRequestAudits])
 
   return <TavernContext.Provider value={value}>{children}</TavernContext.Provider>
 }

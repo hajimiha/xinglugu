@@ -6,7 +6,7 @@ import {
   extractProviderContent,
   extractProviderSseContent,
 } from './protocol-adapters'
-import type { TavernApiAdapter, TavernApiConfig, TavernApiProtocol, TavernPreparedRequest, TavernRequest, TavernStreamEvent } from './types'
+import type { TavernApiAdapter, TavernApiConfig, TavernApiProtocol, TavernPreparedRequest, TavernProviderRequestInspection, TavernRequest, TavernStreamEvent } from './types'
 
 export type TavernApiErrorCode =
   | 'TAVERN_API_KEY_MISSING'
@@ -106,9 +106,32 @@ export function createDisabledTavernApi(): TavernApiAdapter {
       status: 'preview',
       createdAt: Date.now(),
     }),
+    inspect: (prepared) => ({ url: '', method: 'POST', headers: {}, body: { messages: prepared.request.messages } }),
     async *stream() {
       throw new TavernApiDisabledError()
     },
+  }
+}
+
+function redactHeaders(headers: HeadersInit | undefined): Record<string, string> {
+  const values = headers instanceof Headers
+    ? Object.fromEntries(headers.entries())
+    : Array.isArray(headers)
+      ? Object.fromEntries(headers)
+      : Object.fromEntries(Object.entries(headers ?? {}).map(([key, value]) => [key, String(value)]))
+  const sensitive = new Set(['authorization', 'api-key', 'x-api-key', 'x-goog-api-key'])
+  return Object.fromEntries(Object.entries(values).map(([key, value]) => [key, sensitive.has(key.toLowerCase()) ? '[已隐藏]' : value]))
+}
+
+function inspectProviderRequest(config: TavernApiConfig, prepared: TavernPreparedRequest): TavernProviderRequestInspection {
+  const built = buildProviderRequest(config, 'redacted', prepared.request, config.streaming)
+  let body: Record<string, unknown> = {}
+  try { body = JSON.parse(String(built.init.body ?? '{}')) as Record<string, unknown> } catch { body = {} }
+  return {
+    url: built.url,
+    method: built.init.method ?? 'POST',
+    headers: redactHeaders(built.init.headers),
+    body,
   }
 }
 
@@ -232,6 +255,7 @@ export function createRemoteTavernApi(
       status: 'preview',
       createdAt: Date.now(),
     }),
+    inspect: (prepared) => inspectProviderRequest(config, prepared),
     async *stream(prepared: TavernPreparedRequest, signal?: AbortSignal) {
       const key = requireApiKey(apiKey)
       const built = buildProviderRequest(config, key, prepared.request, config.streaming)

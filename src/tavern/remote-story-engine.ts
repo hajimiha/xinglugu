@@ -8,7 +8,10 @@ import {
   type ChatPreset,
   type Lorebook,
   type ParsedTags,
+  type PromptCompilation,
   type TavernApiAdapter,
+  type TavernPreparedRequest,
+  type TavernProviderRequestInspection,
 } from '../sillytavern/types'
 import { aggregateEvents, applyParsedToChat } from '../sillytavern/variables'
 import { applyRegexScripts, getPresetRegexScripts } from '../sillytavern/regex-engine'
@@ -28,6 +31,13 @@ export interface RemoteTurnInput {
   signal?: AbortSignal
   onDelta?: (raw: string) => void
   onReasoningDelta?: (reasoning: string) => void
+  onInspection?: (inspection: RemoteTurnInspection) => void
+}
+
+export interface RemoteTurnInspection {
+  compilation: PromptCompilation
+  preparedRequest: TavernPreparedRequest
+  providerRequest: TavernProviderRequestInspection
 }
 
 export interface RemoteTurnResult {
@@ -37,6 +47,7 @@ export interface RemoteTurnResult {
   matchedEntryIds: string[]
   regexErrors: string[]
   providerReasoning: string
+  inspection: RemoteTurnInspection
 }
 
 const REMOTE_RESPONSE_CONTRACT = `请只输出以下酒馆标签结构，不要使用 Markdown 代码块：
@@ -101,6 +112,12 @@ export async function createRemoteTurn(input: RemoteTurnInput): Promise<RemoteTu
       lorebookEntryIds: assembled.matchedEntries.map((match) => match.entry.id),
     },
   })
+  const inspection = {
+    compilation: assembled,
+    preparedRequest: prepared,
+    providerRequest: input.api.inspect(prepared),
+  }
+  input.onInspection?.(inspection)
   let raw = ''
   let providerReasoning = ''
   for await (const event of input.api.stream(prepared, input.signal)) {
@@ -141,5 +158,6 @@ export async function createRemoteTurn(input: RemoteTurnInput): Promise<RemoteTu
     matchedEntryIds: assembled.matchedEntries.map((match) => match.entry.id),
     regexErrors: outputRegex.errors.map((error) => `正则“${error.scriptName}”：${error.message}`),
     providerReasoning: providerReasoning.trim(),
+    inspection,
   }
 }

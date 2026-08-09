@@ -65,6 +65,11 @@ describe('本地优先酒馆 API 适配器', () => {
     const body = JSON.parse(fetchMock.mock.calls[0][1].body as string)
     expect(body).toMatchObject({ model: 'deepseek-v4-flash', stream: true, temperature: 0.8, max_tokens: 1200 })
     expect(body.messages).toEqual([{ role: 'user', content: '早上好' }])
+    const inspection = api.inspect(preview)
+    expect(inspection.url).toBe('https://api.deepseek.com/chat/completions')
+    expect(inspection.body).toMatchObject({ model: 'deepseek-v4-flash', messages: [{ role: 'user', content: '早上好' }] })
+    expect(JSON.stringify(inspection)).not.toContain('secret-key')
+    expect(inspection.headers.Authorization).toBe('[已隐藏]')
   })
 
   it('兼容不支持流式返回的普通 JSON 响应', async () => {

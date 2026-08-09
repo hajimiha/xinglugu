@@ -223,4 +223,35 @@ describe('雾灯谷酒馆仓储', () => {
       presetBinding: { mode: 'follow-active' },
     })
   })
+
+  it('只保留最近二十条无密钥的出站请求审计', async () => {
+    database = createTavernDatabase(`mistvale-audit-${crypto.randomUUID()}`)
+    const repository = createTavernRepository(database)
+    await repository.initialize()
+    for (let index = 0; index < 23; index += 1) {
+      await repository.saveRequestAudit({
+        id: `audit-${index}`,
+        createdAt: index,
+        status: 'succeeded',
+        sessionId: 'session',
+        characterName: '洛岚',
+        presetId: 'preset',
+        presetName: '测试预设',
+        presetBinding: 'follow-active',
+        provider: 'deepseek',
+        model: 'deepseek-v4-flash',
+        preparedRequest: { task: 'story', messages: [{ role: 'user', content: String(index) }] },
+        providerRequest: { url: 'https://api.deepseek.com/chat/completions', method: 'POST', headers: { Authorization: '[已隐藏]' }, body: {} },
+        segments: [],
+        macroOperations: [],
+        matchedLorebookEntries: [],
+        diagnostics: [],
+      })
+    }
+
+    const audits = await repository.listRequestAudits()
+    expect(audits).toHaveLength(20)
+    expect(audits[0].id).toBe('audit-22')
+    expect(audits.at(-1)?.id).toBe('audit-3')
+  })
 })

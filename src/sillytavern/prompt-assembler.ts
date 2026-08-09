@@ -2,7 +2,7 @@
  * Prompt Assembler
  */
 
-import type { ChatPreset, Lorebook, ChatMessage, MatchedEntry, TavernRegexScript } from './types';
+import type { ChatPreset, Lorebook, ChatMessage, PromptCompilation, TavernRegexScript } from './types';
 import { compileTavernTurn } from './prompt-compiler';
 
 export interface AssembleOptions {
@@ -18,16 +18,10 @@ export interface AssembleOptions {
   regexScripts?: TavernRegexScript[];
 }
 
-export interface AssembleResult {
-  messages: { role: 'system' | 'user' | 'assistant'; content: string }[];
-  matchedEntries: MatchedEntry[];
-  systemPrompt: string;
-  macroVariables: Record<string, unknown>;
-}
+export type AssembleResult = PromptCompilation
 
 export function assemblePrompt(options: AssembleOptions): AssembleResult {
-  const result = compileTavernTurn(options)
-  return { messages: result.messages, matchedEntries: result.matchedEntries, systemPrompt: result.systemPrompt, macroVariables: result.macroVariables }
+  return compileTavernTurn(options)
 }
 
 interface MacroContext {

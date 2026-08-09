@@ -2,7 +2,7 @@ import { CALENDAR_FESTIVALS_ID, createMistvaleDefaults, DEFAULT_CONTENT_VERSION,
 import { normalizeTavernSettings } from './api-config'
 import type { MistvaleTavernDatabase } from './database'
 import { tavernDatabase } from './database'
-import type { CharacterCard, ChatPreset, ChatSession, Lorebook, TavernSettings } from './types'
+import type { CharacterCard, ChatPreset, ChatSession, Lorebook, TavernRequestAudit, TavernSettings } from './types'
 import { loadRepositoryContentPack, mergeById, type TavernContentPack } from './content-pack'
 import { createDefaultPortraitSlots, legacyPortraitsToSlots, parsePortraitSlots } from './portrait-slots'
 import { parseVariableDefinitions } from './variable-definitions'
@@ -65,6 +65,9 @@ export interface TavernRepository {
   deleteSession(id: string): Promise<void>
   getSettings(): Promise<TavernSettings>
   saveSettings(value: TavernSettings): Promise<void>
+  listRequestAudits(): Promise<TavernRequestAudit[]>
+  saveRequestAudit(value: TavernRequestAudit): Promise<void>
+  clearRequestAudits(): Promise<void>
 }
 
 class DexieTavernRepository implements TavernRepository {
@@ -213,6 +216,14 @@ class DexieTavernRepository implements TavernRepository {
   async saveSettings(value: TavernSettings): Promise<void> {
     await this.database.settings.put(normalizeTavernSettings(value))
   }
+
+  listRequestAudits = () => this.database.requestAudits.orderBy('createdAt').reverse().toArray()
+  async saveRequestAudit(value: TavernRequestAudit): Promise<void> {
+    await this.database.requestAudits.put(value)
+    const expired = await this.database.requestAudits.orderBy('createdAt').reverse().offset(20).primaryKeys()
+    if (expired.length) await this.database.requestAudits.bulkDelete(expired)
+  }
+  async clearRequestAudits(): Promise<void> { await this.database.requestAudits.clear() }
 }
 
 export function createTavernRepository(

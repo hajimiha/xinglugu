@@ -127,7 +127,13 @@ describe('NPC 酒馆会话', () => {
       ...structuredClone(oldPreset),
       id: 'active-preset-sentinel',
       name: '当前测试预设',
-      settings: { ...structuredClone(oldPreset.settings), main: 'CURRENT-PRESET-SENTINEL' },
+      settings: {
+        ...structuredClone(oldPreset.settings),
+        main: 'CURRENT-PRESET-SENTINEL',
+        temperature: 1.23,
+        top_p: 0.77,
+        openai_max_tokens: 2345,
+      },
       updatedAt: Date.now() + 10,
     }
     await repository.savePreset({
@@ -170,6 +176,11 @@ describe('NPC 酒馆会话', () => {
     const body = String(fetchMock.mock.calls[0]?.[1]?.body)
     expect(body).toContain('CURRENT-PRESET-SENTINEL')
     expect(body).not.toContain('LEGACY-PRESET-SENTINEL')
+    expect(JSON.parse(body)).toMatchObject({ temperature: 1.23, top_p: 0.77, max_tokens: 2345 })
+    const [audit] = await repository.listRequestAudits()
+    expect(audit).toMatchObject({ presetId: activePreset.id, presetName: activePreset.name, presetBinding: 'follow-active', status: 'succeeded' })
+    expect(audit.preparedRequest.messages.some((message) => message.content.includes('CURRENT-PRESET-SENTINEL'))).toBe(true)
+    expect(JSON.stringify(audit)).not.toContain('session-secret')
   })
 
   it('远程请求失败时保留玩家输入且不结算精力和好感', async () => {

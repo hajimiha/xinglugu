@@ -14,6 +14,9 @@ function createAdapter(response: string) {
     mode: 'remote',
     label: 'DeepSeek · deepseek-v4-flash',
     prepare,
+    inspect: (prepared) => ({
+      url: 'https://api.deepseek.com/chat/completions', method: 'POST', headers: { Authorization: '[已隐藏]' }, body: { messages: prepared.request.messages },
+    }),
     async *stream() {
       yield { type: 'reasoning-delta' as const, text: '核对角色卡' }
       yield { type: 'content-delta' as const, text: response.slice(0, 23) }
