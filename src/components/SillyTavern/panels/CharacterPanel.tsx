@@ -1,4 +1,4 @@
-import { useEffect, useState, type ChangeEvent } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { affinityStageNames, locations } from '../../../game/data'
 import type { AffinityStage } from '../../../game/types'
 import type { CharacterCard } from '../../../sillytavern/types'
@@ -16,7 +16,18 @@ export function CharacterPanel() {
   const [draft, setDraft] = useState<CharacterCard | null>(null)
   const [portraitStage, setPortraitStage] = useState<AffinityStage>('stranger')
   const [notice, setNotice] = useState('')
+  const portraitSectionRef = useRef<HTMLFieldSetElement>(null)
   useEffect(() => { if (source) setDraft(structuredClone(source)) }, [source?.id])
+
+  const closeEditor = () => {
+    setSelectedId(null)
+    setDraft(null)
+    setPortraitStage('stranger')
+  }
+  const showPortraitUpload = () => {
+    portraitSectionRef.current?.scrollIntoView({ block: 'start' })
+    portraitSectionRef.current?.focus({ preventScroll: true })
+  }
 
   const upload = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -55,13 +66,13 @@ export function CharacterPanel() {
     {notice && <div className="tavern-panel-notice" role="status">{notice}</div>}
     <aside className="repository-content-guide"><GameIcon name="branch" size={20} /><div><strong>发布到所有设备</strong><p>完成世界书、预设和立绘编辑后导出整包，替换仓库中的 <code>public/content/mistvale-content-pack.json</code> 并提交。版本变化后，各设备会保留本机新增内容并同步仓库同 ID 内容。</p></div></aside>
     <div className="character-workspace"><div className="character-card-grid">{tavern.characters.map((card, index) => { const location = locations.find((item) => item.id === card.locationId); const locationName = location?.name ?? '苔灯农场·共生牧场'; const portrait = card.portraitByAffinity.stranger; return <article key={card.id} className={card.id === selectedId ? 'is-active' : ''} style={{ '--card-index': index } as React.CSSProperties}><div className="character-card-portrait">{portrait ? <img src={portrait} alt={`${card.name}初识立绘`} /> : <span>{card.name.slice(0, 1)}</span>}<i /></div><div><span>{card.role}</span><h4>{card.name}</h4><p>{locationName} · {card.tags.at(-1)}</p></div><button id={`character-edit-${card.id}`} type="button" aria-label={`编辑角色卡：${card.name}`} onClick={() => setSelectedId(card.id)}><GameIcon name="profile" size={16} />编辑角色卡</button></article> })}</div>
-      {draft && <aside className="character-editor" aria-labelledby={`character-editor-title-${draft.id}`}><header><div><span>CARD EDITOR</span><h4 id={`character-editor-title-${draft.id}`}>{draft.name} · {draft.role}</h4></div><button id={`character-editor-close-${draft.id}`} className="icon-button" type="button" aria-label="关闭角色卡编辑" onClick={() => setSelectedId(null)}><GameIcon name="close" size={16} /></button></header><div className="character-editor-scroll">
+      {draft && <aside className="character-editor" aria-labelledby={`character-editor-title-${draft.id}`}><header><div><span>CARD EDITOR</span><h4 id={`character-editor-title-${draft.id}`}>{draft.name} · {draft.role}</h4></div><div className="character-editor-header-actions"><button id={`character-editor-portrait-${draft.id}`} className="character-editor-portrait-shortcut" type="button" aria-label="前往立绘上传" onClick={showPortraitUpload}><GameIcon name="upload" size={15} />立绘上传</button><button id={`character-editor-close-${draft.id}`} className="icon-button" type="button" aria-label="关闭角色卡编辑" onClick={closeEditor}><GameIcon name="close" size={16} /></button></div></header><div className="character-editor-scroll">
         <label><span>人物描述</span><textarea id={`character-description-${draft.id}`} rows={3} value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} /></label>
         <label><span>性格与话语基调</span><textarea id={`character-personality-${draft.id}`} rows={5} value={draft.personality} onChange={(event) => setDraft({ ...draft, personality: event.target.value })} /></label>
         <label><span>当前场景</span><textarea id={`character-scenario-${draft.id}`} rows={3} value={draft.scenario} onChange={(event) => setDraft({ ...draft, scenario: event.target.value })} /></label>
         <label><span>首句</span><textarea id={`character-first-message-${draft.id}`} rows={4} value={draft.firstMessage} onChange={(event) => setDraft({ ...draft, firstMessage: event.target.value })} /></label>
         <label><span>示例对白</span><textarea id={`character-example-${draft.id}`} rows={3} value={draft.exampleDialogue} onChange={(event) => setDraft({ ...draft, exampleDialogue: event.target.value })} /></label>
-        <fieldset className="portrait-stage-editor"><legend>好感阶段立绘</legend><div className="portrait-stage-tabs">{stages.map((stage) => <button id={`portrait-stage-${draft.id}-${stage}`} key={stage} type="button" className={stage === portraitStage ? 'is-active' : ''} onClick={() => setPortraitStage(stage)}>{affinityStageNames[stage]}</button>)}</div><div className="portrait-upload-zone">{draft.portraitByAffinity[portraitStage] ? <img src={draft.portraitByAffinity[portraitStage]} alt={`${draft.name}${affinityStageNames[portraitStage]}立绘预览`} /> : <div><GameIcon name="upload" size={26} /><strong>尚未上传{affinityStageNames[portraitStage]}立绘</strong><p>支持 PNG、JPG、WebP，单张不超过 512 KB；大量立绘建议提交为仓库静态图片路径。</p></div>}<label htmlFor={`character-portrait-upload-${draft.id}-${portraitStage}`}>选择图片</label><input id={`character-portrait-upload-${draft.id}-${portraitStage}`} type="file" accept="image/png,image/jpeg,image/webp" onChange={upload} /></div></fieldset>
+        <fieldset ref={portraitSectionRef} className="portrait-stage-editor" data-portrait-upload-target="true" tabIndex={-1}><legend>好感阶段立绘</legend><div className="portrait-stage-tabs">{stages.map((stage) => <button id={`portrait-stage-${draft.id}-${stage}`} key={stage} type="button" className={stage === portraitStage ? 'is-active' : ''} onClick={() => setPortraitStage(stage)}>{affinityStageNames[stage]}</button>)}</div><div className="portrait-upload-zone">{draft.portraitByAffinity[portraitStage] ? <img src={draft.portraitByAffinity[portraitStage]} alt={`${draft.name}${affinityStageNames[portraitStage]}立绘预览`} /> : <div><GameIcon name="upload" size={26} /><strong>尚未上传{affinityStageNames[portraitStage]}立绘</strong><p>支持 PNG、JPG、WebP，单张不超过 512 KB；大量立绘建议提交为仓库静态图片路径。</p></div>}<label htmlFor={`character-portrait-upload-${draft.id}-${portraitStage}`}>选择图片</label><input id={`character-portrait-upload-${draft.id}-${portraitStage}`} type="file" accept="image/png,image/jpeg,image/webp" onChange={upload} /></div></fieldset>
       </div><footer><button id={`character-save-${draft.id}`} className="primary-button" type="button" onClick={() => void save()}><GameIcon name="upload" size={16} />保存角色卡</button></footer></aside>}
     </div>
   </section>

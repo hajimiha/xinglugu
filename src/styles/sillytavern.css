@@ -362,15 +362,19 @@
 .character-card-grid h4 { margin: 2px 0; font-size: 12px; }
 .character-card-grid p { overflow: hidden; margin: 0; color: var(--text-muted); font-size: 7px; text-overflow: ellipsis; white-space: nowrap; }
 .character-card-grid article > button { display: flex; min-height: 33px; grid-column: 2; align-items: center; justify-content: center; gap: 4px; color: var(--text-secondary); border: 1px solid var(--border-muted); border-radius: 6px; background: rgba(242, 229, 198, .035); font-size: 7px; }
-.character-editor { position: absolute; inset: -1px -1px -1px auto; z-index: 4; display: grid; width: min(590px, 72%); grid-template-rows: auto 1fr auto; overflow: hidden; border: 1px solid var(--border-copper); border-radius: 12px; background: linear-gradient(155deg, rgba(13, 33, 28, .995), rgba(4, 13, 12, .998)); box-shadow: -30px 0 80px rgba(0, 0, 0, .62); animation: character-editor-in 220ms var(--ease-out) both; }
+.character-editor { position: absolute; inset: -1px -1px -1px auto; z-index: 4; display: grid; min-height: 0; width: min(590px, 72%); grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; border: 1px solid var(--border-copper); border-radius: 12px; background: linear-gradient(155deg, rgba(13, 33, 28, .995), rgba(4, 13, 12, .998)); box-shadow: -30px 0 80px rgba(0, 0, 0, .62); animation: character-editor-in 220ms var(--ease-out) both; }
 @keyframes character-editor-in { from { opacity: 0; transform: translateX(12px); } }
 .character-editor > header { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--border-muted); }
 .character-editor > header span { color: var(--copper-300); font-family: var(--font-numeric); font-size: 7px; }
 .character-editor > header h4 { margin: 2px 0 0; font-size: 14px; }
-.character-editor-scroll { display: grid; align-content: start; gap: 10px; padding: 13px; overflow: auto; }
+.character-editor-header-actions { display: flex; align-items: center; gap: 7px; }
+.character-editor-portrait-shortcut { display: inline-flex; min-height: 38px; align-items: center; gap: 6px; padding: 0 10px; color: var(--copper-300); border: 1px solid var(--border-copper); border-radius: 7px; background: rgba(213, 166, 74, .07); font-size: 8px; }
+.character-editor-portrait-shortcut:hover, .character-editor-portrait-shortcut:focus-visible { color: var(--text-primary); background: rgba(213, 166, 74, .14); transform: translateY(-1px); }
+.character-editor-scroll { display: grid; min-height: 0; align-content: start; gap: 10px; padding: 13px; overflow: auto; overscroll-behavior: contain; }
 .character-editor > footer { display: flex; justify-content: flex-end; padding: 10px 13px; border-top: 1px solid var(--border-muted); }
 .character-editor > footer button { display: flex; min-height: 42px; align-items: center; gap: 6px; padding: 0 13px; color: #202417; border: 1px solid var(--copper-300); border-radius: 7px; background: linear-gradient(#edc46a, #d5a64a); font-size: 8px; }
 .portrait-stage-editor { display: block; }
+.portrait-stage-editor:focus { outline: 1px solid var(--copper-300); outline-offset: 3px; }
 .portrait-stage-tabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin-bottom: 8px; }
 .portrait-stage-tabs button { min-height: 34px; color: var(--text-muted); border: 1px solid var(--border-muted); border-radius: 5px; background: rgba(242, 229, 198, .025); font-size: 7px; }
 .portrait-stage-tabs button.is-active { color: var(--copper-300); border-color: var(--border-copper); background: rgba(213, 166, 74, .08); }
@@ -510,7 +514,8 @@
   .prompt-order-list select { display: none; }
   .prompt-order-detail { margin-left: 9px; }
   .character-card-grid { grid-template-columns: 1fr; }
-  .character-editor { position: fixed; inset: 6px; width: auto; z-index: 170; }
+  .character-panel { animation: none; }
+  .character-editor { position: fixed; inset: calc(64px + env(safe-area-inset-top)) 6px 6px; width: auto; z-index: 170; }
   .portrait-stage-tabs { grid-template-columns: repeat(3, 1fr); }
   .session-inspector > header { align-items: flex-start; }
   .session-inspector > header > div:last-child { flex-direction: column; }

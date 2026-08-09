@@ -89,4 +89,45 @@ describe('酒馆中枢', () => {
     expect(screen.getByText('主提示词')).toBeVisible()
     expect(screen.getByText('模型回复')).toBeVisible()
   })
+
+  it('点击关闭按钮后卸载角色卡编辑器', async () => {
+    const user = userEvent.setup()
+    database = createTavernDatabase(`mistvale-character-close-${crypto.randomUUID()}`)
+    render(
+      <GameProvider>
+        <TavernProvider repository={createTavernRepository(database)}>
+          <TavernHubModal onClose={() => undefined} />
+        </TavernProvider>
+      </GameProvider>,
+    )
+
+    await screen.findByText('浏览器直连提醒')
+    await user.click(screen.getByRole('tab', { name: '角色卡' }))
+    await user.click((await screen.findAllByRole('button', { name: /编辑角色卡/ }))[0])
+    expect(screen.getByRole('button', { name: '关闭角色卡编辑' })).toBeVisible()
+
+    await user.click(screen.getByRole('button', { name: '关闭角色卡编辑' }))
+
+    expect(screen.queryByRole('button', { name: '关闭角色卡编辑' })).not.toBeInTheDocument()
+  })
+
+  it('在角色编辑器首屏提供直达五阶段立绘上传区的入口', async () => {
+    const user = userEvent.setup()
+    database = createTavernDatabase(`mistvale-character-portrait-${crypto.randomUUID()}`)
+    render(
+      <GameProvider>
+        <TavernProvider repository={createTavernRepository(database)}>
+          <TavernHubModal onClose={() => undefined} />
+        </TavernProvider>
+      </GameProvider>,
+    )
+
+    await screen.findByText('浏览器直连提醒')
+    await user.click(screen.getByRole('tab', { name: '角色卡' }))
+    await user.click((await screen.findAllByRole('button', { name: /编辑角色卡/ }))[0])
+
+    const shortcut = screen.getByRole('button', { name: '前往立绘上传' })
+    expect(shortcut).toBeVisible()
+    expect(screen.getByRole('group', { name: '好感阶段立绘' })).toHaveAttribute('data-portrait-upload-target', 'true')
+  })
 })
