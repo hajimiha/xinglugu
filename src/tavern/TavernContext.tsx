@@ -184,6 +184,7 @@ export function TavernProvider({ children, repository = tavernRepository }: { ch
       userName: session.userName,
       variables,
       formatPrompt: currentSettings.formatPromptTemplate,
+      regexScripts: currentSettings.regexScripts,
       signal: input.signal,
       onDelta: input.onDelta,
     })

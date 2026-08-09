@@ -340,6 +340,7 @@ export function createMistvaleDefaults(): MistvaleTavernDefaults {
     formatPromptTemplate: DEFAULT_FORMAT_PROMPT,
     thinkingDisplay: 'fold',
     globalVariables: [],
+    regexScripts: [],
     defaultContentVersion: DEFAULT_CONTENT_VERSION,
     updatedAt: now,
   }

@@ -1,6 +1,7 @@
 import { createMistvaleDefaults } from './defaults'
 import { getTavernProvider, isTavernApiProvider } from './provider-registry'
 import { parseVariableDefinitions } from './variable-definitions'
+import { parseRegexScripts } from './regex-engine'
 import type { TavernApiConfig, TavernApiProvider, TavernProviderOptionKey, TavernSettings } from './types'
 
 type NumericApiField = 'contextLength' | 'maxResponseLength' | 'temperature' | 'frequencyPenalty' | 'presencePenalty' | 'topP'
@@ -108,6 +109,14 @@ export function normalizeTavernSettings(value: unknown): TavernSettings {
       globalVariables = defaults.globalVariables
     }
   }
+  let regexScripts = defaults.regexScripts
+  if (Array.isArray(candidate.regexScripts)) {
+    try {
+      regexScripts = parseRegexScripts(candidate.regexScripts, 'global').filter((script) => script.scope === 'global')
+    } catch {
+      regexScripts = defaults.regexScripts
+    }
+  }
   return {
     ...defaults,
     ...safeCandidate,
@@ -116,5 +125,6 @@ export function normalizeTavernSettings(value: unknown): TavernSettings {
     activeLorebookIds: Array.isArray(candidate.activeLorebookIds) ? candidate.activeLorebookIds : defaults.activeLorebookIds,
     customTags: Array.isArray(candidate.customTags) ? candidate.customTags : defaults.customTags,
     globalVariables,
+    regexScripts,
   }
 }

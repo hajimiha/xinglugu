@@ -45,6 +45,7 @@ import {
   Cake,
   Confetti,
   MapPin,
+  TextAa,
 } from '@phosphor-icons/react'
 
 const icons = {
@@ -94,6 +95,7 @@ const icons = {
   birthday: Cake,
   festival: Confetti,
   location: MapPin,
+  regex: TextAa,
 }
 
 export type GameIconName = keyof typeof icons

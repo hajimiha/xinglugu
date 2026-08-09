@@ -2,7 +2,7 @@
  * Prompt Assembler
  */
 
-import type { ChatPreset, Lorebook, ChatMessage, MatchedEntry } from './types';
+import type { ChatPreset, Lorebook, ChatMessage, MatchedEntry, TavernRegexScript } from './types';
 import { compileTavernTurn } from './prompt-compiler';
 
 export interface AssembleOptions {
@@ -15,6 +15,7 @@ export interface AssembleOptions {
   variables?: Record<string, string | number>;
   extraVariables?: Record<string, any>;
   formatPrompt?: string;
+  regexScripts?: TavernRegexScript[];
 }
 
 export interface AssembleResult {

@@ -207,7 +207,7 @@ export type PresetBinding =
   | { mode: 'follow-active' }
   | { mode: 'pinned'; presetId: string }
 
-export type PromptTraceSource = 'preset' | 'character' | 'lorebook' | 'history' | 'variables' | 'format' | 'user'
+export type PromptTraceSource = 'preset' | 'character' | 'lorebook' | 'history' | 'variables' | 'format' | 'regex' | 'user'
 
 export interface PromptTraceSegment {
   id: string
@@ -338,6 +338,7 @@ export interface TavernSettings {
   formatPromptTemplate: string
   thinkingDisplay: 'fold' | 'hide' | 'inline'
   globalVariables: TavernVariableDefinition[]
+  regexScripts: TavernRegexScript[]
   contentPackVersion?: string
   defaultContentVersion?: number
   updatedAt: number
@@ -355,6 +356,39 @@ export interface TavernVariableDefinition {
   min?: number
   max?: number
   description?: string
+}
+
+export type TavernRegexStage = 'prompt' | 'output' | 'display'
+export type TavernRegexTarget = 'user' | 'assistant'
+export type TavernRegexScope = 'global' | 'preset'
+
+export interface TavernRegexScript {
+  id: string
+  name: string
+  enabled: boolean
+  pattern: string
+  replacement: string
+  trimStrings: string[]
+  stages: TavernRegexStage[]
+  targets: TavernRegexTarget[]
+  minDepth?: number
+  maxDepth?: number
+  scope: TavernRegexScope
+  order: number
+}
+
+export interface TavernRegexMatch {
+  scriptId: string
+  scriptName: string
+  count: number
+  before: string
+  after: string
+}
+
+export interface TavernRegexError {
+  scriptId: string
+  scriptName: string
+  message: string
 }
 
 export const DEFAULT_FORMAT_PROMPT = `模型必须使用以下六段式酒馆结构：

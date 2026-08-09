@@ -459,6 +459,27 @@
 .typed-variable-fields label { min-width: 0; }
 .typed-variable-fields input { width: 100%; }
 .variable-card-delete { position: absolute; right: 12px; bottom: 12px; display: inline-flex; align-items: center; gap: 5px; min-height: 40px; padding: 0 9px; color: #d5a89f; border: 1px solid rgba(192, 92, 74, .35); border-radius: 7px; background: rgba(94, 29, 20, .16); font-size: 8px; }
+.regex-workspace { display: grid; grid-template-columns: minmax(170px, .55fr) minmax(320px, 1.1fr) minmax(250px, .8fr); gap: 12px; min-height: 0; }
+.regex-script-list, .regex-editor, .regex-tester { min-width: 0; padding: 13px; border: 1px solid var(--border-muted); border-radius: 12px; background: linear-gradient(145deg, rgba(22, 47, 38, .58), rgba(5, 16, 14, .72)); }
+.regex-script-list { display: flex; flex-direction: column; gap: 7px; max-height: 650px; overflow: auto; }
+.regex-script-list > button { display: grid; gap: 5px; width: 100%; min-height: 70px; padding: 10px; color: var(--text-muted); text-align: left; border: 1px solid var(--border-muted); border-radius: 8px; background: rgba(2, 10, 8, .3); }
+.regex-script-list > button:hover, .regex-script-list > button.is-active { color: var(--text-primary); border-color: var(--border-copper); background: rgba(213, 166, 74, .08); transform: translateY(-1px); }
+.regex-script-list > button span { color: var(--copper-300); font-family: var(--font-numeric); font-size: 7px; }
+.regex-script-list > button strong { font-size: 10px; }
+.regex-script-list > button code { overflow: hidden; color: var(--text-muted); font-size: 7px; text-overflow: ellipsis; white-space: nowrap; }
+.regex-editor-grid { display: grid; grid-template-columns: 1fr .65fr .65fr; gap: 8px; }
+.regex-editor-grid .wide { grid-column: 1 / -1; }
+.regex-editor-grid input, .regex-editor-grid select, .regex-editor-grid textarea { width: 100%; }
+.regex-check-grid { display: flex; flex-wrap: wrap; gap: 7px 14px; margin: 12px 0; padding: 11px; border: 1px solid var(--border-muted); border-radius: 8px; }
+.regex-check-grid legend { padding: 0 6px; color: var(--copper-300); font-size: 8px; }
+.regex-check-grid label { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; }
+.regex-tester > header { margin-bottom: 10px; }
+.regex-tester > header span { color: var(--copper-300); font-family: var(--font-numeric); font-size: 7px; }
+.regex-tester > header h4 { margin: 3px 0 0; }
+.regex-test-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.regex-tester textarea, .regex-tester select { width: 100%; }
+.regex-tester > label { display: grid; gap: 5px; margin-top: 9px; }
+.regex-test-summary { display: flex; justify-content: space-between; gap: 8px; margin-top: 9px; color: var(--text-muted); font-size: 7px; }
 .variable-table { display: grid; }
 .variable-table > div { display: grid; min-height: 46px; grid-template-columns: minmax(90px, .7fr) minmax(130px, 1.3fr) 42px; align-items: center; gap: 7px; padding: 5px 7px; border-bottom: 1px solid rgba(205, 187, 145, .08); }
 .variable-table-head { min-height: 30px !important; color: var(--text-muted); font-size: 7px; }
@@ -509,6 +530,8 @@
   .variables-bento { grid-template-columns: 1fr; }
   .typed-variable-fields { grid-template-columns: repeat(3, 1fr); }
   .typed-variable-add { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .regex-workspace { grid-template-columns: minmax(160px, .45fr) minmax(0, 1fr); }
+  .regex-tester { grid-column: 1 / -1; }
   .game-mirror dl { grid-template-columns: repeat(3, 1fr); }
 }
 
@@ -565,6 +588,11 @@
   .typed-variable-add { grid-template-columns: 1fr; }
   .typed-variable-fields { grid-template-columns: 1fr; padding-right: 0; }
   .variable-card-delete { position: static; width: 100%; min-height: 44px; justify-content: center; margin-top: 9px; }
+  .regex-workspace { grid-template-columns: 1fr; }
+  .regex-script-list { max-height: 210px; }
+  .regex-editor-grid { grid-template-columns: 1fr; }
+  .regex-editor-grid .wide { grid-column: auto; }
+  .regex-tester { grid-column: auto; }
   .variable-table > div { grid-template-columns: 86px minmax(90px, 1fr) 40px; padding-inline: 2px; }
   .tavern-confirm-bar { grid-template-columns: auto 1fr; }
   .tavern-confirm-bar button { min-height: 44px; }

@@ -1,3 +1,5 @@
+import { parseRegexScripts } from './regex-engine'
+
 export type PresetPromptRole = 'system' | 'user' | 'assistant'
 export type PresetPromptSourceRole = PresetPromptRole | 'model'
 
@@ -105,6 +107,11 @@ export function validatePresetSettings(value: unknown): Record<string, unknown> 
       : value.prompt_order.every(validateOrderItem)
     if (!valid) throw new Error('预设 prompt_order 结构无效。')
   }
+
+  const extensions = value.extensions
+  if (extensions !== undefined && !isRecord(extensions)) throw new Error('预设 extensions 必须是对象。')
+  const regexScripts = value.regex_scripts ?? (isRecord(extensions) ? extensions.regex_scripts : undefined)
+  if (regexScripts !== undefined) parseRegexScripts(regexScripts, 'preset', { validatePatterns: true })
 
   return value
 }

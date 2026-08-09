@@ -4,6 +4,7 @@ import { formatClock, formatGameDate, getCalendarDate, getFestivalOnDay, getNpcP
 import { locations } from '../../game/data'
 import type { GameState, Npc } from '../../game/types'
 import type { ChatSession } from '../../sillytavern/types'
+import { applyRegexScripts, getPresetRegexScripts } from '../../sillytavern/regex-engine'
 import { useTavern } from '../../tavern/TavernContext'
 import { GameIcon } from '../icons/GameIcon'
 import { HistoryDrawer } from './HistoryDrawer'
@@ -82,6 +83,27 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
   const options = lastAssistant?.parsed?.options.length ? lastAssistant.parsed.options : (openingOptions[npc.id] ?? ['继续交谈', '询问她的近况', '暂时告辞'])
   const card = tavern.characters.find((candidate) => candidate.npcId === npc.id)
   const activeLorebooks = useMemo(() => tavern.lorebooks.filter((book) => card?.lorebookIds.includes(book.id)), [tavern.lorebooks, card])
+  const activePreset = tavern.presets.find((preset) => preset.id === tavern.settings?.activePresetId) ?? tavern.presets[0]
+  const displayScripts = useMemo(() => [
+    ...(tavern.settings?.regexScripts ?? []),
+    ...(activePreset ? getPresetRegexScripts(activePreset.settings) : []),
+  ], [tavern.settings?.regexScripts, activePreset])
+  const displayedMessages = useMemo(() => (session?.messages ?? []).map((message, index, messages) => ({
+    ...message,
+    displayContent: applyRegexScripts(message.content, displayScripts, {
+      stage: 'display',
+      target: message.role === 'user' ? 'user' : 'assistant',
+      depth: messages.length - index - 1,
+      macroContext: {
+        userName: session?.userName ?? '旅行者',
+        characterName: card?.name ?? npc.name,
+        original: message.content,
+        lastUserMessage: [...messages.slice(0, index)].reverse().find((item) => item.role === 'user')?.content ?? '',
+        lastCharacterMessage: [...messages.slice(0, index)].reverse().find((item) => item.role === 'assistant')?.content ?? '',
+      },
+      variables: { ...(session?.variables ?? {}), ...dialogueVariables },
+    }).text,
+  })), [session?.messages, session?.userName, session?.variables, displayScripts, card?.name, npc.name, dialogueVariables])
 
   const send = async (text: string) => {
     const message = text.trim()
@@ -179,10 +201,10 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
 
         <div className="dialogue-log" aria-live="polite" aria-busy={working}>
           {!session && <div className="tavern-dialogue-skeleton"><i /><i /><i /></div>}
-          {session?.messages.map((message) => (
+          {displayedMessages.map((message) => (
             <article key={message.id} className={`dialogue-message is-${message.role === 'user' ? 'player' : 'npc'}`}>
               <span>{message.role === 'assistant' ? npc.name : '你'}</span>
-              <p>{message.content}</p>
+              <p>{message.displayContent}</p>
               {message.parsed?.sum && <small className="dialogue-summary">楼层摘要 · {message.parsed.sum}</small>}
             </article>
           ))}

@@ -11,6 +11,8 @@ import {
   type TavernApiAdapter,
 } from '../sillytavern/types'
 import { aggregateEvents, applyParsedToChat } from '../sillytavern/variables'
+import { applyRegexScripts, getPresetRegexScripts } from '../sillytavern/regex-engine'
+import type { TavernRegexScript } from '../sillytavern/types'
 
 export interface RemoteTurnInput {
   api: TavernApiAdapter
@@ -22,6 +24,7 @@ export interface RemoteTurnInput {
   userName: string
   variables: Record<string, unknown>
   formatPrompt: string
+  regexScripts?: TavernRegexScript[]
   signal?: AbortSignal
   onDelta?: (raw: string) => void
 }
@@ -31,6 +34,7 @@ export interface RemoteTurnResult {
   parsed: ParsedTags
   variablesAfter: Record<string, unknown>
   matchedEntryIds: string[]
+  regexErrors: string[]
 }
 
 const REMOTE_RESPONSE_CONTRACT = `请只输出以下酒馆标签结构，不要使用 Markdown 代码块：
@@ -85,6 +89,7 @@ export async function createRemoteTurn(input: RemoteTurnInput): Promise<RemoteTu
     variables: primitiveVariables,
     extraVariables: input.variables,
     formatPrompt: `${input.formatPrompt}\n\n${REMOTE_RESPONSE_CONTRACT}`,
+    regexScripts: input.regexScripts,
   })
   const prepared = input.api.prepare({
     task: 'story',
@@ -103,12 +108,27 @@ export async function createRemoteTurn(input: RemoteTurnInput): Promise<RemoteTu
   }
   if (!raw.trim()) throw new Error('模型没有返回可显示的剧情文字。')
 
+  const outputRegex = applyRegexScripts(raw, [...(input.regexScripts ?? []), ...getPresetRegexScripts(input.preset.settings)], {
+    stage: 'output',
+    target: 'assistant',
+    depth: 0,
+    macroContext: {
+      userName: input.userName,
+      characterName: input.character.name,
+      original: input.playerText,
+      lastUserMessage: [...input.history].reverse().find((message) => message.role === 'user')?.content ?? '',
+      lastCharacterMessage: [...input.history].reverse().find((message) => message.role === 'assistant')?.content ?? '',
+    },
+    variables: assembled.macroVariables,
+  })
+  raw = outputRegex.text
   const parsed = parseResponse(raw)
-  const { nextVariables } = applyParsedToChat(assembled.macroVariables, parsed)
+  const { nextVariables } = applyParsedToChat(outputRegex.variables, parsed)
   return {
     raw,
     parsed,
     variablesAfter: nextVariables,
     matchedEntryIds: assembled.matchedEntries.map((match) => match.entry.id),
+    regexErrors: outputRegex.errors.map((error) => `正则“${error.scriptName}”：${error.message}`),
   }
 }

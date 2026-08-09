@@ -1,5 +1,6 @@
 import { createLorebookEngine } from './lorebook-engine'
 import { evaluateMacros } from './macro-engine'
+import { applyRegexScripts, getPresetRegexScripts } from './regex-engine'
 import { getPresetPromptDefinitions, getPresetPromptOrder, normalizePresetPromptRole } from './preset-compat'
 import type {
   ChatPreset,
@@ -11,6 +12,7 @@ import type {
   PromptTraceSegment,
   TavernMessageRole,
   TavernSettings,
+  TavernRegexScript,
 } from './types'
 import { formatVariablesForPrompt } from './variables'
 
@@ -24,6 +26,7 @@ export interface PromptCompileInput {
   variables?: Record<string, string | number>
   extraVariables?: Record<string, unknown>
   formatPrompt?: string
+  regexScripts?: TavernRegexScript[]
 }
 
 function estimateTokens(content: string): number {
@@ -104,6 +107,7 @@ export function compileTavernTurn(input: PromptCompileInput): PromptCompilation 
     lastUserMessage: [...input.history].reverse().find((message) => message.role === 'user')?.content ?? '',
     lastCharacterMessage: [...input.history].reverse().find((message) => message.role === 'assistant')?.content ?? '',
   }
+  const regexScripts = [...(input.regexScripts ?? []), ...getPresetRegexScripts(preset.settings)]
   const compileMacros = (raw: string) => {
     const evaluation = evaluateMacros(raw, macroVariables, macroContext)
     macroVariables = evaluation.variables
@@ -111,6 +115,15 @@ export function compileTavernTurn(input: PromptCompileInput): PromptCompilation 
     diagnostics.push(...evaluation.diagnostics)
     diagnostics.push(...evaluation.unknownMacros.map((macro) => `未识别宏已原样保留：${macro}`))
     return evaluation
+  }
+  const applyPromptRegex = (raw: string, target: 'user' | 'assistant', depth: number) => {
+    const result = applyRegexScripts(raw, regexScripts, {
+      stage: 'prompt', target, depth, macroContext, variables: macroVariables,
+    })
+    macroVariables = result.variables
+    diagnostics.push(...result.errors.map((error) => `正则“${error.scriptName}”执行失败：${error.message}`))
+    diagnostics.push(...result.matches.map((match) => `正则“${match.scriptName}”命中 ${match.count} 次。`))
+    return result
   }
   let systemAccumulator = ''
   let hasHistoryMarker = false
@@ -158,15 +171,17 @@ export function compileTavernTurn(input: PromptCompileInput): PromptCompilation 
     if (item.identifier === 'chatHistory') {
       hasHistoryMarker = true
       flushSystem()
-      for (const historyMessage of recentHistory) {
-        messages.push({ role: historyMessage.role, content: historyMessage.content })
+      for (const [historyIndex, historyMessage] of recentHistory.entries()) {
+        const regexResult = applyPromptRegex(historyMessage.content, historyMessage.role === 'user' ? 'user' : 'assistant', recentHistory.length - historyIndex)
+        messages.push({ role: historyMessage.role, content: regexResult.text })
         segments.push(traceSegment({
           source: 'history',
           identifier: historyMessage.id,
           role: historyMessage.role,
           raw: historyMessage.content,
-          compiled: historyMessage.content,
+          compiled: regexResult.text,
           sent: true,
+          diagnostics: regexResult.errors.map((error) => error.message),
         }))
       }
       continue
@@ -230,15 +245,17 @@ export function compileTavernTurn(input: PromptCompileInput): PromptCompilation 
   flushSystem()
 
   if (!hasHistoryMarker) {
-    for (const historyMessage of recentHistory) {
-      messages.push({ role: historyMessage.role, content: historyMessage.content })
-      segments.push(traceSegment({ source: 'history', identifier: historyMessage.id, role: historyMessage.role, raw: historyMessage.content, compiled: historyMessage.content, sent: true }))
+    for (const [historyIndex, historyMessage] of recentHistory.entries()) {
+      const regexResult = applyPromptRegex(historyMessage.content, historyMessage.role === 'user' ? 'user' : 'assistant', recentHistory.length - historyIndex)
+      messages.push({ role: historyMessage.role, content: regexResult.text })
+      segments.push(traceSegment({ source: 'history', identifier: historyMessage.id, role: historyMessage.role, raw: historyMessage.content, compiled: regexResult.text, sent: true, diagnostics: regexResult.errors.map((error) => error.message) }))
     }
   }
   const userEvaluation = compileMacros(input.userInput)
-  const userInput = userEvaluation.text
+  const userRegexResult = applyPromptRegex(userEvaluation.text, 'user', 0)
+  const userInput = userRegexResult.text
   messages.push({ role: 'user', content: userInput })
-  segments.push(traceSegment({ source: 'user', identifier: 'current-user-input', role: 'user', raw: input.userInput, compiled: userInput, sent: true }))
+  segments.push(traceSegment({ source: 'user', identifier: 'current-user-input', role: 'user', raw: input.userInput, compiled: userInput, sent: true, diagnostics: userRegexResult.errors.map((error) => error.message) }))
 
   return {
     messages,

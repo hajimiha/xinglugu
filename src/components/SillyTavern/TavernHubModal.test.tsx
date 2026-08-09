@@ -31,7 +31,7 @@ describe('酒馆中枢', () => {
     )
 
     const tabs = screen.getAllByRole('tab')
-    expect(tabs).toHaveLength(6)
+    expect(tabs).toHaveLength(7)
     expect(screen.getByRole('tab', { name: '接口' })).toHaveAttribute('id', 'tavern-tab-api')
     expect(await screen.findByText('浏览器直连提醒')).toBeVisible()
     expect(screen.getByLabelText('API 密钥')).toBeVisible()
@@ -135,6 +135,34 @@ describe('酒馆中枢', () => {
     expect(screen.getByText('affinityMultiplier')).toBeVisible()
     expect(screen.getByText('全局', { selector: '.variable-scope-badge' })).toBeVisible()
     expect(screen.getByLabelText('affinityMultiplier的值')).toHaveAttribute('type', 'number')
+  })
+
+  it('正则中心可以创建分阶段脚本并即时测试输入输出', async () => {
+    const user = userEvent.setup()
+    database = createTavernDatabase(`mistvale-regex-center-${crypto.randomUUID()}`)
+    render(
+      <GameProvider>
+        <TavernProvider repository={createTavernRepository(database)}>
+          <TavernHubModal onClose={() => undefined} />
+        </TavernProvider>
+      </GameProvider>,
+    )
+
+    await screen.findByText('浏览器直连提醒')
+    await user.click(screen.getByRole('tab', { name: '正则' }))
+    expect(await screen.findByRole('heading', { name: '正则中心' })).toBeVisible()
+    expect(screen.getByRole('button', { name: '导入正则 JSON' })).toBeVisible()
+    expect(screen.getByRole('button', { name: '导出正则 JSON' })).toBeVisible()
+
+    await user.click(screen.getByRole('button', { name: '新建正则脚本' }))
+    await user.clear(screen.getByLabelText('正则表达式'))
+    await user.type(screen.getByLabelText('正则表达式'), '/<box>(.*?)<\\/box>/g')
+    await user.clear(screen.getByLabelText('替换文本'))
+    await user.type(screen.getByLabelText('替换文本'), '$1')
+    await user.clear(screen.getByLabelText('正则测试输入'))
+    await user.type(screen.getByLabelText('正则测试输入'), '<box>雾灯</box>')
+
+    expect(screen.getByLabelText('正则测试输出')).toHaveValue('雾灯')
   })
 
   it('点击关闭按钮后卸载角色卡编辑器', async () => {
