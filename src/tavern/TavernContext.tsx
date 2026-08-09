@@ -3,6 +3,7 @@ import { createRemoteTavernApi } from '../sillytavern/api-adapter'
 import { validateTavernApiConfig } from '../sillytavern/api-config'
 import { resolveApiKey } from '../sillytavern/api-credentials'
 import { getTavernProvider } from '../sillytavern/provider-registry'
+import { resolveSessionPreset } from '../sillytavern/prompt-compiler'
 import { tavernRepository, type TavernRepository } from '../sillytavern/repository'
 import type {
   CharacterCard,
@@ -128,7 +129,8 @@ export function TavernProvider({ children, repository = tavernRepository }: { ch
       npcId,
       characterName: card.name,
       userName: settings?.userName ?? '旅行者',
-      presetId: settings?.activePresetId ?? null,
+      presetId: null,
+      presetBinding: { mode: 'follow-active' as const },
       lorebookIds: [...card.lorebookIds],
       variables,
       messages: [{
@@ -156,8 +158,8 @@ export function TavernProvider({ children, repository = tavernRepository }: { ch
     const character = characters.find((candidate) => candidate.npcId === input.npcId)
       ?? (await repository.listCharacters()).find((candidate) => candidate.npcId === input.npcId)
     if (!character) throw new Error(`找不到 NPC 角色卡：${input.npcId}`)
-    const preset = presets.find((candidate) => candidate.id === (session.presetId ?? currentSettings.activePresetId))
-      ?? (await repository.listPresets()).find((candidate) => candidate.id === (session.presetId ?? currentSettings.activePresetId))
+    const availablePresets = presets.length ? presets : await repository.listPresets()
+    const preset = resolveSessionPreset(session, currentSettings, availablePresets)
     if (!preset) throw new Error('尚未选择可用的酒馆提示词预设。')
     const sessionLorebookIds = session.lorebookIds.length ? session.lorebookIds : currentSettings.activeLorebookIds
     const activeLorebooks = lorebooks.filter((book) => sessionLorebookIds.includes(book.id))
@@ -246,6 +248,7 @@ export function TavernProvider({ children, repository = tavernRepository }: { ch
     const branch = branchChat(source, messageIndex, {
       name,
       presetId: source.presetId,
+      presetBinding: source.presetBinding,
       lorebookIds: source.lorebookIds,
     })
     await saveSession(branch)

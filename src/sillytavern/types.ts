@@ -195,10 +195,38 @@ export interface ChatSession {
   characterName: string
   userName: string
   presetId: string | null
+  presetBinding?: PresetBinding
   lorebookIds: string[]
   variables: Record<string, unknown>
   createdAt: number
   updatedAt: number
+}
+
+export type PresetBinding =
+  | { mode: 'follow-active' }
+  | { mode: 'pinned'; presetId: string }
+
+export type PromptTraceSource = 'preset' | 'character' | 'lorebook' | 'history' | 'variables' | 'format' | 'user'
+
+export interface PromptTraceSegment {
+  id: string
+  source: PromptTraceSource
+  identifier?: string
+  role: TavernMessageRole
+  raw: string
+  compiled: string
+  sent: boolean
+  tokenEstimate: number
+  diagnostics: string[]
+}
+
+export interface PromptCompilation {
+  messages: TavernRequest['messages']
+  segments: PromptTraceSegment[]
+  matchedEntries: MatchedEntry[]
+  macroVariables: Record<string, unknown>
+  diagnostics: string[]
+  systemPrompt: string
 }
 
 export interface CharacterCard {

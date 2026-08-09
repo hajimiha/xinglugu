@@ -194,6 +194,33 @@ describe('雾灯谷酒馆仓储', () => {
       { id: 'portrait-0-100', minAffinity: 0, maxAffinity: 100, source: '/portraits/legacy-loran.webp' },
     ])
     expect(migrated).not.toHaveProperty('portraitByAffinity')
-    expect((await repository.getSettings()).defaultContentVersion).toBe(4)
+    expect((await repository.getSettings()).defaultContentVersion).toBe(5)
+  })
+
+  it('将旧会话迁移为跟随当前激活预设，避免继续发送创建会话时的旧预设', async () => {
+    database = createTavernDatabase(`mistvale-preset-binding-migration-${crypto.randomUUID()}`)
+    const repository = createTavernRepository(database)
+    await repository.initialize()
+    const settings = await repository.getSettings()
+    await database.sessions.put({
+      id: 'legacy-preset-session',
+      name: '旧预设会话',
+      characterName: '测试角色',
+      userName: '旅行者',
+      presetId: 'stale-preset-id',
+      lorebookIds: [],
+      variables: {},
+      messages: [],
+      createdAt: 1,
+      updatedAt: 1,
+    })
+    await database.settings.put({ ...settings, defaultContentVersion: 4 })
+
+    await repository.initialize()
+
+    expect(await repository.getSession('legacy-preset-session')).toMatchObject({
+      presetId: null,
+      presetBinding: { mode: 'follow-active' },
+    })
   })
 })

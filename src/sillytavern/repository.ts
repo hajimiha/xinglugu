@@ -75,6 +75,7 @@ class DexieTavernRepository implements TavernRepository {
         const shouldMigrateCalendar = storedContentVersion < 2
         const shouldMigrateProduction = storedContentVersion < 3
         const shouldMigratePortraitSlots = storedContentVersion < 4
+        const shouldMigratePresetBinding = storedContentVersion < 5
         const shouldMigrateDefaults = storedContentVersion < DEFAULT_CONTENT_VERSION
         const migrationLorebookIds = [
           ...(shouldMigrateCalendar ? [CALENDAR_FESTIVALS_ID] : []),
@@ -120,9 +121,26 @@ class DexieTavernRepository implements TavernRepository {
           await this.database.sessions.bulkAdd(defaults.sessions)
         } else if (shouldMigrateDefaults) {
           const defaultNpcIds = new Set(defaults.characters.map((card) => card.npcId))
-          const migratedSessions = (await this.database.sessions.toArray())
-            .filter((session) => session.npcId && defaultNpcIds.has(session.npcId) && migrationLorebookIds.some((id) => !session.lorebookIds.includes(id)))
-            .map((session) => ({ ...session, lorebookIds: Array.from(new Set([...session.lorebookIds, ...migrationLorebookIds])) }))
+          const storedSessions = await this.database.sessions.toArray()
+          const migratedSessions = storedSessions
+            .map((session) => {
+              const shouldAddLorebooks = Boolean(
+                session.npcId
+                && defaultNpcIds.has(session.npcId)
+                && migrationLorebookIds.some((id) => !session.lorebookIds.includes(id)),
+              )
+              const next = {
+                ...session,
+                ...(shouldAddLorebooks
+                  ? { lorebookIds: Array.from(new Set([...session.lorebookIds, ...migrationLorebookIds])) }
+                  : {}),
+                ...(shouldMigratePresetBinding && !session.presetBinding
+                  ? { presetId: null, presetBinding: { mode: 'follow-active' as const } }
+                  : {}),
+              }
+              return JSON.stringify(next) === JSON.stringify(session) ? null : next
+            })
+            .filter((session): session is ChatSession => Boolean(session))
           if (migratedSessions.length) await this.database.sessions.bulkPut(migratedSessions)
         }
         if ((await this.database.settings.count()) === 0) {

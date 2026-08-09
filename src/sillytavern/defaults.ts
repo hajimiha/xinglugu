@@ -17,7 +17,7 @@ const WORLD_RULES_ID = 'mistvale-world-rules'
 const VILLAGE_ARCHIVE_ID = 'mistvale-village-archive'
 export const CALENDAR_FESTIVALS_ID = 'mistvale-calendar-festivals'
 export const PRODUCTION_PARTNERS_ID = 'mistvale-production-partners'
-export const DEFAULT_CONTENT_VERSION = 4
+export const DEFAULT_CONTENT_VERSION = 5
 export const MONSTER_GIRL_CARD_IDS = (Object.keys(MONSTER_PARTNERS) as MonsterPartnerId[]).map((id) => `mistvale-character-${id}`)
 
 function entry(

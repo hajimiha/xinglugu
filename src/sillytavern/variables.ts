@@ -2,7 +2,7 @@
  * Variable System Utilities
  */
 
-import type { ChatSession, ParsedTags } from './types';
+import type { ChatSession, ParsedTags, PresetBinding } from './types';
 import type { ParserEvent } from './stream-parser';
 import { parseVarsBlock, applyVarsPatch } from './vars-merger';
 
@@ -53,6 +53,7 @@ export function branchChat(
   options: {
     name: string;
     presetId: string | null;
+    presetBinding?: PresetBinding;
     lorebookIds: string[];
     variables?: Record<string, string | number>;
   }
@@ -67,6 +68,7 @@ export function branchChat(
     characterName: source.characterName,
     userName: source.userName,
     presetId: options.presetId,
+    presetBinding: options.presetBinding,
     lorebookIds: [...options.lorebookIds],
     variables: options.variables ?? source.messages[index].variables ?? {},
     createdAt: Date.now(),

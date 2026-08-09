@@ -262,3 +262,11 @@
 - `LocationStage` 当前只把场景文件上传为组件内 Blob URL，刷新即丢失；它也没有读取 Tavern 角色卡，因此酒馆中枢保存的立绘不会进入实际场景。新实现必须让场景读取角色卡槽位，并把快捷上传保存到当前命中的槽位。
 - UI/UX Pro Max 建议在现有深绿金色像素风中使用渐进披露：默认只展示一个区间槽位卡，点击“新增区间”后再出现两个数字输入；输入使用 `type=number`、`inputMode=numeric`、就地错误提示，桌面与手机触控目标至少 44px。
 - 区间列表最多 101 个但常规远低于虚拟化阈值；保持普通 React 列表即可。选中槽位 ID 与新增表单是必要状态，区间标签、覆盖轨道和命中立绘全部从 `portraitSlots` 派生，避免重复状态漂移。
+
+# Phase 16 严格酒馆核心调查
+
+- 当前真实调用链为 `TavernContext.sendTurn → createRemoteTurn → assemblePrompt → api.prepare → buildProviderRequest`；之前没有统一编译结果或出站审计对象。
+- 预设未发送的可复现根因不是导入失败，而是 `sendTurn` 以 `session.presetId` 优先于 `settings.activePresetId`；旧会话永久绑定创建时预设，而界面从未向玩家说明或提供显式固定操作。
+- 正确兼容模型是新增 `PresetBinding`：新旧会话默认 `follow-active`，只有玩家明确选择固定预设才使用 `pinned`；迁移时清理旧 `presetId`，避免刷新后回退。
+- 用户真实预设包含 140 个提示词、2 个顺序分组，默认 100001 组有 55 项且启用 28 项；宏包括 `setvar/getvar/addvar/random/roll/trim/user/char/lastusermessage/lastcharmessage`，现有基础替换远不足以保持 SillyTavern 语义。
+- “AI 思维链”只能展示供应商实际返回的 `reasoning_content` / reasoning blocks 或模型自行输出的 `<thinking>/<think>`，必须明确标记来源；不能声称读取或伪造模型隐藏思维。

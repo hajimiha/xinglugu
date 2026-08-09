@@ -111,6 +111,67 @@ describe('NPC 酒馆会话', () => {
     expect(screen.getByTestId('game-state-probe')).toHaveTextContent('精力 4 · 好感 6')
   })
 
+  it('既有会话继续交谈时使用当前激活预设，而不是创建会话时遗留的旧 presetId', async () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: true }))
+    const response = '<maintext>当前预设已生效。</maintext><option>继续</option><sum>验证预设。</sum><vars>{}</vars>'
+    const fetchMock = vi.fn().mockResolvedValue(new Response(`data: ${JSON.stringify({ choices: [{ delta: { content: response } }] })}\n\ndata: [DONE]\n\n`, {
+      headers: { 'content-type': 'text/event-stream' },
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    setSessionApiKey('session-secret')
+    database = createTavernDatabase(`mistvale-active-preset-${crypto.randomUUID()}`)
+    const repository = createTavernRepository(database)
+    await repository.initialize()
+    const [oldPreset] = await repository.listPresets()
+    const activePreset = {
+      ...structuredClone(oldPreset),
+      id: 'active-preset-sentinel',
+      name: '当前测试预设',
+      settings: { ...structuredClone(oldPreset.settings), main: 'CURRENT-PRESET-SENTINEL' },
+      updatedAt: Date.now() + 10,
+    }
+    await repository.savePreset({
+      ...oldPreset,
+      settings: { ...structuredClone(oldPreset.settings), main: 'LEGACY-PRESET-SENTINEL' },
+    })
+    await repository.savePreset(activePreset)
+    const settings = await repository.getSettings()
+    await repository.saveSettings({ ...settings, activePresetId: activePreset.id })
+    const character = (await repository.listCharacters()).find((card) => card.npcId === 'loran')!
+    await repository.saveSession({
+      id: 'legacy-preset-session',
+      name: '洛岚 · 旧预设会话',
+      npcId: 'loran',
+      characterId: character.id,
+      characterName: character.name,
+      userName: '旅行者',
+      presetId: oldPreset.id,
+      lorebookIds: character.lorebookIds,
+      variables: {},
+      messages: [{ id: 'opening', role: 'assistant', content: character.firstMessage, timestamp: 1 }],
+      createdAt: 1,
+      updatedAt: Date.now() + 20,
+    })
+    const user = userEvent.setup()
+    const loran = npcs.find((npc) => npc.id === 'loran')!
+
+    render(
+      <GameProvider initialState={{ ...initialGameState, location: 'mayor-home' }}>
+        <TavernProvider repository={repository}>
+          <TavernDialogue npc={loran} />
+        </TavernProvider>
+      </GameProvider>,
+    )
+
+    const action = await screen.findByRole('button', { name: /选择行动：询问今日委托/ })
+    await waitFor(() => expect(action).toBeEnabled())
+    await user.click(action)
+    expect(await screen.findByText('当前预设已生效。')).toBeVisible()
+    const body = String(fetchMock.mock.calls[0]?.[1]?.body)
+    expect(body).toContain('CURRENT-PRESET-SENTINEL')
+    expect(body).not.toContain('LEGACY-PRESET-SENTINEL')
+  })
+
   it('远程请求失败时保留玩家输入且不结算精力和好感', async () => {
     vi.stubGlobal('matchMedia', () => ({ matches: true }))
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('拒绝访问', { status: 401 })))
