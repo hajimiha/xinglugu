@@ -24,7 +24,7 @@ describe('雾灯谷酒馆默认内容', () => {
     expect(defaults.presets[0].settings).not.toHaveProperty('apiKey')
     expect(defaults.presets[0].description).toContain('模型')
     expect(defaults.presets[0].description).not.toContain('本地剧情引擎')
-    expect(DEFAULT_CONTENT_VERSION).toBe(4)
+    expect(DEFAULT_CONTENT_VERSION).toBe(5)
   })
 
   it('提供六位共生伙伴角色卡与完整生产世界书', () => {
