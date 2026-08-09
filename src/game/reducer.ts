@@ -1,4 +1,4 @@
-import { createInitialPlots, crops, getFarmExpansion, npcs, quests, shopItems, spells } from './data'
+import { MONSTER_PARTNERS, createInitialPlots, crops, getFarmExpansion, npcs, quests, shopItems, spells } from './data'
 import { advanceCalendarClock, formatGameDate, getSeasonForDay, getWeekday, isNpcBirthday } from './calendar'
 import {
   DEFAULT_GAME_RULES,
@@ -46,6 +46,18 @@ function advancePlots(state: GameState, elapsedMinutes: number): GameState['plot
   })
 }
 
+function advanceRanchProducts(state: GameState, crossedDays: number): GameState['inventory'] {
+  if (crossedDays <= 0 || !state.ranch.owned || state.ranch.residents.length === 0) return state.inventory
+  const inventory = { ...state.inventory }
+  for (const residentId of state.ranch.residents) {
+    const product = MONSTER_PARTNERS[residentId].dailyProduct
+    if (!product) continue
+    const amount = scaleReward(product.quantity * crossedDays, state.rules.dropMultiplier)
+    inventory[product.itemId] = (inventory[product.itemId] ?? 0) + amount
+  }
+  return inventory
+}
+
 export const initialGameState: GameState = {
   year: 1,
   day: 1,
@@ -77,6 +89,7 @@ export const initialGameState: GameState = {
   mine: { currentFloor: 1, highestFloor: 1, unlockedElevators: [] },
   hospitalUsedToday: false,
   ownsMonsterRanch: false,
+  ranch: { owned: false, residents: [], dragonStatus: 'wild' },
   tools: { hoe: 1, rod: 1, pickaxe: 1 },
   fishing: { active: false },
   activeModal: null,
@@ -108,6 +121,7 @@ export function advanceGameClock(state: GameState, elapsedMinutes: number): Game
     energy: crossedDays > 0 ? state.maxEnergy : state.energy,
     hospitalUsedToday: crossedDays > 0 ? false : state.hospitalUsedToday,
     relationships,
+    inventory: advanceRanchProducts(state, crossedDays),
     plots: advancePlots(state, actualElapsed),
   }
 }
@@ -340,8 +354,41 @@ function reduceGameState(state: GameState, action: GameAction): GameState {
       return { ...state, money: state.money - 180, energy: Math.min(state.maxEnergy, state.energy + recovery), hospitalUsedToday: true, toasts: [...state.toasts, makeToast({ tone: 'success', title: '治疗完成', message: `草药热敷让你恢复了 ${recovery} 点精力。` })] }
     }
     case 'BUY_RANCH':
-      if (state.ownsMonsterRanch || state.money < 2800) return state
-      return { ...state, money: state.money - 2800, ownsMonsterRanch: true, toasts: [...state.toasts, makeToast({ tone: 'success', title: '牧场合同生效', message: '现在可以邀请魔物娘经营伙伴入住了。' })] }
+      if (state.ranch.owned || state.money < 2800) return state
+      return {
+        ...state,
+        money: state.money - 2800,
+        ownsMonsterRanch: true,
+        ranch: state.ranch.dragonStatus === 'promised'
+          ? { owned: true, residents: [...state.ranch.residents, 'dragon-girl'], dragonStatus: 'resident' }
+          : { ...state.ranch, owned: true },
+        toasts: [...state.toasts, makeToast({ tone: 'success', title: '牧场合同生效', message: state.ranch.dragonStatus === 'promised' ? '牧场启用，龙娘也如约来到农场。' : '现在可以邀请魔物娘经营伙伴入住了。' })],
+      }
+    case 'BUY_MONSTER_PARTNER': {
+      const partner = MONSTER_PARTNERS[action.partnerId]
+      if (!state.ranch.owned || !partner?.price || action.partnerId === 'dragon-girl' || state.ranch.residents.includes(action.partnerId) || state.money < partner.price) return state
+      return {
+        ...state,
+        money: state.money - partner.price,
+        ranch: { ...state.ranch, residents: [...state.ranch.residents, action.partnerId] },
+        toasts: [...state.toasts, makeToast({ tone: 'success', title: '伙伴入住', message: `${partner.name}已经搬进共生牧场。` })],
+      }
+    }
+    case 'INVITE_DRAGON': {
+      if (state.ranch.dragonStatus !== 'wild') return state
+      if (action.method === 'coins' && state.money < 20000) return state
+      const resident = state.ranch.owned
+      return {
+        ...state,
+        money: action.method === 'coins' ? state.money - 20000 : state.money,
+        ranch: {
+          ...state.ranch,
+          residents: resident ? [...state.ranch.residents, 'dragon-girl'] : state.ranch.residents,
+          dragonStatus: resident ? 'resident' : 'promised',
+        },
+        toasts: [...state.toasts, makeToast({ tone: 'success', title: resident ? '龙娘入住' : '龙娘的约定', message: resident ? '龙娘已成为农场的矿脉守望者。' : '她答应在牧场建成后前来定居。' })],
+      }
+    }
     case 'TRAIN_COMBAT': {
       const cost = getEnergyCost(1, state.rules.energyCostMode)
       if (state.energy < cost) return { ...state, toasts: [...state.toasts, makeToast({ tone: 'warning', title: '精力不足', message: `需要 ${cost} 点精力才能完成训练。` })] }

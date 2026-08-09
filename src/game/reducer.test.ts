@@ -3,6 +3,7 @@ import { getDayOfYear } from './calendar'
 import { npcs } from './data'
 import { gameReducer, initialGameState } from './reducer'
 import { DEFAULT_GAME_RULES } from './rules'
+import type { GameState } from './types'
 
 describe('游戏状态变更', () => {
   it('以刚抵达小镇的新手数据开始游戏', () => {
@@ -270,5 +271,48 @@ describe('游戏状态变更', () => {
     }))
     const full = { ...initialGameState, plots: rows }
     expect(gameReducer(full, { type: 'EXPAND_FARM', roll: 0 } as never).plots).toBe(rows)
+  })
+
+  it('购买牧场后才能邀请五位商店魔物娘且不能重复购买', () => {
+    const wealthy = { ...initialGameState, money: 10000 }
+    expect(gameReducer(wealthy, { type: 'BUY_MONSTER_PARTNER', partnerId: 'cow-girl' } as never)).toBe(wealthy)
+
+    const withRanch = gameReducer(wealthy, { type: 'BUY_RANCH' })
+    expect(withRanch.ranch).toMatchObject({ owned: true, residents: [] })
+    const invited = gameReducer(withRanch, { type: 'BUY_MONSTER_PARTNER', partnerId: 'cow-girl' } as never)
+    expect(invited.money).toBe(10000 - 2800 - 1500)
+    expect(invited.ranch.residents).toEqual(['cow-girl'])
+    expect(gameReducer(invited, { type: 'BUY_MONSTER_PARTNER', partnerId: 'cow-girl' } as never)).toBe(invited)
+    expect(gameReducer(invited, { type: 'BUY_MONSTER_PARTNER', partnerId: 'dragon-girl' } as never)).toBe(invited)
+  })
+
+  it('跨日结算牧场每日产物并叠加两位史莱姆娘的粘液', () => {
+    const producing: GameState = {
+      ...initialGameState,
+      ranch: {
+        owned: true,
+        residents: ['cow-girl', 'fire-slime-girl', 'water-slime-girl'],
+        dragonStatus: 'wild',
+      },
+      inventory: {},
+    }
+    const later = gameReducer(producing, { type: 'ADVANCE_TIME', minutes: 3 * 1440, reason: '等待牧场生产' })
+    expect(later.inventory).toMatchObject({ milk: 3, 'slime-gel': 6 })
+
+    const multiplied = gameReducer({
+      ...producing,
+      rules: { ...producing.rules, dropMultiplier: 2 },
+    }, { type: 'ADVANCE_TIME', minutes: 1440, reason: '等待牧场生产' })
+    expect(multiplied.inventory).toMatchObject({ milk: 2, 'slime-gel': 4 })
+  })
+
+  it('可用大量金币吸引龙娘，并在后购牧场时兑现入住承诺', () => {
+    const invited = gameReducer({ ...initialGameState, money: 25000 }, { type: 'INVITE_DRAGON', method: 'coins' } as never)
+    expect(invited.money).toBe(5000)
+    expect(invited.ranch).toMatchObject({ owned: false, dragonStatus: 'promised', residents: [] })
+
+    const settled = gameReducer(invited, { type: 'BUY_RANCH' })
+    expect(settled.ranch.dragonStatus).toBe('resident')
+    expect(settled.ranch.residents).toContain('dragon-girl')
   })
 })

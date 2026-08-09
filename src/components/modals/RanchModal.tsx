@@ -1,13 +1,60 @@
+import { ITEM_CATALOG, MONSTER_PARTNERS } from '../../game/data'
 import { useGame } from '../../game/GameContext'
+import type { MonsterPartnerId } from '../../game/types'
 
-const partners = [
-  { id: 'slime', name: '史莱姆娘', price: 900, ability: '每天产出黏液凝胶，可替代基础肥料材料。' },
-  { id: 'bee', name: '蜂娘', price: 1280, ability: '为相邻作物授粉，收获数量有概率增加。' },
-  { id: 'rock-goat', name: '岩羊娘', price: 1600, ability: '每两日寻回随机矿石，挖矿等级提高稀有度。' },
-  { id: 'mushroom', name: '蘑菇娘', price: 1180, ability: '雨后培育药用菌菇，适合制作恢复药剂。' },
-]
+const purchasablePartnerIds = [
+  'cow-girl',
+  'bee-girl',
+  'spider-girl',
+  'fire-slime-girl',
+  'water-slime-girl',
+] satisfies MonsterPartnerId[]
 
 export function RanchModal() {
   const { state, dispatch } = useGame()
-  return <div className="ranch-content">{!state.ownsMonsterRanch ? <section className="ranch-contract"><span>林下共生协议 · 第一阶段</span><h3>雾苔共生牧场</h3><p>解锁独立饲育区、伙伴起居室与每日产物记录。购买牧场后才能邀请魔物娘经营伙伴。</p><dl><div><dt>合同价格</dt><dd>2,800 金币</dd></div><div><dt>初始栏位</dt><dd>4 位伙伴</dd></div><div><dt>维护费用</dt><dd>每日 0 金币</dd></div></dl><button id="ranch-buy-contract" className="primary-button" type="button" disabled={state.money < 2800} onClick={() => dispatch({ type: 'BUY_RANCH' })}>签署牧场合同</button>{state.money < 2800 && <div className="inline-warning">还差 {2800 - state.money} 金币。</div>}</section> : <p className="ranch-owned-banner">牧场合同已经生效，可以邀请经营伙伴。</p>}<div className="partner-grid">{partners.map((partner) => <article key={partner.id}><span className="partner-sigil" aria-hidden="true"><i /></span><h3>{partner.name}</h3><p>{partner.ability}</p><footer><strong>{partner.price} 金币</strong><button id={`ranch-partner-${partner.id}`} type="button" disabled={!state.ownsMonsterRanch}>{state.ownsMonsterRanch ? '邀请伙伴' : '需先购买牧场'}</button></footer></article>)}</div></div>
+  const { ranch } = state
+  const dragon = MONSTER_PARTNERS['dragon-girl']
+
+  return <div className="ranch-content">
+    {!ranch.owned ? <section className="ranch-contract">
+      <span>林下共生协议 · 六席共生区</span>
+      <h3>雾苔共生牧场</h3>
+      <p>解锁伙伴起居室、每日产物记录与机器协作。签约后可邀请五位经营伙伴，龙娘只会通过矿洞或金币邀约加入。</p>
+      <dl><div><dt>合同价格</dt><dd>2,800 金币</dd></div><div><dt>共生席位</dt><dd>6 位伙伴</dd></div><div><dt>维护费用</dt><dd>每日 0 金币</dd></div></dl>
+      <button id="ranch-buy-contract" className="primary-button" type="button" disabled={state.money < 2800} onClick={() => dispatch({ type: 'BUY_RANCH' })}>签署牧场合同</button>
+      {state.money < 2800 && <div className="inline-warning">还差 {2800 - state.money} 金币。</div>}
+      {ranch.dragonStatus === 'promised' && <div className="inline-success">龙娘正在等待牧场建成，签约后会直接入住。</div>}
+    </section> : <p className="ranch-owned-banner">牧场合同已经生效 · 已入住 {ranch.residents.length} / 6 · 每次跨日自动结算产物</p>}
+
+    <div className="partner-grid">
+      {purchasablePartnerIds.map((partnerId) => {
+        const partner = MONSTER_PARTNERS[partnerId]
+        const owned = ranch.residents.includes(partnerId)
+        const product = partner.dailyProduct
+        const disabled = !ranch.owned || owned || state.money < partner.price!
+        const buttonLabel = owned
+          ? `${partner.name}已经入住`
+          : !ranch.owned
+            ? `需先购买牧场才能邀请${partner.name}`
+            : `邀请${partner.name}，花费 ${partner.price} 金币`
+        return <article key={partner.id} className={owned ? 'is-owned' : ''}>
+          <span className="partner-sigil" aria-hidden="true"><i /></span>
+          <span className="partner-role">{partner.role}</span>
+          <h3>{partner.name}</h3>
+          <p>{partner.ability}</p>
+          {product && <small>每日产物：{ITEM_CATALOG[product.itemId].name} ×{product.quantity}</small>}
+          <footer><strong>{owned ? '已经入住' : `${partner.price} 金币`}</strong><button id={`ranch-partner-${partner.id}`} type="button" aria-label={buttonLabel} disabled={disabled} onClick={() => dispatch({ type: 'BUY_MONSTER_PARTNER', partnerId })}>{owned ? '已入住' : ranch.owned ? '邀请伙伴' : '需先购买牧场'}</button></footer>
+        </article>
+      })}
+
+      <article className="dragon-partner-card">
+        <span className="partner-sigil dragon-sigil" aria-hidden="true"><i /></span>
+        <span className="partner-role">{dragon.role}</span>
+        <h3>{dragon.name}</h3>
+        <p>{dragon.ability}</p>
+        <small>龙娘不在商店售卖：前往矿洞第 20 层击败她，或准备 20,000 金币吸引她。</small>
+        <footer><strong>{ranch.dragonStatus === 'resident' ? '已经入住' : ranch.dragonStatus === 'promised' ? '等待牧场' : '矿洞终局伙伴'}</strong><button id="ranch-dragon-record" type="button" disabled>不可商店购买</button></footer>
+      </article>
+    </div>
+  </div>
 }

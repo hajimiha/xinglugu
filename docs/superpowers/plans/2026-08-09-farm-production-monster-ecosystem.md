@@ -153,21 +153,21 @@ Commit: `feat: 添加可扩建滚动农田`
 - Produces: `ranch: { owned, residents, dragonStatus }`；actions `BUY_RANCH`, `BUY_MONSTER_PARTNER`, `INVITE_DRAGON`。
 - Consumes: `MONSTER_PARTNERS`, `advanceGameClock`。
 
-- [ ] **Step 1: 写牧场状态红灯测试**
+- [x] **Step 1: 写牧场状态红灯测试**
 
 覆盖未购牧场拒绝伙伴、扣正确金币、禁止重复、跨 1/3 天生产、两类史莱姆叠加粘液、掉落倍率、龙娘承诺在后购牧场时入住。
 
-- [ ] **Step 2: 运行红灯并实现 reducer**
+- [x] **Step 2: 运行红灯并实现 reducer**
 
 Run: `pnpm test:run src/game/reducer.test.ts -t "牧场|魔物娘|每日产物|龙娘"`
 
 `advanceGameClock` 只按 `crossedDays` 结算，不依赖组件挂载；伙伴产物写入库存，入住数组去重。
 
-- [ ] **Step 3: 写牧场 UI 红灯测试**
+- [x] **Step 3: 写牧场 UI 红灯测试**
 
 断言五位可购买卡、龙娘不可购买说明、拥有/价格/每日产物、火水史莱姆机器助理文案和实际购买按钮 dispatch 后状态。
 
-- [ ] **Step 4: 实现牧场 UI 与状态样式**
+- [x] **Step 4: 实现牧场 UI 与状态样式**
 
 伙伴卡按目录渲染，已入住显示生产状态；龙娘使用独立终局卡，明确“矿洞第 20 层或 20,000 金币”。
 

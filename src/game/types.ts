@@ -20,6 +20,7 @@ export type AffinityStage = 'stranger' | 'acquainted' | 'trusted' | 'intimate' |
 export type NpcAction = 'chat' | 'gift' | 'trade' | 'quest' | 'profile'
 export type SkillId = 'fishing' | 'farming' | 'mining' | 'combat' | 'magic'
 export type EnergyCostMode = 'free' | 'normal' | 'double'
+export type MonsterPartnerId = 'cow-girl' | 'bee-girl' | 'spider-girl' | 'fire-slime-girl' | 'water-slime-girl' | 'dragon-girl'
 
 export interface GameRuleSettings {
   experienceMultiplier: number
@@ -227,6 +228,11 @@ export interface GameState {
   mine: { currentFloor: number; highestFloor: number; unlockedElevators: number[] }
   hospitalUsedToday: boolean
   ownsMonsterRanch: boolean
+  ranch: {
+    owned: boolean
+    residents: MonsterPartnerId[]
+    dragonStatus: 'wild' | 'promised' | 'resident'
+  }
   battle?: BattleState
   tools: { hoe: number; rod: number; pickaxe: number }
   fishing: { active: boolean; lastCatch?: string }
@@ -258,6 +264,8 @@ export type GameAction =
   | { type: 'TRAIN_COMBAT' }
   | { type: 'USE_HOSPITAL' }
   | { type: 'BUY_RANCH' }
+  | { type: 'BUY_MONSTER_PARTNER'; partnerId: MonsterPartnerId }
+  | { type: 'INVITE_DRAGON'; method: 'battle' | 'coins' }
   | { type: 'LEARN_SPELL'; spellId: string }
   | { type: 'ENTER_MINE_FLOOR'; floor: number }
   | { type: 'MINE_ORE'; floor: number }
