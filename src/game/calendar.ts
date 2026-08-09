@@ -1,4 +1,5 @@
 import { npcs } from './data'
+import { FESTIVAL_SEED_OFFERS } from './economy'
 import type { Festival, LocationId, NpcDailySchedule, ScheduleSegment, Season } from './types'
 
 export const MONTH_LENGTHS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31] as const
@@ -163,6 +164,14 @@ export const festivals: Festival[] = [
 export function getFestivalOnDay(day: number): Festival | undefined {
   const calendar = getCalendarDate(1, day)
   return festivals.find((festival) => festival.month === calendar.month && festival.date === calendar.date)
+}
+
+export function getFestivalOffers(day: number, locationId: LocationId) {
+  const festival = getFestivalOnDay(day)
+  if (!festival || festival.locationId !== locationId) return []
+  return FESTIVAL_SEED_OFFERS.filter((offer) => (
+    offer.festivalId === festival.id && offer.locationId === locationId
+  ))
 }
 
 const segment = (startMinute: number, endMinute: number, locationId: LocationId, activity: string): ScheduleSegment => ({ startMinute, endMinute, locationId, activity })

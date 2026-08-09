@@ -7,6 +7,7 @@ import {
   getCalendarDate,
   getDayOfYear,
   getFestivalOnDay,
+  getFestivalOffers,
   getNpcPresence,
   getNpcSchedule,
   getNpcsAtLocation,
@@ -36,6 +37,20 @@ describe('雾灯谷日历', () => {
     expect(festivals.every((festival) => festival.activities.length === 3)).toBe(true)
     expect(getFestivalOnDay(getDayOfYear(1, 12))?.name).toBe('迎岁灯会')
     expect(getFestivalOnDay(getDayOfYear(12, 31))?.name).toBe('守夜落雪宴')
+  })
+
+  it('只在指定节日与会场供应对应的限定种子', () => {
+    expect(getFestivalOffers(getDayOfYear(6, 21), 'fisher-home')).toEqual([
+      expect.objectContaining({ itemId: 'tide-lotus-seed' }),
+    ])
+    expect(getFestivalOffers(getDayOfYear(8, 15), 'general-store')).toEqual([
+      expect.objectContaining({ itemId: 'stone-pumpkin-seed' }),
+    ])
+    expect(getFestivalOffers(getDayOfYear(9, 9), 'smithy')).toEqual([
+      expect.objectContaining({ itemId: 'ember-berry-seed' }),
+    ])
+    expect(getFestivalOffers(getDayOfYear(6, 20), 'fisher-home')).toEqual([])
+    expect(getFestivalOffers(getDayOfYear(6, 21), 'general-store')).toEqual([])
   })
 
   it('为十五位角色配置有效且互不重复的生日', () => {

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { crops, itemDisplayNames, npcs, shopItems } from '../../game/data'
 import { useGame } from '../../game/GameContext'
+import { getFestivalOffers } from '../../game/calendar'
 import { SpecialShopPanel } from './SpecialShopPanel'
 
 const locationCategories = {
@@ -19,7 +20,12 @@ export function TradeModal() {
   const [quantity, setQuantity] = useState(1)
   const seller = npcs.find((npc) => npc.id === state.selectedNpcId)
   const allowed = locationCategories[state.location as keyof typeof locationCategories] ?? ['seed', 'material', 'gift']
-  const buyItems = shopItems.filter((item) => (allowed as readonly string[]).includes(item.category))
+  const festivalOfferIds = new Set<string>(getFestivalOffers(state.day, state.location).map((offer) => offer.itemId))
+  const buyItems = shopItems.filter((item) => (
+    item.festivalId
+      ? festivalOfferIds.has(item.id)
+      : (allowed as readonly string[]).includes(item.category)
+  ))
   const sellItems = useMemo(() => Object.entries(state.inventory).filter(([, amount]) => amount > 0).map(([id, amount]) => {
     const item = shopItems.find((entry) => entry.id === id)
     const crop = crops.find((entry) => entry.id === id)
@@ -43,7 +49,7 @@ export function TradeModal() {
     dispatch(mode === 'buy' ? { type: 'BUY_ITEM', itemId, quantity, total } : { type: 'SELL_ITEM', itemId, quantity, total })
   }
 
-  const list = mode === 'buy' ? buyItems.map((item) => ({ id: item.id, name: item.name, price: item.price, amount: state.inventory[item.id] ?? 0, detail: item.category === 'seed' ? `${item.season}季 · ${item.growthDays}日成熟` : item.description })) : sellItems.map((item) => ({ ...item, detail: `当前持有 ${item.amount}` }))
+  const list = mode === 'buy' ? buyItems.map((item) => ({ id: item.id, name: item.name, price: item.price, amount: state.inventory[item.id] ?? 0, detail: item.festivalId ? `节日限定 · 今日会场闭市前供应 · ${item.season}季作物` : item.category === 'seed' ? `${item.season}季 · ${item.growthDays}日成熟` : item.description })) : sellItems.map((item) => ({ ...item, detail: `当前持有 ${item.amount}` }))
 
   return <div className="trade-modal-content">
     <div className="modal-summary"><div><span>柜台</span><strong>{seller?.name ?? '自助柜台'}</strong></div><div><span>余额</span><strong>{state.money.toLocaleString('zh-CN')} 金币</strong></div></div>

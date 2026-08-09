@@ -271,19 +271,19 @@ Commit: `feat: 完成矿洞龙巢与金属锻造`
 - Produces: `getFestivalOffers(day, locationId)`。
 - Consumes: `FESTIVAL_SEED_OFFERS`, `getFestivalOnDay`。
 
-- [ ] **Step 1: 写节日条件红灯测试**
+- [x] **Step 1: 写节日条件红灯测试**
 
 按具体年日换算断言：6 月 21 日渔家只有潮汐莲种子；8 月 15 日杂货店只有岩纹南瓜；9 月 9 日铁匠铺只有余烬莓；日期或地点任一不符时三者均不可购买。
 
-- [ ] **Step 2: 运行红灯并实现筛选器**
+- [x] **Step 2: 运行红灯并实现筛选器**
 
 Run: `pnpm test:run src/components/modals/economy.test.tsx`
 
-- [ ] **Step 3: 将限定商品集成交易 UI**
+- [x] **Step 3: 将限定商品集成交易 UI**
 
 常驻 `buyItems` 排除 `festivalId` 项；仅把当前会场命中的商品追加，并显示“节日限定 / 今日会场闭市前供应”。
 
-- [ ] **Step 4: 运行定向测试与提交推送**
+- [x] **Step 4: 运行定向测试与提交推送**
 
 Run: `pnpm test:run src/components/modals/economy.test.tsx src/game/calendar.test.ts && pnpm exec tsc -b --pretty false`
 
