@@ -1,8 +1,9 @@
-import { locations, spells } from './data'
+import { crops, locations, spells } from './data'
 import { getSeasonForDay, getWeekday, MAX_GAME_YEAR } from './calendar'
+import { ITEM_CATALOG, MACHINE_RECIPES, MINE_MAX_FLOOR, MONSTER_PARTNERS } from './economy'
 import { initialGameState } from './reducer'
 import { normalizeGameRules } from './rules'
-import type { AffinityStage, GameState, LocationId, Relationship, SkillId } from './types'
+import type { AffinityStage, FarmMachineState, GameState, LocationId, MachineId, MonsterPartnerId, Plot, Relationship, SkillId } from './types'
 
 export const GAME_SAVE_STORAGE_KEY = 'mistvale-game-save-v1'
 export const GAME_SAVE_SCHEMA_VERSION = 1 as const
@@ -54,25 +55,49 @@ export function sanitizeGameState(value: Partial<GameState>): GameState {
     }]
   })) as GameState['skills']
 
+  const knownItemIds = new Set(Object.keys(ITEM_CATALOG))
   const inventory = Object.fromEntries(Object.entries(isObject(value.inventory) ? value.inventory : {})
-    .filter((entry): entry is [string, number] => typeof entry[1] === 'number' && Number.isFinite(entry[1]) && entry[1] >= 0)
+    .filter((entry): entry is [string, number] => knownItemIds.has(entry[0]) && typeof entry[1] === 'number' && Number.isFinite(entry[1]) && entry[1] >= 0)
     .map(([id, amount]) => [id, Math.floor(amount)]))
 
-  const rawPlots = Array.isArray(value.plots) ? value.plots : []
-  const plots = initialGameState.plots.map((fallback) => {
-    const raw = rawPlots.find((plot) => isObject(plot) && plot.id === fallback.id)
-    if (!isObject(raw)) return { ...fallback }
-    const cropId = typeof raw.cropId === 'string' ? raw.cropId : undefined
-    return {
-      ...fallback,
-      ...(cropId ? { cropId } : {}),
-      ...(typeof raw.plantedAt === 'number' && Number.isFinite(raw.plantedAt) && raw.plantedAt >= 0 ? { plantedAt: raw.plantedAt } : {}),
-      ...(typeof raw.remainingHours === 'number' && Number.isFinite(raw.remainingHours) && raw.remainingHours >= 0 ? { remainingHours: raw.remainingHours } : {}),
-      watered: boolean(raw.watered, fallback.watered),
-      fertilized: boolean(raw.fertilized, fallback.fertilized),
-      ready: boolean(raw.ready, fallback.ready),
+  const fallbackPlots = () => initialGameState.plots.map((plot) => ({ ...plot }))
+  const knownCropIds = new Set(crops.map((crop) => crop.id))
+  const sanitizePlots = (): Plot[] => {
+    if (!Array.isArray(value.plots) || value.plots.length < initialGameState.plots.length) return fallbackPlots()
+    const seen = new Set<string>()
+    const parsed: Plot[] = []
+    for (const candidate of value.plots) {
+      if (!isObject(candidate)) return fallbackPlots()
+      const { id, row, column } = candidate
+      if (typeof id !== 'string' || !Number.isInteger(row) || !Number.isInteger(column)) return fallbackPlots()
+      const safeRow = row as number
+      const safeColumn = column as number
+      const coordinate = `${safeRow}-${safeColumn}`
+      if (safeRow < 1 || safeRow > 30 || safeColumn < 1 || safeColumn > 12 || id !== `plot-${coordinate}` || seen.has(coordinate)) return fallbackPlots()
+      seen.add(coordinate)
+      const cropId = typeof candidate.cropId === 'string' && knownCropIds.has(candidate.cropId) ? candidate.cropId : undefined
+      parsed.push({
+        id,
+        row: safeRow,
+        column: safeColumn,
+        ...(cropId ? { cropId } : {}),
+        ...(cropId && typeof candidate.plantedAt === 'number' && Number.isFinite(candidate.plantedAt) && candidate.plantedAt >= 0 ? { plantedAt: candidate.plantedAt } : {}),
+        ...(cropId && typeof candidate.remainingHours === 'number' && Number.isFinite(candidate.remainingHours) && candidate.remainingHours >= 0 ? { remainingHours: candidate.remainingHours } : {}),
+        watered: boolean(candidate.watered, false),
+        fertilized: boolean(candidate.fertilized, false),
+        ready: cropId ? boolean(candidate.ready, false) : false,
+      })
     }
-  })
+
+    const maxRow = Math.max(...parsed.map((plot) => plot.row))
+    for (let row = 1; row <= maxRow; row += 1) {
+      const columns = parsed.filter((plot) => plot.row === row).map((plot) => plot.column).sort((a, b) => a - b)
+      const validLength = row <= 4 ? columns.length === 6 : [6, 8, 10, 12].includes(columns.length)
+      if (!validLength || columns.some((column, index) => column !== index + 1)) return fallbackPlots()
+    }
+    return parsed.sort((left, right) => left.row - right.row || left.column - right.column)
+  }
+  const plots = sanitizePlots()
 
   const affinityStages = new Set<AffinityStage>(['stranger', 'acquainted', 'trusted', 'intimate', 'bonded'])
   const rawRelationships: Record<string, unknown> = isObject(value.relationships) ? value.relationships : {}
@@ -96,14 +121,50 @@ export function sanitizeGameState(value: Partial<GameState>): GameState {
   })
 
   const rawMine: Record<string, unknown> = isObject(value.mine) ? value.mine : {}
-  const highestFloor = integer(rawMine.highestFloor, initialGameState.mine.highestFloor, 1)
-  const currentFloor = Math.min(integer(rawMine.currentFloor, initialGameState.mine.currentFloor, 1), highestFloor)
+  const highestFloor = Math.min(MINE_MAX_FLOOR, integer(rawMine.highestFloor, initialGameState.mine.highestFloor, 1))
+  const currentFloor = Math.min(MINE_MAX_FLOOR, integer(rawMine.currentFloor, initialGameState.mine.currentFloor, 1), highestFloor)
   const unlockedElevators = Array.isArray(rawMine.unlockedElevators)
-    ? [...new Set(rawMine.unlockedElevators.filter((floor: unknown): floor is number => typeof floor === 'number' && Number.isInteger(floor) && floor > 0 && floor <= highestFloor && floor % 5 === 0))]
+    ? [...new Set(rawMine.unlockedElevators.filter((floor: unknown): floor is number => typeof floor === 'number' && Number.isInteger(floor) && [5, 10, 15].includes(floor) && floor <= highestFloor))].sort((a, b) => a - b)
     : []
 
   const rawTools: Record<string, unknown> = isObject(value.tools) ? value.tools : {}
   const toolLevel = (candidate: unknown, fallback: number) => Math.min(4, integer(candidate, fallback, 1))
+  const rawEquipment: Record<string, unknown> = isObject(value.equipment) ? value.equipment : {}
+  const rawRanch: Record<string, unknown> = isObject(value.ranch) ? value.ranch : {}
+  const legacyRanchOwned = boolean(value.ownsMonsterRanch, initialGameState.ownsMonsterRanch)
+  const ranchOwned = boolean(rawRanch.owned, legacyRanchOwned)
+  const partnerIds = new Set(Object.keys(MONSTER_PARTNERS) as MonsterPartnerId[])
+  let residents = ranchOwned
+    ? [...new Set(stringList(rawRanch.residents).filter((id): id is MonsterPartnerId => partnerIds.has(id as MonsterPartnerId)))]
+    : []
+  const dragonStates = new Set(['wild', 'promised', 'resident'])
+  let dragonStatus = dragonStates.has(String(rawRanch.dragonStatus))
+    ? rawRanch.dragonStatus as GameState['ranch']['dragonStatus']
+    : 'wild'
+  if (!ranchOwned && dragonStatus === 'resident') dragonStatus = 'promised'
+  if (ranchOwned && (dragonStatus === 'resident' || dragonStatus === 'promised' || residents.includes('dragon-girl'))) {
+    dragonStatus = 'resident'
+    if (!residents.includes('dragon-girl')) residents.push('dragon-girl')
+  } else if (dragonStatus !== 'resident') {
+    residents = residents.filter((id) => id !== 'dragon-girl')
+  }
+  const ranch: GameState['ranch'] = { owned: ranchOwned, residents, dragonStatus }
+
+  const rawMachines: Record<string, unknown> = isObject(value.machines) ? value.machines : {}
+  const sanitizeMachine = (machineId: MachineId): FarmMachineState => {
+    const raw: Record<string, unknown> = isObject(rawMachines[machineId]) ? rawMachines[machineId] as Record<string, unknown> : {}
+    const built = boolean(raw.built, initialGameState.machines[machineId].built)
+    if (!built || !isObject(raw.job)) return { built }
+    const recipe = typeof raw.job.recipeId === 'string' ? MACHINE_RECIPES[raw.job.recipeId] : undefined
+    const batches = raw.job.batches
+    const completesAt = raw.job.completesAt
+    const poweredBy = raw.job.poweredBy
+    if (!recipe || recipe.machine !== machineId || !Number.isInteger(batches) || (batches as number) < 1 || (batches as number) > 999 || typeof completesAt !== 'number' || !Number.isFinite(completesAt) || completesAt < 0 || (poweredBy !== 'magic' && poweredBy !== 'partner')) return { built }
+    const outputQuantity = recipe.outputPerBatch * (batches as number)
+    if (raw.job.outputItemId !== recipe.outputItemId || raw.job.outputQuantity !== outputQuantity) return { built }
+    return { built, job: { recipeId: recipe.id, batches: batches as number, outputItemId: recipe.outputItemId, outputQuantity, completesAt, poweredBy } }
+  }
+  const machines: GameState['machines'] = { furnace: sanitizeMachine('furnace'), mill: sanitizeMachine('mill') }
   const rawFishing: Record<string, unknown> = isObject(value.fishing) ? value.fishing : {}
   const knownSpellIds = new Set(spells.map((spell) => spell.id))
   const year = Math.min(MAX_GAME_YEAR, integer(value.year, initialGameState.year, 1))
@@ -138,12 +199,18 @@ export function sanitizeGameState(value: Partial<GameState>): GameState {
     knownSpells: stringList(value.knownSpells).filter((id) => knownSpellIds.has(id)),
     mine: { currentFloor, highestFloor, unlockedElevators },
     hospitalUsedToday: boolean(value.hospitalUsedToday, initialGameState.hospitalUsedToday),
-    ownsMonsterRanch: boolean(value.ownsMonsterRanch, initialGameState.ownsMonsterRanch),
+    ownsMonsterRanch: ranchOwned,
+    ranch,
+    machines,
     battle: undefined,
     tools: {
       hoe: toolLevel(rawTools.hoe, initialGameState.tools.hoe),
       rod: toolLevel(rawTools.rod, initialGameState.tools.rod),
       pickaxe: toolLevel(rawTools.pickaxe, initialGameState.tools.pickaxe),
+    },
+    equipment: {
+      sword: toolLevel(rawEquipment.sword, initialGameState.equipment.sword),
+      armor: toolLevel(rawEquipment.armor, initialGameState.equipment.armor),
     },
     fishing: {
       active: false,

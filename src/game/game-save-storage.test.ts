@@ -112,4 +112,82 @@ describe('版本化游戏自动存档', () => {
     expect(saveGameState(initialGameState, blockedStorage)).toBeNull()
     expect(() => clearGameSave(blockedStorage)).not.toThrow()
   })
+
+  it('完整保留动态田地、牧场伙伴、机器队列、装备与二十层矿洞进度', () => {
+    const expandedPlots = [
+      ...initialGameState.plots,
+      ...Array.from({ length: 8 }, (_, index) => ({
+        id: `plot-5-${index + 1}`,
+        row: 5,
+        column: index + 1,
+        ...(index === 0 ? { cropId: 'ember-berry', plantedAt: 123, remainingHours: 12 } : {}),
+        watered: index === 0,
+        fertilized: false,
+        ready: false,
+      })),
+    ]
+    const sanitized = sanitizeGameState({
+      ...initialGameState,
+      inventory: { milk: 3, 'month-mushroom': 8, 'moss-herb': 4, unknown: 99 },
+      plots: expandedPlots,
+      ownsMonsterRanch: true,
+      ranch: { owned: true, residents: ['cow-girl', 'cow-girl', 'fire-slime-girl', 'dragon-girl'], dragonStatus: 'resident' },
+      machines: {
+        furnace: { built: true, job: { recipeId: 'smelt-iron', batches: 2, outputItemId: 'iron-ingot', outputQuantity: 2, completesAt: 9876, poweredBy: 'partner' } },
+        mill: { built: true },
+      },
+      mine: { currentFloor: 20, highestFloor: 20, unlockedElevators: [5, 10, 15] },
+      tools: { hoe: 4, rod: 2, pickaxe: 3 },
+      equipment: { sword: 3, armor: 4 },
+    } as never)
+
+    expect(sanitized.plots).toHaveLength(32)
+    expect(sanitized.plots.at(-8)).toMatchObject({ id: 'plot-5-1', cropId: 'ember-berry', remainingHours: 12 })
+    expect(sanitized.inventory).toEqual({ milk: 3 })
+    expect(sanitized.ranch).toEqual({ owned: true, residents: ['cow-girl', 'fire-slime-girl', 'dragon-girl'], dragonStatus: 'resident' })
+    expect(sanitized.ownsMonsterRanch).toBe(true)
+    expect(sanitized.machines.furnace.job).toMatchObject({ recipeId: 'smelt-iron', batches: 2, outputItemId: 'iron-ingot', outputQuantity: 2, completesAt: 9876 })
+    expect(sanitized.mine).toEqual({ currentFloor: 20, highestFloor: 20, unlockedElevators: [5, 10, 15] })
+    expect(sanitized.equipment).toEqual({ sword: 3, armor: 4 })
+  })
+
+  it('迁移旧牧场布尔值并修复龙娘约定状态', () => {
+    const legacy = sanitizeGameState({
+      ...initialGameState,
+      ownsMonsterRanch: true,
+      ranch: undefined,
+    } as never)
+    expect(legacy.ranch).toEqual({ owned: true, residents: [], dragonStatus: 'wild' })
+
+    const promised = sanitizeGameState({
+      ...initialGameState,
+      ownsMonsterRanch: false,
+      ranch: { owned: false, residents: ['dragon-girl'], dragonStatus: 'resident' },
+    } as never)
+    expect(promised.ranch).toEqual({ owned: false, residents: [], dragonStatus: 'promised' })
+  })
+
+  it('拒绝断行、重复或超过三十行的田地并净化伪造生产状态', () => {
+    const corruptPlots = [
+      ...initialGameState.plots,
+      { id: 'plot-6-1', row: 6, column: 1, watered: false, fertilized: false, ready: false },
+      { id: 'plot-6-1', row: 6, column: 1, watered: false, fertilized: false, ready: false },
+      { id: 'plot-31-1', row: 31, column: 1, watered: false, fertilized: false, ready: false },
+    ]
+    const sanitized = sanitizeGameState({
+      ...initialGameState,
+      plots: corruptPlots,
+      mine: { currentFloor: 88, highestFloor: 99, unlockedElevators: [5, 10, 15, 20, 25] },
+      machines: {
+        furnace: { built: true, job: { recipeId: 'mill-flour', batches: -2, outputItemId: 'diamond-ingot', outputQuantity: 999, completesAt: Number.POSITIVE_INFINITY, poweredBy: 'partner' } },
+        mill: { built: false, job: { recipeId: 'mill-flour', batches: 1, outputItemId: 'flour', outputQuantity: 1, completesAt: 100, poweredBy: 'magic' } },
+      },
+      equipment: { sword: 99, armor: 0 },
+    } as never)
+
+    expect(sanitized.plots).toEqual(initialGameState.plots)
+    expect(sanitized.mine).toEqual({ currentFloor: 20, highestFloor: 20, unlockedElevators: [5, 10, 15] })
+    expect(sanitized.machines).toEqual({ furnace: { built: true }, mill: { built: false } })
+    expect(sanitized.equipment).toEqual({ sword: 4, armor: 1 })
+  })
 })

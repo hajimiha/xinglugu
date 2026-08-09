@@ -299,19 +299,19 @@ Commit: `feat: 添加三种节日限定种子`
 - Consumes: `ITEM_CATALOG`, `MACHINE_RECIPES`, `MONSTER_PARTNERS`, `MINE_MAX_FLOOR`。
 - Produces: 兼容旧档的完整 `GameState`。
 
-- [ ] **Step 1: 写迁移红灯测试**
+- [x] **Step 1: 写迁移红灯测试**
 
 覆盖旧 `ownsMonsterRanch=true`、24 格旧田地、合法动态田地、重复/断行/超过 30 行、机器队列、伙伴去重、龙娘状态、装备等级、矿洞 20 层上限、删除物品和未知物品过滤。
 
-- [ ] **Step 2: 运行红灯**
+- [x] **Step 2: 运行红灯**
 
 Run: `pnpm test:run src/game/game-save-storage.test.ts`
 
-- [ ] **Step 3: 实现逐字段净化**
+- [x] **Step 3: 实现逐字段净化**
 
 地块先校验行列和 ID 一致性再排序；背包只保留目录 ID；队列只接受已知配方、正整数批数、有限完成时间和匹配输出；伙伴只保留六类且龙娘与状态一致。
 
-- [ ] **Step 4: 运行绿灯与提交推送**
+- [x] **Step 4: 运行绿灯与提交推送**
 
 Run: `pnpm test:run src/game/game-save-storage.test.ts src/game/GameContext.test.tsx && pnpm exec tsc -b --pretty false`
 
