@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { npcs } from '../game/data'
 import { DEFAULT_TAGS } from './types'
-import { createMistvaleDefaults } from './defaults'
+import { createMistvaleDefaults, DEFAULT_CONTENT_VERSION, PRODUCTION_PARTNERS_ID } from './defaults'
 
 describe('雾灯谷酒馆默认内容', () => {
   it('创建完整且默认等待模型密钥的酒馆种子', () => {
     const defaults = createMistvaleDefaults()
     const comments = defaults.lorebooks.flatMap((book) => book.entries.map((entry) => entry.comment))
 
-    expect(defaults.characters).toHaveLength(15)
-    expect(defaults.lorebooks).toHaveLength(3)
-    expect(defaults.characters.map((card) => card.npcId)).toEqual(npcs.map((npc) => npc.id))
+    expect(defaults.characters).toHaveLength(21)
+    expect(defaults.lorebooks).toHaveLength(4)
+    expect(defaults.characters.slice(0, 15).map((card) => card.npcId)).toEqual(npcs.map((npc) => npc.id))
     expect(defaults.characters.every((card) => card.id === `mistvale-character-${card.npcId}`)).toBe(true)
     expect(comments).toEqual(expect.arrayContaining(['五行克制', '每日精力', '地点营业']))
     expect(defaults.settings).not.toHaveProperty('adapterMode')
@@ -24,6 +24,26 @@ describe('雾灯谷酒馆默认内容', () => {
     expect(defaults.presets[0].settings).not.toHaveProperty('apiKey')
     expect(defaults.presets[0].description).toContain('模型')
     expect(defaults.presets[0].description).not.toContain('本地剧情引擎')
+    expect(DEFAULT_CONTENT_VERSION).toBe(3)
+  })
+
+  it('提供六位共生伙伴角色卡与完整生产世界书', () => {
+    const defaults = createMistvaleDefaults()
+    const productionBook = defaults.lorebooks.find((book) => book.id === PRODUCTION_PARTNERS_ID)
+    const partnerIds = ['cow-girl', 'bee-girl', 'spider-girl', 'fire-slime-girl', 'water-slime-girl', 'dragon-girl']
+    const partnerCards = defaults.characters.filter((card) => partnerIds.includes(card.npcId))
+
+    expect(productionBook?.entries.map((item) => item.comment)).toEqual(expect.arrayContaining([
+      '牛奶娘', '蜂娘', '蜘蛛娘', '火史莱姆娘', '水史莱姆娘', '龙娘', '农场生产链',
+    ]))
+    expect(productionBook?.entries.find((item) => item.comment === '蜘蛛娘')?.content).toContain('线团')
+    expect(productionBook?.entries.find((item) => item.comment === '龙娘')?.content).toContain('第20层')
+    expect(partnerCards).toHaveLength(6)
+    expect(partnerCards.every((card) => card.tags.includes('女性角色') && card.tags.includes('共生伙伴'))).toBe(true)
+    expect(partnerCards.every((card) => card.lorebookIds.includes(PRODUCTION_PARTNERS_ID))).toBe(true)
+    expect(partnerCards.every((card) => ['stranger', 'acquainted', 'trusted', 'intimate', 'bonded'].every((stage) => stage in card.portraitByAffinity))).toBe(true)
+    expect(defaults.characters.every((card) => card.lorebookIds.includes(PRODUCTION_PARTNERS_ID))).toBe(true)
+    expect(defaults.settings.activeLorebookIds).toContain(PRODUCTION_PARTNERS_ID)
   })
 
   it('提供完整岁时世界书并挂载到每张角色卡', () => {

@@ -4,7 +4,7 @@ import type { MistvaleTavernDatabase } from './database'
 import { createTavernDatabase } from './database'
 import { createTavernRepository } from './repository'
 import { createContentPack } from './content-pack'
-import { createMistvaleDefaults } from './defaults'
+import { createMistvaleDefaults, PRODUCTION_PARTNERS_ID } from './defaults'
 
 let database: MistvaleTavernDatabase | undefined
 
@@ -22,13 +22,13 @@ describe('雾灯谷酒馆仓储', () => {
     await repository.initialize()
 
     const characters = await repository.listCharacters()
-    expect(characters).toHaveLength(15)
+    expect(characters).toHaveLength(21)
     const edited = { ...characters[0], personality: '玩家自定义性格', updatedAt: Date.now() + 1 }
     await repository.saveCharacter(edited)
 
     await repository.initialize()
     expect((await repository.getCharacter(edited.id))?.personality).toBe('玩家自定义性格')
-    expect(await repository.listLorebooks()).toHaveLength(3)
+    expect(await repository.listLorebooks()).toHaveLength(4)
     const settings = await repository.getSettings()
     expect(settings).not.toHaveProperty('adapterMode')
     expect(settings.api.model).toBe('deepseek-v4-flash')
@@ -131,5 +131,44 @@ describe('雾灯谷酒馆仓储', () => {
     expect((await repository.getCharacter(loran.id))?.personality).toBe(customPersonality)
     expect((await repository.getSettings()).activeLorebookIds).toContain(calendarId)
     expect((await repository.getSession('legacy-session'))?.lorebookIds).toContain(calendarId)
+  })
+
+  it('从内容版本二只补入生产世界书与六位伙伴，并保留删除和自定义内容', async () => {
+    database = createTavernDatabase(`mistvale-production-migration-${crypto.randomUUID()}`)
+    const repository = createTavernRepository(database)
+    await repository.initialize()
+    const defaults = createMistvaleDefaults()
+    const partnerCardIds = defaults.characters.filter((card) => card.tags.includes('共生伙伴')).map((card) => card.id)
+    const settings = await repository.getSettings()
+    const loran = (await repository.listCharacters()).find((card) => card.npcId === 'loran')!
+    await database.lorebooks.bulkDelete([PRODUCTION_PARTNERS_ID, 'mistvale-world-rules', 'mistvale-village-archive'])
+    await database.characters.bulkDelete(partnerCardIds)
+    await database.characters.put({
+      ...loran,
+      personality: '玩家自定义且必须保留',
+      portraitByAffinity: { ...loran.portraitByAffinity, stranger: '/portraits/custom-loran.webp' },
+      lorebookIds: loran.lorebookIds.filter((id) => id !== PRODUCTION_PARTNERS_ID),
+    })
+    await database.sessions.put({
+      id: 'v2-session', name: '版本二会话', npcId: 'loran', characterId: loran.id, characterName: '洛岚', userName: '旅行者', presetId: null,
+      lorebookIds: loran.lorebookIds.filter((id) => id !== PRODUCTION_PARTNERS_ID), variables: {}, messages: [], createdAt: 1, updatedAt: 1,
+    })
+    await database.settings.put({
+      ...settings,
+      defaultContentVersion: 2,
+      activeLorebookIds: settings.activeLorebookIds.filter((id) => id !== PRODUCTION_PARTNERS_ID),
+    })
+
+    await repository.initialize()
+
+    expect(await repository.getLorebook(PRODUCTION_PARTNERS_ID)).toBeDefined()
+    expect(await repository.getLorebook('mistvale-world-rules')).toBeUndefined()
+    expect(await repository.getLorebook('mistvale-village-archive')).toBeUndefined()
+    expect((await repository.listCharacters()).filter((card) => card.tags.includes('共生伙伴'))).toHaveLength(6)
+    expect((await repository.getCharacter(loran.id))?.personality).toBe('玩家自定义且必须保留')
+    expect((await repository.getCharacter(loran.id))?.portraitByAffinity.stranger).toBe('/portraits/custom-loran.webp')
+    expect((await repository.getCharacter(loran.id))?.lorebookIds).toContain(PRODUCTION_PARTNERS_ID)
+    expect((await repository.getSettings()).activeLorebookIds).toContain(PRODUCTION_PARTNERS_ID)
+    expect((await repository.getSession('v2-session'))?.lorebookIds).toContain(PRODUCTION_PARTNERS_ID)
   })
 })

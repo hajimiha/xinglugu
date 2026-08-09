@@ -1,4 +1,4 @@
-import { CALENDAR_FESTIVALS_ID, createMistvaleDefaults, DEFAULT_CONTENT_VERSION } from './defaults'
+import { CALENDAR_FESTIVALS_ID, createMistvaleDefaults, DEFAULT_CONTENT_VERSION, MONSTER_GIRL_CARD_IDS, PRODUCTION_PARTNERS_ID } from './defaults'
 import { normalizeTavernSettings } from './api-config'
 import type { MistvaleTavernDatabase } from './database'
 import { tavernDatabase } from './database'
@@ -51,14 +51,21 @@ class DexieTavernRepository implements TavernRepository {
       async () => {
         const storedSettings = await this.database.settings.get('mistvale-settings')
         const shouldPublishPack = Boolean(contentPack && storedSettings?.contentPackVersion !== contentPack.contentVersion)
-        const shouldMigrateDefaults = (storedSettings?.defaultContentVersion ?? 1) < DEFAULT_CONTENT_VERSION
+        const storedContentVersion = storedSettings?.defaultContentVersion ?? 1
+        const shouldMigrateCalendar = storedContentVersion < 2
+        const shouldMigrateProduction = storedContentVersion < 3
+        const shouldMigrateDefaults = storedContentVersion < DEFAULT_CONTENT_VERSION
+        const migrationLorebookIds = [
+          ...(shouldMigrateCalendar ? [CALENDAR_FESTIVALS_ID] : []),
+          ...(shouldMigrateProduction ? [PRODUCTION_PARTNERS_ID] : []),
+        ]
         if ((await this.database.lorebooks.count()) === 0 && !storedSettings) {
           await this.database.lorebooks.bulkAdd(mergeById(defaults.lorebooks, contentPack?.lorebooks ?? []))
         } else {
           if (shouldMigrateDefaults) {
             const existingIds = new Set((await this.database.lorebooks.toArray()).map((book) => book.id))
-            const calendarBook = defaults.lorebooks.find((book) => book.id === CALENDAR_FESTIVALS_ID)
-            if (calendarBook && !existingIds.has(CALENDAR_FESTIVALS_ID)) await this.database.lorebooks.add(calendarBook)
+            const missingMigrationBooks = defaults.lorebooks.filter((book) => migrationLorebookIds.includes(book.id) && !existingIds.has(book.id))
+            if (missingMigrationBooks.length) await this.database.lorebooks.bulkAdd(missingMigrationBooks)
           }
           if (shouldPublishPack && contentPack?.lorebooks.length) await this.database.lorebooks.bulkPut(contentPack.lorebooks)
         }
@@ -74,9 +81,14 @@ class DexieTavernRepository implements TavernRepository {
           if (shouldMigrateDefaults) {
             const defaultCharacterIds = new Set(defaults.characters.map((card) => card.id))
             const migratedCharacters = (await this.database.characters.toArray())
-              .filter((card) => defaultCharacterIds.has(card.id) && !card.lorebookIds.includes(CALENDAR_FESTIVALS_ID))
-              .map((card) => ({ ...card, lorebookIds: [...card.lorebookIds, CALENDAR_FESTIVALS_ID] }))
+              .filter((card) => defaultCharacterIds.has(card.id) && migrationLorebookIds.some((id) => !card.lorebookIds.includes(id)))
+              .map((card) => ({ ...card, lorebookIds: Array.from(new Set([...card.lorebookIds, ...migrationLorebookIds])) }))
             if (migratedCharacters.length) await this.database.characters.bulkPut(migratedCharacters)
+            if (shouldMigrateProduction) {
+              const existingIds = new Set((await this.database.characters.toArray()).map((card) => card.id))
+              const missingPartnerCards = defaults.characters.filter((card) => MONSTER_GIRL_CARD_IDS.includes(card.id) && !existingIds.has(card.id))
+              if (missingPartnerCards.length) await this.database.characters.bulkAdd(missingPartnerCards)
+            }
           }
         }
         if ((await this.database.sessions.count()) === 0 && defaults.sessions.length > 0) {
@@ -84,8 +96,8 @@ class DexieTavernRepository implements TavernRepository {
         } else if (shouldMigrateDefaults) {
           const defaultNpcIds = new Set(defaults.characters.map((card) => card.npcId))
           const migratedSessions = (await this.database.sessions.toArray())
-            .filter((session) => session.npcId && defaultNpcIds.has(session.npcId) && !session.lorebookIds.includes(CALENDAR_FESTIVALS_ID))
-            .map((session) => ({ ...session, lorebookIds: [...session.lorebookIds, CALENDAR_FESTIVALS_ID] }))
+            .filter((session) => session.npcId && defaultNpcIds.has(session.npcId) && migrationLorebookIds.some((id) => !session.lorebookIds.includes(id)))
+            .map((session) => ({ ...session, lorebookIds: Array.from(new Set([...session.lorebookIds, ...migrationLorebookIds])) }))
           if (migratedSessions.length) await this.database.sessions.bulkPut(migratedSessions)
         }
         if ((await this.database.settings.count()) === 0) {
@@ -95,7 +107,7 @@ class DexieTavernRepository implements TavernRepository {
             ...(shouldPublishPack && contentPack ? { contentPackVersion: contentPack.contentVersion } : {}),
             ...(shouldMigrateDefaults ? {
               defaultContentVersion: DEFAULT_CONTENT_VERSION,
-              activeLorebookIds: Array.from(new Set([...(storedSettings?.activeLorebookIds ?? []), CALENDAR_FESTIVALS_ID])),
+              activeLorebookIds: Array.from(new Set([...(storedSettings?.activeLorebookIds ?? []), ...migrationLorebookIds])),
             } : {}),
           })
         }

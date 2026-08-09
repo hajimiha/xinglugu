@@ -332,29 +332,29 @@ Commit: `feat: 迁移生产链与牧场存档`
 - Produces: `PRODUCTION_PARTNERS_ID`, `DEFAULT_CONTENT_VERSION=3`、六张魔物娘卡。
 - Consumes: `MONSTER_PARTNERS` 和角色卡上传/导出基础设施。
 
-- [ ] **Step 1: 写默认内容红灯测试**
+- [x] **Step 1: 写默认内容红灯测试**
 
 断言四本默认世界书、21 张角色卡、新世界书六位伙伴条目和生产规则；每张魔物娘卡含五阶段立绘对象、女性标签与新世界书绑定；所有居民卡也绑定新生产书。
 
-- [ ] **Step 2: 写 v2→v3 精准迁移红灯测试**
+- [x] **Step 2: 写 v2→v3 精准迁移红灯测试**
 
 删除世界规则和村庄档案后升级，断言它们不复活；只新增生产书和缺失的六张魔物娘卡；自定义居民卡文字/立绘不覆盖；设置与默认会话增加生产书绑定。
 
-- [ ] **Step 3: 运行红灯并实现默认内容/迁移**
+- [x] **Step 3: 运行红灯并实现默认内容/迁移**
 
 Run: `pnpm test:run src/sillytavern/defaults.test.ts src/sillytavern/repository.test.ts`
 
 迁移以显式 `PRODUCTION_PARTNERS_ID` 和 `monsterGirlCardIds` 为白名单，不对全部默认内容做 `bulkPut`。
 
-- [ ] **Step 4: 更新角色卡面板文案与回退**
+- [x] **Step 4: 更新角色卡面板文案与回退**
 
 标题显示“居民与共生伙伴”，动态数量不再写死十五；未知 `locationId` 显示“苔灯农场·共生牧场”，五阶段上传 ID 保持唯一。
 
-- [ ] **Step 5: 更新仓库内容包并验证解析**
+- [x] **Step 5: 更新仓库内容包并验证解析**
 
 用默认内容生成无立绘占位的有效 JSON，版本号提升；运行内容包 schema 测试，确保各设备可加载。
 
-- [ ] **Step 6: 运行定向测试与提交推送**
+- [x] **Step 6: 运行定向测试与提交推送**
 
 Run: `pnpm test:run src/sillytavern/defaults.test.ts src/sillytavern/repository.test.ts src/sillytavern/content-pack.test.ts src/components/SillyTavern/TavernHubModal.test.tsx && pnpm exec tsc -b --pretty false`
 

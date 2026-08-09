@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createMistvaleDefaults } from './defaults'
 import { createContentPack, parseContentPack } from './content-pack'
+import repositoryContentPack from '../../public/content/mistvale-content-pack.json'
 
 describe('仓库酒馆内容包', () => {
   it('导出世界书、预设、角色卡与可发布版本号', () => {
@@ -13,10 +14,10 @@ describe('仓库酒馆内容包', () => {
     })
 
     expect(pack).toMatchObject({ schemaVersion: 1, contentVersion: '2026.08.08.2' })
-    expect(pack.lorebooks).toHaveLength(3)
+    expect(pack.lorebooks).toHaveLength(4)
     expect(pack.lorebooks.map((book) => book.id)).toContain('mistvale-calendar-festivals')
     expect(pack.presets).toHaveLength(1)
-    expect(pack.characters).toHaveLength(15)
+    expect(pack.characters).toHaveLength(21)
   })
 
   it('拒绝缺少版本号或包含非图像立绘的仓库包', () => {
@@ -48,5 +49,12 @@ describe('仓库酒馆内容包', () => {
     }
     const pack = createContentPack({ contentVersion: 'grouped-preset', lorebooks: [], presets: [groupedPreset], characters: [] })
     expect(pack.presets[0].settings.prompt_order).toEqual(groupedPreset.settings.prompt_order)
+  })
+
+  it('仓库内置内容包可解析并发布六位共生伙伴', () => {
+    const pack = parseContentPack(repositoryContentPack)
+    expect(pack.lorebooks.map((book) => book.id)).toContain('mistvale-production-partners')
+    expect(pack.characters).toHaveLength(6)
+    expect(pack.characters.every((card) => card.tags.includes('共生伙伴'))).toBe(true)
   })
 })

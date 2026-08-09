@@ -47,7 +47,9 @@ describe('酒馆中枢', () => {
     expect(screen.getByRole('button', { name: '导出当前预设' })).toBeVisible()
 
     await user.click(screen.getByRole('tab', { name: '角色卡' }))
-    await waitFor(() => expect(screen.getAllByRole('button', { name: /编辑角色卡/ })).toHaveLength(15))
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /编辑角色卡/ })).toHaveLength(21))
+    expect(screen.getByText('居民与共生伙伴')).toBeVisible()
+    expect(screen.getAllByText(/苔灯农场·共生牧场/).length).toBeGreaterThan(0)
     expect(screen.getByRole('button', { name: '导出仓库内容包' })).toBeVisible()
     expect(screen.getByText(/public\/content\/mistvale-content-pack\.json/)).toBeVisible()
   })

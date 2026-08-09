@@ -1,6 +1,6 @@
-import { locations, npcs } from '../game/data'
+import { locations, MONSTER_PARTNERS, npcs } from '../game/data'
 import { festivals, formatClock, npcSchedules, WEEKDAYS } from '../game/calendar'
-import type { Npc } from '../game/types'
+import type { MonsterPartnerId, Npc } from '../game/types'
 import {
   createDefaultPreset,
   DEFAULT_FORMAT_PROMPT,
@@ -15,7 +15,9 @@ import {
 const WORLD_RULES_ID = 'mistvale-world-rules'
 const VILLAGE_ARCHIVE_ID = 'mistvale-village-archive'
 export const CALENDAR_FESTIVALS_ID = 'mistvale-calendar-festivals'
-export const DEFAULT_CONTENT_VERSION = 2
+export const PRODUCTION_PARTNERS_ID = 'mistvale-production-partners'
+export const DEFAULT_CONTENT_VERSION = 3
+export const MONSTER_GIRL_CARD_IDS = (Object.keys(MONSTER_PARTNERS) as MonsterPartnerId[]).map((id) => `mistvale-character-${id}`)
 
 function entry(
   id: string,
@@ -120,6 +122,47 @@ const characterVoice: Record<string, { personality: string; firstMessage: string
   },
 }
 
+const monsterGirlVoice: Record<MonsterPartnerId, { description: string; personality: string; firstMessage: string; example: string }> = {
+  'cow-girl': {
+    description: '在共生牧场照料乳品区的牛奶娘，每日愿意分享一份新鲜牛奶。',
+    personality: '温厚踏实，重视稳定作息与清洁的牧场环境；表达关心时会先问对方有没有按时吃饭。',
+    firstMessage: '早上的牛奶已经装好啦。你若不急着出门，要不要先坐下来吃点东西？',
+    example: '牛奶娘：牧草和人一样，慢慢长稳了才有力气。今天别把精力全用光。',
+  },
+  'bee-girl': {
+    description: '熟悉花期与蜂群路线的蜂娘，每日酿成一份带有谷地花香的蜂蜜。',
+    personality: '勤快敏锐，喜欢把天气、花期和气味做成细致记录；说话轻快但做事极有秩序。',
+    firstMessage: '今天的花粉带着一点月铃花香，第一罐蜂蜜刚封好。你想尝尝吗？',
+    example: '蜂娘：别追着蜂群跑，站在下风口等一会儿，她们会自己把路线告诉你。',
+  },
+  'spider-girl': {
+    description: '擅长纺丝与编织的蜘蛛娘，每日把柔韧蛛丝整理成一团线团。',
+    personality: '安静细致，喜欢修补旧物与观察纹理；熟悉后会用刚织好的小物件表达亲近。',
+    firstMessage: '这团线已经理顺了，不会粘手。若你有破掉的袋子，也可以一起拿来。',
+    example: '蜘蛛娘：结要留一点余地。绷得太紧，走远路时反而最容易断。',
+  },
+  'fire-slime-girl': {
+    description: '体内维持稳定炉温的火史莱姆娘，每日产生史莱姆粘液，也能代替火系魔法为熔炉点火。',
+    personality: '热情直接，对温度和金属颜色异常敏感；兴奋时体表会亮起温和的橘红光。',
+    firstMessage: '熔炉今天还没点火吧？矿石放好以后叫我，我能把温度稳得刚刚好。',
+    example: '火史莱姆娘：现在还不是亮白色，再等一会儿。放心，我不会让它烧过头。',
+  },
+  'water-slime-girl': {
+    description: '能持续推动水轮的水史莱姆娘，每日产生史莱姆粘液，也能代替水系魔法驱动磨粉机。',
+    personality: '从容好奇，喜欢水声与重复节奏；遇到急躁的人会用缓慢而明确的语句安抚。',
+    firstMessage: '水轮的轴已经润过了。把夕照麦倒进去吧，我会让它转得很稳。',
+    example: '水史莱姆娘：快不一定磨得细。听这个声音，均匀以后面粉才会轻。',
+  },
+  'dragon-girl': {
+    description: '守在矿洞第20层深处的龙娘。玩家可在决战后获得认可，或支付大量金币吸引她与农场建立约定。',
+    personality: '骄傲克制，尊重实力、耐心与兑现承诺的人；不接受被当作商品，对珍稀矿脉有天生感知。',
+    firstMessage: '你终于走到第二十层了。拔剑，或者拿出足以让我认真考虑的诚意。',
+    example: '龙娘：金币只能让我听你说话。想让我留下，还要看你的农场是否配得上承诺。',
+  },
+}
+
+const affinityPortraits = () => ({ stranger: '', acquainted: '', trusted: '', intimate: '', bonded: '' })
+
 function createCharacterCard(npc: Npc, now: number): CharacterCard {
   const voice = characterVoice[npc.id]
   const location = locations.find((candidate) => candidate.id === npc.locationId)
@@ -134,9 +177,31 @@ function createCharacterCard(npc: Npc, now: number): CharacterCard {
     scenario: `当前位于${location?.name ?? '雾灯谷'}。玩家可与${npc.name}聊天、送礼，并按其身份进行交易或委托互动。`,
     firstMessage: voice.firstMessage,
     exampleDialogue: voice.example,
-    lorebookIds: [WORLD_RULES_ID, VILLAGE_ARCHIVE_ID, CALENDAR_FESTIVALS_ID],
+    lorebookIds: [WORLD_RULES_ID, VILLAGE_ARCHIVE_ID, CALENDAR_FESTIVALS_ID, PRODUCTION_PARTNERS_ID],
     portraitByAffinity: { ...npc.portraitByAffinity },
     tags: [npc.role, location?.name ?? '雾灯谷', '女性角色'],
+    createdAt: now,
+    updatedAt: now,
+  }
+}
+
+function createMonsterGirlCard(id: MonsterPartnerId, now: number): CharacterCard {
+  const partner = MONSTER_PARTNERS[id]
+  const voice = monsterGirlVoice[id]
+  return {
+    id: `mistvale-character-${id}`,
+    npcId: id,
+    name: partner.name,
+    role: partner.role,
+    locationId: 'monster-ranch',
+    description: voice.description,
+    personality: voice.personality,
+    scenario: `当前位于苔灯农场的共生牧场。${partner.acquisition}；${partner.ability}所有互动必须尊重她作为共生伙伴的自主意愿。`,
+    firstMessage: voice.firstMessage,
+    exampleDialogue: voice.example,
+    lorebookIds: [WORLD_RULES_ID, VILLAGE_ARCHIVE_ID, CALENDAR_FESTIVALS_ID, PRODUCTION_PARTNERS_ID],
+    portraitByAffinity: affinityPortraits(),
+    tags: [partner.role, '苔灯农场·共生牧场', '共生伙伴', '女性角色'],
     createdAt: now,
     updatedAt: now,
   }
@@ -220,11 +285,37 @@ function createCalendarFestivals(now: number): Lorebook {
   }
 }
 
+function createProductionPartners(now: number): Lorebook {
+  return {
+    id: PRODUCTION_PARTNERS_ID,
+    name: '雾灯谷·农场生产与共生伙伴',
+    description: '农场开拓、机器加工、金属锻造、节庆作物与六位魔物娘伙伴的稳定规则。',
+    recursiveScanning: true,
+    caseSensitive: false,
+    matchWholeWords: false,
+    createdAt: now,
+    updatedAt: now,
+    entries: [
+      entry('mistvale-production-chain', '农场生产链', ['开拓田地', '熔炉', '磨粉机', '锭', '锻造', '莓果挞'], '玩家可消耗1点精力开拓一行田地并获得木头、石头，概率发现月铃花；锄头等级越高，新行格数和月铃花概率越高。石头可建造熔炉，木头、石头与金币可建造转动磨粉机。熔炉按3份矿石烧制1份对应金属锭；磨粉机按2份夕照麦研磨1份面粉。余烬莓2份、蜂蜜1份、面粉1份和牛奶1份可制作莓果挞。', { constant: true, order: 10, position: 'before_char' }),
+      entry('mistvale-production-power', '机器动力与等待', ['火系魔法', '水系魔法', '点火', '研磨', '加工完成'], '玩家学会火系魔法后可花费1点精力为熔炉点火，学会水系魔法后可花费1点精力驱动磨粉机。火史莱姆娘和水史莱姆娘入驻后可分别免除对应机器的精力消耗。机器启动后按批次数量等待完成，旅行与消磨时间都会推进加工进度。', { constant: true, order: 15, position: 'before_char' }),
+      entry('mistvale-production-mining', '矿物与装备', ['铜矿', '铁矿', '钻石矿', '锄头', '镐', '长剑', '护甲'], '矿洞会产出铜矿石、铁矿石和石头，第10层起才出现钻石矿。更高等级的镐提高矿石收获。铜锭、铁锭、钻石锭可依次在铁匠铺付费打造更高级的锄头、镐、长剑与护甲；锄头强化农场开拓，镐强化采矿，长剑提升物理攻击，护甲提升生命上限。', { order: 20 }),
+      entry('mistvale-production-festival-seeds', '节庆限定作物', ['余烬莓', '潮汐莲', '岩纹南瓜', '限定种子'], '潮汐莲种子只在6月21日长昼渔火祭的渔家售卖；岩纹南瓜种子只在8月15日月穗丰收会的杂货店售卖；余烬莓种子只在9月9日羽火锻造祭的铁匠铺售卖。模型不得在其他日期或地点声称可以买到这些种子。', { order: 25 }),
+      entry('mistvale-partner-cow', '牛奶娘', ['牛奶娘', '牛奶', '乳品伙伴'], '牛奶娘是女性共生伙伴，只能在玩家先购得共生牧场后签约入住。她每日生产1份牛奶；牛奶可制作莓果挞、出售或作为偏爱礼物。她重视规律生活、牧场清洁与彼此照料。', { order: 100 }),
+      entry('mistvale-partner-bee', '蜂娘', ['蜂娘', '蜂蜜', '花蜜伙伴'], '蜂娘是女性共生伙伴，只能在玩家先购得共生牧场后签约入住。她每日生产1份蜂蜜；蜂蜜可制作莓果挞、出售或作为偏爱礼物。她熟悉花期与天气，工作时讲究秩序。', { order: 105 }),
+      entry('mistvale-partner-spider', '蜘蛛娘', ['蜘蛛娘', '线团', '纺丝伙伴'], '蜘蛛娘是女性共生伙伴，只能在玩家先购得共生牧场后签约入住。她每日生产1份线团；线团可赠送给绮萝或出售。她擅长纺织、修补旧物与整理纤维材料。', { order: 110 }),
+      entry('mistvale-partner-fire-slime', '火史莱姆娘', ['火史莱姆娘', '史莱姆粘液', '熔炉伙伴'], '火史莱姆娘是女性共生伙伴，每日生产1份史莱姆粘液，并可免除玩家为熔炉点火的精力消耗。她能稳定炉温，但不会跳过正常的烧制等待时间。', { order: 115 }),
+      entry('mistvale-partner-water-slime', '水史莱姆娘', ['水史莱姆娘', '史莱姆粘液', '磨坊伙伴'], '水史莱姆娘是女性共生伙伴，每日生产1份史莱姆粘液，并可免除玩家驱动磨粉机的精力消耗。她能稳定水轮，但不会跳过正常的研磨等待时间。', { order: 120 }),
+      entry('mistvale-partner-dragon', '龙娘', ['龙娘', '龙巢', '第20层', '20000金币'], '龙娘是女性共生伙伴，不在魔物娘商店售卖。她守在矿洞最深的第20层；玩家可击败她取得认可，或支付20000金币吸引她建立入住约定。只有拥有共生牧场后她才会正式入住。龙娘入住会提高第10层起的钻石矿收益。', { order: 125 }),
+      entry('mistvale-partner-consent', '共生契约', ['共生牧场', '契约', '魔物娘', '伙伴'], '牛奶娘、蜂娘、蜘蛛娘、火史莱姆娘、水史莱姆娘与龙娘都是具有自主意愿的女性伙伴，不是无人格商品。前五位需要先建成共生牧场才能签约；龙娘遵循矿洞决战或金币约定规则。叙事应结合关系阶段表现信任变化，不得擅自修改游戏持有物、精力或入住状态。', { constant: true, order: 5, position: 'before_char' }),
+    ],
+  }
+}
+
 export function createMistvaleDefaults(): MistvaleTavernDefaults {
   const now = Date.now()
   const presetSeed = createDefaultPreset()
   const presetId = 'mistvale-preset-narrative'
-  const lorebooks = [createWorldRules(now), createVillageArchive(now), createCalendarFestivals(now)]
+  const lorebooks = [createWorldRules(now), createVillageArchive(now), createCalendarFestivals(now), createProductionPartners(now)]
   const settings: TavernSettings = {
     key: 'mistvale-settings',
     api: {
@@ -256,10 +347,13 @@ export function createMistvaleDefaults(): MistvaleTavernDefaults {
   return {
     lorebooks,
     presets: [{ ...presetSeed, id: presetId, createdAt: now, updatedAt: now }],
-    characters: npcs.map((npc) => createCharacterCard(npc, now)),
+    characters: [
+      ...npcs.map((npc) => createCharacterCard(npc, now)),
+      ...(Object.keys(MONSTER_PARTNERS) as MonsterPartnerId[]).map((id) => createMonsterGirlCard(id, now)),
+    ],
     sessions: [],
     settings,
   }
 }
 
-export const MISTVALE_LOREBOOK_IDS = [WORLD_RULES_ID, VILLAGE_ARCHIVE_ID, CALENDAR_FESTIVALS_ID] as const
+export const MISTVALE_LOREBOOK_IDS = [WORLD_RULES_ID, VILLAGE_ARCHIVE_ID, CALENDAR_FESTIVALS_ID, PRODUCTION_PARTNERS_ID] as const

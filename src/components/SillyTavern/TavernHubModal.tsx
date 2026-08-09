@@ -13,7 +13,7 @@ const tabs = [
   { id: 'api', label: '接口', note: '模型连接', icon: 'settings' },
   { id: 'lorebooks', label: '世界书', note: '规则与记忆', icon: 'book' },
   { id: 'presets', label: '预设', note: '上下文顺序', icon: 'magic' },
-  { id: 'characters', label: '角色卡', note: '十五位 NPC', icon: 'profile' },
+  { id: 'characters', label: '角色卡', note: '居民与伙伴', icon: 'profile' },
   { id: 'sessions', label: '会话', note: '楼层与分支', icon: 'history' },
   { id: 'variables', label: '变量', note: '状态快照', icon: 'variables' },
 ] as const satisfies ReadonlyArray<{ id: string; label: string; note: string; icon: GameIconName }>
