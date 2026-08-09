@@ -1,4 +1,4 @@
-import { createInitialPlots, crops, npcs, quests, shopItems, spells } from './data'
+import { createInitialPlots, crops, getFarmExpansion, npcs, quests, shopItems, spells } from './data'
 import { advanceCalendarClock, formatGameDate, getSeasonForDay, getWeekday, isNpcBirthday } from './calendar'
 import {
   DEFAULT_GAME_RULES,
@@ -134,6 +134,44 @@ function reduceGameState(state: GameState, action: GameAction): GameState {
         }
       }
       return { ...state, energy: state.energy - cost }
+    }
+    case 'EXPAND_FARM': {
+      const currentRow = Math.max(0, ...state.plots.map((plot) => plot.row))
+      if (currentRow >= 30) {
+        return { ...state, toasts: [...state.toasts, makeToast({ tone: 'info', title: '田地已达上限', message: '南坡田区最多可以开拓三十行。' })] }
+      }
+      const cost = getEnergyCost(1, state.rules.energyCostMode)
+      if (state.energy < cost) {
+        return { ...state, toasts: [...state.toasts, makeToast({ tone: 'warning', title: '精力不足', message: `需要 ${cost} 点精力才能开拓新田垄。` })] }
+      }
+      const reward = getFarmExpansion(state.tools.hoe, action.roll, state.rules.dropMultiplier)
+      const row = currentRow + 1
+      const plots = Array.from({ length: reward.plotCount }, (_, index) => ({
+        id: `plot-${row}-${index + 1}`,
+        row,
+        column: index + 1,
+        watered: false,
+        fertilized: false,
+        ready: false,
+      }))
+      const inventory = {
+        ...state.inventory,
+        wood: (state.inventory.wood ?? 0) + reward.wood,
+        stone: (state.inventory.stone ?? 0) + reward.stone,
+        ...(reward.moonflower > 0 ? { moonflower: (state.inventory.moonflower ?? 0) + reward.moonflower } : {}),
+      }
+      const flowerMessage = reward.moonflower > 0 ? `，并发现月铃花 ${reward.moonflower} 朵` : ''
+      return {
+        ...state,
+        energy: state.energy - cost,
+        inventory,
+        plots: [...state.plots, ...plots],
+        toasts: [...state.toasts, makeToast({
+          tone: 'success',
+          title: '新田垄开拓完成',
+          message: `新增 ${reward.plotCount} 格，获得木头 ${reward.wood}、石头 ${reward.stone}${flowerMessage}。`,
+        })],
+      }
     }
     case 'ADD_TOAST':
       return { ...state, toasts: [...state.toasts, makeToast(action.toast)] }

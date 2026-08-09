@@ -172,6 +172,28 @@ export const CRAFT_RECIPES = {
 
 export const getItemName = (id: string) => ITEM_CATALOG[id as ItemId]?.name ?? '未鉴定物品'
 
+export interface FarmExpansionReward {
+  plotCount: number
+  wood: number
+  stone: number
+  moonflower: number
+  moonflowerChance: number
+}
+
+export function getFarmExpansion(hoeLevel: number, roll: number, dropMultiplier: number): FarmExpansionReward {
+  const safeLevel = Math.min(4, Math.max(1, Math.floor(hoeLevel)))
+  const plotCount = [6, 8, 10, 12][safeLevel - 1]
+  const moonflowerChance = [0.12, 0.2, 0.28, 0.36][safeLevel - 1]
+  const foundMoonflower = Number.isFinite(roll) && roll >= 0 && roll < moonflowerChance
+  return {
+    plotCount,
+    wood: scaleReward(6 + 2 * safeLevel, dropMultiplier),
+    stone: scaleReward(4 + safeLevel, dropMultiplier),
+    moonflower: foundMoonflower ? scaleReward(1, dropMultiplier) : 0,
+    moonflowerChance,
+  }
+}
+
 export const MINE_MAX_FLOOR = 20
 
 export interface MineYield {

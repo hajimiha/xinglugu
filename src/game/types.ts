@@ -244,6 +244,7 @@ export type GameAction =
   | { type: 'CLOSE_MODAL' }
   | { type: 'TRAVEL_TO_LOCATION'; location: LocationId; minutes: number }
   | { type: 'ADVANCE_TIME'; minutes: number; reason: string }
+  | { type: 'EXPAND_FARM'; roll: number }
   | { type: 'PLANT_PLOT'; plotId: string; seedId: string }
   | { type: 'WATER_PLOT'; plotId: string }
   | { type: 'FERTILIZE_PLOT'; plotId: string }

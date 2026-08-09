@@ -110,27 +110,27 @@ git push origin main
 - Consumes: `EXPAND_FARM`, `getFarmExpansion(level, roll, dropMultiplier)`。
 - Produces: 动态行地块和 `farm-expand-plots` 唯一按钮；机器区占位结构供 Task 4 填充。
 
-- [ ] **Step 1: 写扩建 reducer 红灯测试**
+- [x] **Step 1: 写扩建 reducer 红灯测试**
 
 测试锄头 1/2/4 级分别新增 6/8/12 格；精力不足不变；`roll=0.11` 在一级掉落月铃花而 `roll=0.13` 不掉；木石数量使用手工字面量断言。
 
-- [ ] **Step 2: 运行 reducer 红灯**
+- [x] **Step 2: 运行 reducer 红灯**
 
 Run: `pnpm test:run src/game/reducer.test.ts -t "开拓|田垄"`
 
-- [ ] **Step 3: 实现 `EXPAND_FARM`**
+- [x] **Step 3: 实现 `EXPAND_FARM`**
 
 以现有最大 `row + 1` 建立唯一 `plot-{row}-{column}`，使用 `getEnergyCost(1)`，最大 30 行；成功通知说明新增格数、木头、石头与月铃花结果。
 
-- [ ] **Step 4: 写并运行农场组件红灯测试**
+- [x] **Step 4: 写并运行农场组件红灯测试**
 
 断言 `aria-label="可滚动农田"`、动态行文案、扩建按钮、持有资源摘要和 30 行满级禁用态；验证新增地块仍可打开播种详情。
 
-- [ ] **Step 5: 重构农场舞台**
+- [x] **Step 5: 重构农场舞台**
 
 将单格拆为 `memo(FarmPlotButton)`；田地外层使用 `tabIndex=0`、`role="region"`、可见滚动提示，保留所有原播种/浇水/施肥/收获交互。
 
-- [ ] **Step 6: 添加滚动和移动端 CSS**
+- [x] **Step 6: 添加滚动和移动端 CSS**
 
 农田使用 `max-height`、`overflow:auto`、`overscroll-behavior:contain`、`touch-action:pan-x pan-y`；桌面保留像素透视，390px 改为稳定二维滑动且按钮最小 44px。
 

@@ -1,9 +1,10 @@
-import type { CSSProperties } from 'react'
+import { memo, useMemo } from 'react'
+import type { CSSProperties, Dispatch } from 'react'
 import farmDuskImage from '../../assets/pixel/farm-dusk.webp'
 import { crops, shopItems } from '../../game/data'
 import { useGame } from '../../game/GameContext'
-import { scaleGrowthHours, scaleReward } from '../../game/rules'
-import type { Plot } from '../../game/types'
+import { getEnergyCost, scaleGrowthHours, scaleReward } from '../../game/rules'
+import type { GameAction, Plot } from '../../game/types'
 import { GameIcon } from '../icons/GameIcon'
 
 function formatRemaining(hours: number) {
@@ -22,6 +23,27 @@ function plotLabel(plot: Plot) {
     : `地块 ${plot.row}-${plot.column}，空地`
 }
 
+const FarmPlotButton = memo(function FarmPlotButton({ plot, dispatch }: { plot: Plot; dispatch: Dispatch<GameAction> }) {
+  const crop = crops.find((item) => item.id === plot.cropId)
+  return (
+    <button
+      id={`farm-${plot.id}`}
+      className={`farm-plot ${crop ? 'has-crop' : 'is-empty'} ${plot.ready ? 'is-ready' : ''} ${plot.watered ? 'is-watered' : ''}`}
+      style={{ '--crop-color': crop?.color ?? '#6b4b31' } as CSSProperties}
+      type="button"
+      aria-label={plotLabel(plot)}
+      onClick={() => dispatch({ type: 'OPEN_MODAL', modal: 'plot', plotId: plot.id })}
+    >
+      <span className="crop-sprite" aria-hidden="true"><i /><i /><i /></span>
+      <span className="plot-status">
+        <strong>{crop?.name ?? '空地'}</strong>
+        <small>{crop ? (plot.ready ? '可收获' : formatRemaining(plot.remainingHours ?? 0).replace('后成熟', '')) : '可播种'}</small>
+      </span>
+      {plot.watered && <span className="water-mark" aria-hidden="true" />}
+    </button>
+  )
+})
+
 export function FarmStage() {
   const { state, dispatch } = useGame()
   const selected = state.activeModal === 'plot'
@@ -29,6 +51,14 @@ export function FarmStage() {
     : undefined
   const selectedCrop = crops.find((crop) => crop.id === selected?.cropId)
   const matureCount = state.plots.filter((plot) => plot.ready).length
+  const maxRow = Math.max(0, ...state.plots.map((plot) => plot.row))
+  const farmRows = useMemo(() => Array.from({ length: maxRow }, (_, index) => ({
+    row: index + 1,
+    plots: state.plots.filter((plot) => plot.row === index + 1).sort((left, right) => left.column - right.column),
+  })), [maxRow, state.plots])
+  const expansionEnergy = getEnergyCost(1, state.rules.energyCostMode)
+  const nextPlotCount = [6, 8, 10, 12][Math.min(4, Math.max(1, state.tools.hoe)) - 1]
+  const farmIsFull = maxRow >= 30
   const fertilizerCount = state.inventory['moss-fertilizer'] ?? 0
   const seedChoices = shopItems.flatMap((seed) => {
     if (seed.category !== 'seed' || (state.inventory[seed.id] ?? 0) < 1) return []
@@ -60,28 +90,39 @@ export function FarmStage() {
         <strong>{state.plots.some((plot) => plot.cropId) ? '田垄已有新芽，今天的劳作正等待你的安排。' : '刚接手的田地还很安静，从第一包种子开始吧。'}</strong>
       </div>
 
-      <div className="farm-grid" aria-label="四行六列农田">
-        {state.plots.map((plot) => {
-          const crop = crops.find((item) => item.id === plot.cropId)
-          return (
-            <button
-              id={`farm-${plot.id}`}
-              key={plot.id}
-              className={`farm-plot ${crop ? 'has-crop' : 'is-empty'} ${plot.ready ? 'is-ready' : ''} ${plot.watered ? 'is-watered' : ''}`}
-              style={{ '--crop-color': crop?.color ?? '#6b4b31' } as CSSProperties}
-              type="button"
-              aria-label={plotLabel(plot)}
-              onClick={() => dispatch({ type: 'OPEN_MODAL', modal: 'plot', plotId: plot.id })}
+      <div className="farm-field-panel">
+        <header className="farm-field-toolbar">
+          <div>
+            <span>田垄档案 · 锄头等级 {state.tools.hoe}</span>
+            <strong>{maxRow} 行 · {state.plots.length} 格</strong>
+            <small>下次增加 {nextPlotCount} 格 · 木头 {state.inventory.wood ?? 0} · 石头 {state.inventory.stone ?? 0} · 月铃花 {state.inventory.moonflower ?? 0}</small>
+          </div>
+          <button
+            id="farm-expand-plots"
+            className="farm-expand-button"
+            type="button"
+            aria-label={farmIsFull ? '田地已达三十行上限' : `开拓新田垄，消耗 ${expansionEnergy} 点精力`}
+            disabled={farmIsFull || state.energy < expansionEnergy}
+            onClick={() => dispatch({ type: 'EXPAND_FARM', roll: Math.random() })}
+          >
+            <GameIcon name="farming" size={17} weight="duotone" />
+            <span>{farmIsFull ? '田垄已满' : '开拓田地'}</span>
+            <small>{farmIsFull ? '30 行上限' : `${expansionEnergy} 精力`}</small>
+          </button>
+        </header>
+        <div className="farm-grid" role="region" aria-label="可滚动农田" tabIndex={0}>
+          {farmRows.map((row) => (
+            <div
+              key={row.row}
+              className="farm-row"
+              role="group"
+              aria-label={`第 ${row.row} 行，共 ${row.plots.length} 格`}
+              style={{ '--farm-columns': row.plots.length } as CSSProperties}
             >
-              <span className="crop-sprite" aria-hidden="true"><i /><i /><i /></span>
-              <span className="plot-status">
-                <strong>{crop?.name ?? '空地'}</strong>
-                <small>{crop ? (plot.ready ? '可收获' : formatRemaining(plot.remainingHours ?? 0).replace('后成熟', '')) : '可播种'}</small>
-              </span>
-              {plot.watered && <span className="water-mark" aria-hidden="true" />}
-            </button>
-          )
-        })}
+              {row.plots.map((plot) => <FarmPlotButton key={plot.id} plot={plot} dispatch={dispatch} />)}
+            </div>
+          ))}
+        </div>
       </div>
 
       {selected && (

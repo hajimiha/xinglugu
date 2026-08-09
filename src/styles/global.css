@@ -142,7 +142,20 @@ h1, h2, h3, p { margin-top: 0; }
 .farm-stage-copy { position: absolute; bottom: 24px; left: 24px; z-index: 3; width: min(270px, 30%); padding: 14px 16px; border: 1px solid rgba(242, 229, 198, .14); border-radius: 11px; background: rgba(7, 18, 15, .78); box-shadow: 0 14px 38px rgba(0, 0, 0, .32); backdrop-filter: blur(8px); }
 .farm-stage-copy span { color: var(--copper-300); font-size: 9px; letter-spacing: .1em; }
 .farm-stage-copy strong { display: block; margin-top: 5px; font-family: var(--font-display); font-size: 14px; line-height: 1.55; }
-.farm-grid { position: absolute; top: 25%; right: 7%; bottom: 7%; z-index: 3; display: grid; width: 55%; grid-template-columns: repeat(6, minmax(42px, 1fr)); grid-template-rows: repeat(4, minmax(48px, 1fr)); gap: clamp(4px, .55vw, 9px); padding: 11px; border: 1px solid rgba(221, 178, 91, .16); border-radius: 12px; background: rgba(38, 27, 19, .2); box-shadow: inset 0 0 34px rgba(27, 15, 9, .4), 0 16px 42px rgba(0, 0, 0, .28); transform: perspective(1100px) rotateX(2deg) rotateZ(-.4deg); }
+.farm-field-panel { position: absolute; top: 23%; right: 5%; bottom: 5%; z-index: 3; display: grid; width: 59%; min-width: 0; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; border: 1px solid rgba(221, 178, 91, .2); border-radius: 13px; background: rgba(7, 18, 15, .62); box-shadow: inset 0 0 34px rgba(27, 15, 9, .4), 0 16px 42px rgba(0, 0, 0, .32); backdrop-filter: blur(5px); }
+.farm-field-toolbar { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 10px; border-bottom: 1px solid rgba(221, 178, 91, .16); background: linear-gradient(90deg, rgba(11, 29, 24, .96), rgba(8, 22, 18, .86)); }
+.farm-field-toolbar > div { min-width: 0; }
+.farm-field-toolbar span, .farm-field-toolbar small { display: block; color: var(--text-muted); font-size: 8px; }
+.farm-field-toolbar > div > span { color: var(--copper-300); letter-spacing: .08em; }
+.farm-field-toolbar strong { display: block; margin: 2px 0; font-family: var(--font-numeric); font-size: 13px; }
+.farm-expand-button { display: grid; min-width: 116px; min-height: 48px; flex: 0 0 auto; grid-template-columns: 24px 1fr; grid-template-rows: auto auto; align-items: center; padding: 6px 9px; color: var(--text-primary); border: 1px solid rgba(221, 178, 91, .4); border-radius: 8px; background: linear-gradient(145deg, rgba(112, 81, 40, .72), rgba(42, 66, 48, .82)); transition: transform var(--duration-fast), border-color var(--duration-fast), filter var(--duration-fast); }
+.farm-expand-button svg { grid-row: 1 / 3; color: var(--copper-300); }
+.farm-expand-button span, .farm-expand-button small { text-align: left; }
+.farm-expand-button span { color: var(--text-primary); font-size: 10px; font-weight: 700; }
+.farm-expand-button:hover:not(:disabled), .farm-expand-button:focus-visible { border-color: var(--copper-300); filter: brightness(1.12); transform: translateY(-1px); }
+.farm-expand-button:disabled { cursor: not-allowed; opacity: .48; }
+.farm-grid { display: flex; min-width: 0; min-height: 0; flex-direction: column; gap: clamp(4px, .55vw, 8px); padding: 10px; overflow: auto; scrollbar-color: rgba(221, 178, 91, .58) rgba(6, 17, 14, .54); scrollbar-width: thin; overscroll-behavior: contain; touch-action: pan-x pan-y; transform: perspective(1100px) rotateX(1.5deg); transform-origin: center top; }
+.farm-row { display: grid; min-width: max(100%, calc(var(--farm-columns) * 48px)); min-height: 54px; flex: 0 0 54px; grid-template-columns: repeat(var(--farm-columns), minmax(42px, 1fr)); gap: clamp(4px, .55vw, 8px); }
 .farm-plot { position: relative; min-width: 0; min-height: 44px; padding: 0; overflow: hidden; color: var(--text-primary); border: 1px solid rgba(203, 143, 77, .35); border-radius: 4px; background: repeating-linear-gradient(90deg, rgba(119, 74, 42, .94) 0 7px, rgba(94, 56, 34, .96) 7px 14px); box-shadow: inset 0 0 0 2px rgba(49, 29, 18, .36), 2px 3px 0 rgba(18, 16, 12, .38); transition: transform var(--duration-fast), border-color var(--duration-fast), filter var(--duration-fast); image-rendering: pixelated; }
 .farm-plot:hover, .farm-plot:focus-visible { z-index: 4; border-color: var(--copper-300); filter: brightness(1.14); transform: translateY(-3px) scale(1.03); }
 .farm-plot.is-empty { opacity: .8; }
@@ -858,7 +871,7 @@ h1, h2, h3, p { margin-top: 0; }
   .game-layout { grid-template-columns: 1fr; height: auto; min-height: calc(100dvh - 98px); }
   .story-rail, .context-rail { display: none; }
   .world-column { min-height: 820px; grid-template-rows: minmax(540px, 1fr) 260px; }
-  .farm-grid { right: 4%; width: 62%; }
+  .farm-field-panel { right: 3%; width: 66%; }
   .farm-stage-copy { left: 16px; width: 28%; }
   .npc-stage-list { left: 31%; }
   .npc-portrait-card { min-width: 128px; }
@@ -895,7 +908,12 @@ h1, h2, h3, p { margin-top: 0; }
   .field-copy { padding: 18px; }
   .field-copy h2 { font-size: 18px; }
   .field-copy p { font-size: 11px; }
-  .farm-grid { top: 27%; right: 3%; bottom: 5%; width: 94%; gap: 4px; padding: 7px; }
+  .farm-field-panel { top: 25%; right: 3%; bottom: 3%; width: 94%; }
+  .farm-field-toolbar { padding: 7px; }
+  .farm-field-toolbar > div > small { max-width: 175px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .farm-expand-button { min-width: 104px; min-height: 44px; }
+  .farm-grid { gap: 5px; padding: 7px; transform: none; }
+  .farm-row { min-width: max(100%, calc(var(--farm-columns) * 52px)); min-height: 50px; flex-basis: 50px; gap: 5px; }
   .farm-stage-copy { display: none; }
   .plot-dialog { top: 76px; right: 8px; bottom: 8px; left: 8px; width: auto; }
   .location-story { right: 12px; bottom: 12px; left: 12px; width: auto; }

@@ -9,6 +9,7 @@ import {
   MINE_MAX_FLOOR,
   MONSTER_PARTNERS,
   getItemName,
+  getFarmExpansion,
   getMineYield,
 } from './economy'
 
@@ -22,6 +23,7 @@ export {
   MINE_MAX_FLOOR,
   MONSTER_PARTNERS,
   getItemName,
+  getFarmExpansion,
   getMineYield,
 }
 

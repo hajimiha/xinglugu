@@ -66,4 +66,27 @@ describe('农场主舞台', () => {
     expect(autumnSeed).toBeDisabled()
     expect(within(autumnSeed).getByText('秋季可用')).toBeVisible()
   })
+
+  it('提供可滚动农田与开拓入口，新增地块仍可打开播种详情', async () => {
+    const user = userEvent.setup()
+    render(<GameProvider initialState={initialGameState}><FarmStage /></GameProvider>)
+
+    const field = screen.getByRole('region', { name: '可滚动农田' })
+    expect(field).toHaveAttribute('tabindex', '0')
+    expect(screen.getByText('4 行 · 24 格')).toBeVisible()
+
+    await user.click(screen.getByRole('button', { name: '开拓新田垄，消耗 1 点精力' }))
+    expect(screen.getByText('5 行 · 30 格')).toBeVisible()
+    await user.click(within(field).getByRole('button', { name: '地块 5-6，空地' }))
+    expect(screen.getByRole('dialog', { name: '地块详情' })).toBeVisible()
+    expect(screen.getByRole('button', { name: '播种月铃萝卜，持有 8 包' })).toBeEnabled()
+  })
+
+  it('三十行满级时禁用继续开拓', () => {
+    const plots = Array.from({ length: 30 }, (_, row) => ({
+      id: `plot-${row + 1}-1`, row: row + 1, column: 1, watered: false, fertilized: false, ready: false,
+    }))
+    render(<GameProvider initialState={{ ...initialGameState, plots }}><FarmStage /></GameProvider>)
+    expect(screen.getByRole('button', { name: '田地已达三十行上限' })).toBeDisabled()
+  })
 })

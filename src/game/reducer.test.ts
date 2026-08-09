@@ -235,4 +235,40 @@ describe('游戏状态变更', () => {
     }), { ...initialGameState, toasts: [] })
     expect(filled.toasts.map((toast) => toast.title)).toEqual(['二', '三', '四'])
   })
+
+  it('开拓田地按锄头等级增加一行并获得木头、石头与概率月铃花', () => {
+    const levelOne = gameReducer(initialGameState, { type: 'EXPAND_FARM', roll: 0.11 } as never)
+    expect(levelOne.energy).toBe(4)
+    expect(levelOne.plots).toHaveLength(30)
+    expect(levelOne.plots.slice(-6).map((plot) => plot.id)).toEqual([
+      'plot-5-1', 'plot-5-2', 'plot-5-3', 'plot-5-4', 'plot-5-5', 'plot-5-6',
+    ])
+    expect(levelOne.inventory).toMatchObject({ wood: 8, stone: 5, moonflower: 1 })
+
+    const levelTwo = gameReducer({ ...initialGameState, tools: { ...initialGameState.tools, hoe: 2 } }, { type: 'EXPAND_FARM', roll: 0.21 } as never)
+    expect(levelTwo.plots).toHaveLength(32)
+    expect(levelTwo.inventory).toMatchObject({ wood: 10, stone: 6 })
+    expect(levelTwo.inventory.moonflower ?? 0).toBe(0)
+
+    const levelFour = gameReducer({ ...initialGameState, tools: { ...initialGameState.tools, hoe: 4 } }, { type: 'EXPAND_FARM', roll: 0.37 } as never)
+    expect(levelFour.plots).toHaveLength(36)
+    expect(levelFour.plots.at(-1)?.id).toBe('plot-5-12')
+  })
+
+  it('开拓田地遵循精力和掉落倍率并限制为三十行', () => {
+    const multiplied = gameReducer({
+      ...initialGameState,
+      rules: { ...initialGameState.rules, dropMultiplier: 2 },
+    }, { type: 'EXPAND_FARM', roll: 0.01 } as never)
+    expect(multiplied.inventory).toMatchObject({ wood: 16, stone: 10, moonflower: 2 })
+
+    const exhausted = { ...initialGameState, energy: 0 }
+    expect(gameReducer(exhausted, { type: 'EXPAND_FARM', roll: 0 } as never).plots).toBe(exhausted.plots)
+
+    const rows = Array.from({ length: 30 }, (_, row) => ({
+      id: `plot-${row + 1}-1`, row: row + 1, column: 1, watered: false, fertilized: false, ready: false,
+    }))
+    const full = { ...initialGameState, plots: rows }
+    expect(gameReducer(full, { type: 'EXPAND_FARM', roll: 0 } as never).plots).toBe(rows)
+  })
 })
