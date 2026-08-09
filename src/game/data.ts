@@ -1,19 +1,33 @@
 import type { Crop, Location, Npc, Plot, Quest, ShopItem, Spell } from './types'
+import {
+  BUILD_RECIPES,
+  CRAFT_RECIPES,
+  FESTIVAL_SEED_OFFERS,
+  FORGE_RECIPES,
+  ITEM_CATALOG,
+  MACHINE_RECIPES,
+  MINE_MAX_FLOOR,
+  MONSTER_PARTNERS,
+  getItemName,
+  getMineYield,
+} from './economy'
 
-export const itemDisplayNames: Record<string, string> = {
-  'moon-radish-seed': '月铃萝卜种子',
-  'mist-bean-seed': '雾荚豆种子',
-  'sun-wheat-seed': '夕照麦种子',
-  'moon-radish': '月铃萝卜',
-  'mist-bean': '雾荚豆',
-  'sun-wheat': '夕照麦',
-  moonflower: '月铃花',
-  'silver-carp': '银鳞鲫',
-  honey: '林蜜',
-  mushroom: '月影菇',
-  'slime-gel': '史莱姆凝胶',
-  'berry-tart': '莓果挞',
+export {
+  BUILD_RECIPES,
+  CRAFT_RECIPES,
+  FESTIVAL_SEED_OFFERS,
+  FORGE_RECIPES,
+  ITEM_CATALOG,
+  MACHINE_RECIPES,
+  MINE_MAX_FLOOR,
+  MONSTER_PARTNERS,
+  getItemName,
+  getMineYield,
 }
+
+export const itemDisplayNames: Record<string, string> = Object.fromEntries(
+  Object.values(ITEM_CATALOG).map((item) => [item.id, item.name]),
+)
 
 export const affinityStageNames = {
   stranger: '初识', acquainted: '相识', trusted: '信赖', intimate: '亲密', bonded: '羁绊',
@@ -21,19 +35,19 @@ export const affinityStageNames = {
 
 export const npcs: Npc[] = [
   { id: 'loran', name: '洛岚', role: '村长', locationId: 'mayor-home', description: '语气从容的村长，熟知雾灯谷每一条旧路。', availableActions: ['chat','gift','quest','profile'], preferredGifts: ['moonflower','amber-tea'], portraitByAffinity: {}, birthday: { month: 1, day: 18 } },
-  { id: 'freya', name: '芙蕾雅', role: '草药师', locationId: 'mayor-home', description: '负责村里的草药园，也会悄悄照料受伤的魔物。', availableActions: ['chat','gift','quest','profile'], preferredGifts: ['moss-herb','moonflower'], portraitByAffinity: {}, birthday: { month: 3, day: 6 } },
+  { id: 'freya', name: '芙蕾雅', role: '草药师', locationId: 'mayor-home', description: '负责村里的草药园，也会悄悄照料受伤的魔物。', availableActions: ['chat','gift','quest','profile'], preferredGifts: ['milk','moonflower'], portraitByAffinity: {}, birthday: { month: 3, day: 6 } },
   { id: 'mina', name: '弥奈', role: '风信使', locationId: 'mayor-home', description: '村长家的女儿，总是第一个听到远方的新鲜事。', availableActions: ['chat','gift','quest','profile'], preferredGifts: ['silver-carp','berry-tart'], portraitByAffinity: {}, birthday: { month: 5, day: 17 } },
   { id: 'liuan', name: '柳安', role: '杂货店主', locationId: 'general-store', description: '擅长从每一枚铜板里找出最好用的种子。', availableActions: ['chat','gift','trade','quest','profile'], preferredGifts: ['amber-tea','sun-wheat'], portraitByAffinity: {}, birthday: { month: 4, day: 12 } },
-  { id: 'taomi', name: '桃弥', role: '账房', locationId: 'general-store', description: '算盘快得像雨点，喜欢收集奇怪的旧票据。', availableActions: ['chat','gift','trade','profile'], preferredGifts: ['berry-tart','copper-ore'], portraitByAffinity: {}, birthday: { month: 9, day: 3 } },
-  { id: 'yanque', name: '岩雀', role: '铁匠', locationId: 'smithy', description: '沉默而可靠，打造的工具会留下羽纹火花。', availableActions: ['chat','gift','trade','quest','profile'], preferredGifts: ['iron-ore','fire-potion'], portraitByAffinity: {}, birthday: { month: 11, day: 8 } },
+  { id: 'taomi', name: '桃弥', role: '账房', locationId: 'general-store', description: '算盘快得像雨点，喜欢收集奇怪的旧票据。', availableActions: ['chat','gift','trade','profile'], preferredGifts: ['berry-tart','copper-ingot'], portraitByAffinity: {}, birthday: { month: 9, day: 3 } },
+  { id: 'yanque', name: '岩雀', role: '铁匠', locationId: 'smithy', description: '沉默而可靠，打造的工具会留下羽纹火花。', availableActions: ['chat','gift','trade','quest','profile'], preferredGifts: ['iron-ingot','fire-potion'], portraitByAffinity: {}, birthday: { month: 11, day: 8 } },
   { id: 'sera', name: '塞拉', role: '共生牧场店主', locationId: 'monster-market', description: '主张把魔物娘当作经营伙伴而非商品。', availableActions: ['chat','gift','trade','quest','profile'], preferredGifts: ['moonflower','slime-gel'], portraitByAffinity: {}, birthday: { month: 7, day: 22 } },
-  { id: 'mira', name: '米菈', role: '育种师', locationId: 'monster-market', description: '能从脚印判断每一位伙伴今天的心情。', availableActions: ['chat','gift','trade','profile'], preferredGifts: ['moss-herb','honey'], portraitByAffinity: {}, birthday: { month: 8, day: 9 } },
-  { id: 'qiluo', name: '绮萝', role: '饲育员', locationId: 'monster-market', description: '会为不同种族调配带有星屑香味的饲料。', availableActions: ['chat','gift','trade','profile'], preferredGifts: ['amber-tea','mushroom'], portraitByAffinity: {}, birthday: { month: 6, day: 2 } },
+  { id: 'mira', name: '米菈', role: '育种师', locationId: 'monster-market', description: '能从脚印判断每一位伙伴今天的心情。', availableActions: ['chat','gift','trade','profile'], preferredGifts: ['milk','honey'], portraitByAffinity: {}, birthday: { month: 8, day: 9 } },
+  { id: 'qiluo', name: '绮萝', role: '饲育员', locationId: 'monster-market', description: '会为不同种族调配带有星屑香味的饲料。', availableActions: ['chat','gift','trade','profile'], preferredGifts: ['amber-tea','thread-ball'], portraitByAffinity: {}, birthday: { month: 6, day: 2 } },
   { id: 'daifu', name: '黛芙', role: '五行魔女', locationId: 'witch-home', description: '住在林雾深处，出售药剂，也收藏失传法术。', availableActions: ['chat','gift','trade','quest','profile'], preferredGifts: ['moonflower','mana-potion'], portraitByAffinity: {}, birthday: { month: 10, day: 27 } },
-  { id: 'rin', name: '凛', role: '猎人', locationId: 'hunter-camp', description: '负责标记魔物迁徙路线，训练从不拖泥带水。', availableActions: ['chat','gift','quest','profile'], preferredGifts: ['iron-ore','silver-carp'], portraitByAffinity: {}, birthday: { month: 12, day: 5 } },
-  { id: 'chaoyin', name: '潮音', role: '船主', locationId: 'fisher-home', description: '记得海湾里每一道潮汐的名字。', availableActions: ['chat','gift','trade','quest','profile'], preferredGifts: ['amber-tea','moss-herb'], portraitByAffinity: {}, birthday: { month: 2, day: 19 } },
+  { id: 'rin', name: '凛', role: '猎人', locationId: 'hunter-camp', description: '负责标记魔物迁徙路线，训练从不拖泥带水。', availableActions: ['chat','gift','quest','profile'], preferredGifts: ['iron-ingot','silver-carp'], portraitByAffinity: {}, birthday: { month: 12, day: 5 } },
+  { id: 'chaoyin', name: '潮音', role: '船主', locationId: 'fisher-home', description: '记得海湾里每一道潮汐的名字。', availableActions: ['chat','gift','trade','quest','profile'], preferredGifts: ['amber-tea','milk'], portraitByAffinity: {}, birthday: { month: 2, day: 19 } },
   { id: 'xiye', name: '汐野', role: '钓师', locationId: 'fisher-home', description: '相信最好的鱼竿应该听得见水下的歌。', availableActions: ['chat','gift','trade','profile'], preferredGifts: ['silver-carp','honey'], portraitByAffinity: {}, birthday: { month: 6, day: 24 } },
-  { id: 'weina', name: '维娜', role: '医师', locationId: 'hospital', description: '诊断精准，但更在意病人有没有按时吃饭。', availableActions: ['chat','gift','trade','quest','profile'], preferredGifts: ['moss-herb','sun-wheat'], portraitByAffinity: {}, birthday: { month: 1, day: 30 } },
+  { id: 'weina', name: '维娜', role: '医师', locationId: 'hospital', description: '诊断精准，但更在意病人有没有按时吃饭。', availableActions: ['chat','gift','trade','quest','profile'], preferredGifts: ['milk','sun-wheat'], portraitByAffinity: {}, birthday: { month: 1, day: 30 } },
   { id: 'sujin', name: '苏槿', role: '护理师', locationId: 'hospital', description: '准备的热敷草包能驱走矿洞最深处的寒气。', availableActions: ['chat','gift','profile'], preferredGifts: ['moonflower','berry-tart'], portraitByAffinity: {}, birthday: { month: 3, day: 29 } },
 ]
 
@@ -51,29 +65,44 @@ export const locations: Location[] = [
   { id:'hospital', name:'医院', subtitle:'白槿诊所', description:'每日一次花钱恢复两点精力。', hours:'07:00–22:00', travelMinutes:19, npcIds:['weina','sujin'], mapPosition:{x:47,y:57,w:12,h:16}, category:'village' },
 ]
 
-export const crops: Crop[] = [
-  { id:'moon-radish', name:'月铃萝卜', season:'春', growthHours:56, sellPrice:90, color:'#b5a5d6', description:'成熟时根须会发出风铃般的轻响。' },
-  { id:'sun-wheat', name:'夕照麦', season:'秋', growthHours:96, sellPrice:135, color:'#d5a64a', description:'麦芒会储存傍晚最后一束光。' },
-  { id:'mist-bean', name:'雾荚豆', season:'春', growthHours:72, sellPrice:110, color:'#86b86d', description:'雨天收成更好的攀藤豆。' },
-  { id:'ember-berry', name:'余烬莓', season:'秋', growthHours:120, sellPrice:185, color:'#c95d5d', description:'用于制作火属性药剂。' },
-  { id:'tide-lotus', name:'潮汐莲', season:'夏', growthHours:144, sellPrice:220, color:'#5fa8bc', description:'只在浇水充足的地块开花。' },
-  { id:'stone-pumpkin', name:'岩纹南瓜', season:'秋', growthHours:168, sellPrice:260, color:'#c07a42', description:'表皮坚硬，是铁匠喜爱的礼物。' },
-]
+const cropPresentation = [
+  { id: 'moon-radish', color: '#b5a5d6' },
+  { id: 'sun-wheat', color: '#d5a64a' },
+  { id: 'mist-bean', color: '#86b86d' },
+  { id: 'ember-berry', color: '#c95d5d' },
+  { id: 'tide-lotus', color: '#5fa8bc' },
+  { id: 'stone-pumpkin', color: '#c07a42' },
+] as const
 
-export const shopItems: ShopItem[] = [
-  { id:'moon-radish-seed', name:'月铃萝卜种子', category:'seed', price:38, sellPrice:18, description:'春季种子，成熟迅速。', season:'春', growthDays:3 },
-  { id:'sun-wheat-seed', name:'夕照麦种子', category:'seed', price:62, sellPrice:30, description:'秋季谷物种子。', season:'秋', growthDays:4 },
-  { id:'mist-bean-seed', name:'雾荚豆种子', category:'seed', price:55, sellPrice:26, description:'春季攀藤作物。', season:'春', growthDays:3 },
-  { id:'moss-fertilizer', name:'苔肥', category:'material', price:80, sellPrice:35, description:'令作物提前八小时成熟。' },
-  { id:'copper-ore', name:'铜矿石', category:'material', price:120, sellPrice:55, description:'工具升级的基础材料。' },
-  { id:'iron-ore', name:'铁矿石', category:'material', price:210, sellPrice:95, description:'锻造可靠工具的矿石。' },
-  { id:'reed-bait', name:'苇心鱼饵', category:'bait', price:25, sellPrice:10, description:'适合河湾常见鱼类。' },
-  { id:'tide-rod', name:'潮汐钓竿', category:'tool', price:980, sellPrice:420, description:'扩大钓鱼时机判定区域。' },
-  { id:'energy-tonic', name:'金盏恢复剂', category:'potion', price:260, sellPrice:110, description:'战斗中恢复生命。' },
-  { id:'mana-potion', name:'蓝雾魔力剂', category:'potion', price:320, sellPrice:140, description:'战斗中恢复魔力。', element:'water' },
-  { id:'fire-potion', name:'流火瓶', category:'potion', price:380, sellPrice:165, description:'造成火属性伤害。', element:'fire' },
-  { id:'amber-tea', name:'琥珀茶', category:'gift', price:145, sellPrice:65, description:'多数村民都喜欢的温暖饮品。' },
-]
+export const crops: Crop[] = cropPresentation.map(({ id, color }) => {
+  const item = ITEM_CATALOG[id]
+  return {
+    id,
+    name: item.name,
+    season: item.season!,
+    growthHours: item.growthDays! * 24,
+    sellPrice: item.sellPrice,
+    color,
+    description: item.description,
+  }
+})
+
+export const shopItems: ShopItem[] = Object.values(ITEM_CATALOG).flatMap((item) => {
+  if (item.price === undefined || !item.retailCategory) return []
+  return [{
+    id: item.id,
+    name: item.name,
+    category: item.retailCategory,
+    price: item.price,
+    sellPrice: item.sellPrice,
+    description: item.description,
+    season: item.season,
+    growthDays: item.growthDays,
+    element: item.element,
+    festivalId: item.festivalId,
+    festivalLocationId: item.festivalLocationId,
+  }]
+})
 
 export const quests: Quest[] = [
   { id:'q-mist-beans', title:'雾后新芽', issuerId:'freya', description:'为草药园带来三份雾荚豆。', requiredItemId:'mist-bean', requiredAmount:3, rewardMoney:420, rewardAffinity:18, mayorAffinity:6, expiresInDays:3, status:'active' },

@@ -129,6 +129,8 @@ export interface ShopItem {
   season?: Season
   growthDays?: number
   element?: ElementType
+  festivalId?: string
+  festivalLocationId?: LocationId
 }
 
 export interface Quest {

@@ -32,7 +32,7 @@
 - Produces: `ITEM_CATALOG`, `MACHINE_RECIPES`, `BUILD_RECIPES`, `FORGE_RECIPES`, `MONSTER_PARTNERS`, `FESTIVAL_SEED_OFFERS`, `MINE_MAX_FLOOR`, `getItemName(id)`, `getMineYield(floor, pickaxeLevel, dropMultiplier, hasDragon)`。
 - Consumes: 现有 `Crop`、`ShopItem`、`Npc`、`Festival` 与规则倍率函数。
 
-- [ ] **Step 1: 写物品完整性与删除项失败测试**
+- [x] **Step 1: 写物品完整性与删除项失败测试**
 
 ```ts
 it('gives every catalog item a gameplay source and use', () => {
@@ -46,13 +46,13 @@ it('removes deleted materials and remaps gift preferences', () => {
 })
 ```
 
-- [ ] **Step 2: 运行红灯**
+- [x] **Step 2: 运行红灯**
 
 Run: `pnpm test:run src/game/economy.test.ts src/game/reducer.test.ts`
 
 Expected: FAIL，因为 `economy.ts` 和新目录不存在，旧偏好仍引用删除项。
 
-- [ ] **Step 3: 实现目录和类型**
+- [x] **Step 3: 实现目录和类型**
 
 定义：
 
@@ -77,13 +77,13 @@ export interface MachineJob {
 }
 ```
 
-登记规格中的全部物品、三种机器配方、两种建筑、九组工具/装备锻造配方、五位商店伙伴与三种节日种子。`itemDisplayNames` 改由目录派生；NPC 偏好按规格迁移。
+登记规格中的全部物品、四种机器配方、两种建筑、十二组工具/装备锻造配方、五位商店伙伴与三种节日种子。`itemDisplayNames` 改由目录派生；NPC 偏好按规格迁移。
 
-- [ ] **Step 4: 实现独立矿洞产量函数并覆盖边界**
+- [x] **Step 4: 实现独立矿洞产量函数并覆盖边界**
 
 测试字面量覆盖第 1、5、10、20 层、四级镐子和龙娘额外钻石，确保第 9 层钻石为 0、第 10 层开始大于 0。
 
-- [ ] **Step 5: 运行绿灯和类型检查**
+- [x] **Step 5: 运行绿灯和类型检查**
 
 Run: `pnpm test:run src/game/economy.test.ts src/game/reducer.test.ts && pnpm exec tsc -b --pretty false`
 
