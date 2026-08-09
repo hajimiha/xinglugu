@@ -27,6 +27,7 @@ export interface RemoteTurnInput {
   regexScripts?: TavernRegexScript[]
   signal?: AbortSignal
   onDelta?: (raw: string) => void
+  onReasoningDelta?: (reasoning: string) => void
 }
 
 export interface RemoteTurnResult {
@@ -35,6 +36,7 @@ export interface RemoteTurnResult {
   variablesAfter: Record<string, unknown>
   matchedEntryIds: string[]
   regexErrors: string[]
+  providerReasoning: string
 }
 
 const REMOTE_RESPONSE_CONTRACT = `请只输出以下酒馆标签结构，不要使用 Markdown 代码块：
@@ -100,13 +102,21 @@ export async function createRemoteTurn(input: RemoteTurnInput): Promise<RemoteTu
     },
   })
   let raw = ''
+  let providerReasoning = ''
   for await (const event of input.api.stream(prepared, input.signal)) {
-    if (event.type === 'delta') {
+    if (event.type === 'content-delta') {
       raw += event.text
       input.onDelta?.(raw)
+    } else if (event.type === 'reasoning-delta') {
+      providerReasoning += event.text
+      input.onReasoningDelta?.(providerReasoning)
     }
   }
-  if (!raw.trim()) throw new Error('模型没有返回可显示的剧情文字。')
+  if (!raw.trim()) {
+    throw new Error(providerReasoning.trim()
+      ? '模型只返回了供应商推理内容，没有返回剧情正文。请检查预设的输出格式或模型设置。'
+      : '模型没有返回可显示的剧情文字。')
+  }
 
   const outputRegex = applyRegexScripts(raw, [...(input.regexScripts ?? []), ...getPresetRegexScripts(input.preset.settings)], {
     stage: 'output',
@@ -130,5 +140,6 @@ export async function createRemoteTurn(input: RemoteTurnInput): Promise<RemoteTu
     variablesAfter: nextVariables,
     matchedEntryIds: assembled.matchedEntries.map((match) => match.entry.id),
     regexErrors: outputRegex.errors.map((error) => `正则“${error.scriptName}”：${error.message}`),
+    providerReasoning: providerReasoning.trim(),
   }
 }

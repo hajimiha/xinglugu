@@ -37,6 +37,8 @@ describe('本地优先酒馆 API 适配器', () => {
   it('以 OpenAI-compatible 格式发送请求并解析 SSE 增量', async () => {
     const config = createMistvaleDefaults().settings.api
     const fetchMock = vi.fn().mockResolvedValue(new Response([
+      'data: {"choices":[{"delta":{"reasoning_content":"先读取记忆"}}]}',
+      '',
       'data: {"choices":[{"delta":{"content":"洛岚"}}]}',
       '',
       'data: {"choices":[{"delta":{"content":"向你点头。"}}]}',
@@ -51,8 +53,9 @@ describe('本地优先酒馆 API 适配器', () => {
     })
 
     expect(await collect(api.stream(preview))).toEqual([
-      { type: 'delta', text: '洛岚' },
-      { type: 'delta', text: '向你点头。' },
+      { type: 'reasoning-delta', text: '先读取记忆' },
+      { type: 'content-delta', text: '洛岚' },
+      { type: 'content-delta', text: '向你点头。' },
       { type: 'done' },
     ])
     expect(fetchMock).toHaveBeenCalledWith('https://api.deepseek.com/chat/completions', expect.objectContaining({
@@ -76,7 +79,7 @@ describe('本地优先酒馆 API 适配器', () => {
       messages: [{ role: 'user', content: '继续' }],
     })))
 
-    expect(events).toEqual([{ type: 'delta', text: '普通响应正文' }, { type: 'done' }])
+    expect(events).toEqual([{ type: 'content-delta', text: '普通响应正文' }, { type: 'done' }])
     expect(JSON.parse(fetchMock.mock.calls[0][1].body as string)).toMatchObject({ stream: false })
   })
 
@@ -145,7 +148,7 @@ describe('本地优先酒馆 API 适配器', () => {
     const api = createRemoteTavernApi(config, 'secret-key', fetchMock)
 
     expect(await collect(api.stream(api.prepare({ task: 'story', messages: [{ role: 'user', content: '继续' }] })))).toEqual([
-      { type: 'delta', text: '远程正文' },
+      { type: 'content-delta', text: '远程正文' },
       { type: 'done' },
     ])
     expect(fetchMock.mock.calls[0][0]).toBe('https://api.anthropic.com/v1/messages')

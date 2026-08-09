@@ -57,6 +57,7 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
   const [input, setInput] = useState('')
   const [working, setWorking] = useState(false)
   const [streamingText, setStreamingText] = useState('')
+  const [streamingReasoning, setStreamingReasoning] = useState('')
   const [historyOpen, setHistoryOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const openingRef = useRef(false)
@@ -116,6 +117,7 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
     abortRef.current = controller
     setWorking(true)
     setStreamingText('')
+    setStreamingReasoning('')
     setError(null)
     setInput('')
     try {
@@ -128,6 +130,7 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
         memoryTags: relationship.memoryTags,
         signal: controller.signal,
         onDelta: (raw) => setStreamingText(extractStreamingMaintext(raw)),
+        onReasoningDelta: setStreamingReasoning,
       })
       setSessionSnapshot(next)
       if (!settlementRef.current) {
@@ -142,6 +145,7 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
     } finally {
       setWorking(false)
       setStreamingText('')
+      setStreamingReasoning('')
       abortRef.current = null
     }
   }
@@ -171,7 +175,16 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
     const scrollRegion = scrollRef.current
     if (!scrollRegion) return
     scrollRegion.scrollTop = scrollRegion.scrollHeight
-  }, [session?.messages.length, working, streamingText, options.length, displayedError])
+  }, [session?.messages.length, working, streamingText, streamingReasoning, options.length, displayedError])
+
+  const thinkingDisplay = tavern.settings?.thinkingDisplay ?? 'fold'
+  const renderReasoning = (label: string, content: string | undefined, source: 'provider' | 'authored') => {
+    if (!content?.trim() || thinkingDisplay === 'hide') return null
+    const body = <p>{content.trim()}</p>
+    return thinkingDisplay === 'inline'
+      ? <aside className={`tavern-reasoning is-${source}`}><strong>{label}</strong>{body}</aside>
+      : <details className={`tavern-reasoning is-${source}`}><summary>{label}</summary>{body}</details>
+  }
 
   return (
     <section className="dialogue-view tavern-dialogue" role="dialog" aria-modal="false" aria-labelledby={`tavern-dialogue-title-${npc.id}`}>
@@ -204,12 +217,16 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
           {displayedMessages.map((message) => (
             <article key={message.id} className={`dialogue-message is-${message.role === 'user' ? 'player' : 'npc'}`}>
               <span>{message.role === 'assistant' ? npc.name : '你'}</span>
+              {message.role === 'assistant' && renderReasoning('供应商返回的推理内容', message.metadata?.providerReasoning, 'provider')}
+              {message.role === 'assistant' && renderReasoning('模型自行输出的思考标签', message.parsed?.thinking, 'authored')}
               <p>{message.displayContent}</p>
               {message.parsed?.sum && <small className="dialogue-summary">楼层摘要 · {message.parsed.sum}</small>}
             </article>
           ))}
-          {working && <article className="dialogue-message is-npc is-working"><span>{npc.name}</span><p><i className="typing-caret" aria-label="正在组织回应" /> {streamingText || '模型正在读取角色卡与世界书……'}</p></article>}
+          {working && <article className="dialogue-message is-npc is-working"><span>{npc.name}</span>{renderReasoning('供应商正在返回推理内容', streamingReasoning, 'provider')}<p><i className="typing-caret" aria-label="正在组织回应" /> {streamingText || '模型正在读取角色卡与世界书……'}</p></article>}
         </div>
+
+        {thinkingDisplay !== 'hide' && <p className="tavern-reasoning-notice">这里只显示服务商实际返回的推理字段或模型主动写出的思考标签，不代表系统隐藏思维。</p>}
 
         <div className="tavern-options" aria-label="本回合可选行动">
           {options.map((option, index) => (

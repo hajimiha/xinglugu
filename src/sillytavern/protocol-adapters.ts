@@ -123,49 +123,104 @@ export function buildProviderModelsRequest(config: TavernApiConfig, apiKey: stri
   }
 }
 
-function partsText(parts: unknown): string {
+export interface ProviderContent {
+  content: string
+  reasoning: string
+}
+
+const EMPTY_PROVIDER_CONTENT: ProviderContent = { content: '', reasoning: '' }
+
+function appendText(value: unknown): string {
+  return typeof value === 'string' ? value : ''
+}
+
+function anthropicParts(parts: unknown): ProviderContent {
+  if (!Array.isArray(parts)) return EMPTY_PROVIDER_CONTENT
+  let content = ''
+  let reasoning = ''
+  for (const part of parts) {
+    if (!part || typeof part !== 'object') continue
+    const value = part as Record<string, unknown>
+    if (value.type === 'thinking' || value.type === 'redacted_thinking') {
+      reasoning += appendText(value.thinking) || appendText(value.text)
+    } else if (value.type === 'text' || !value.type) {
+      content += appendText(value.text)
+    }
+  }
+  return { content, reasoning }
+}
+
+function geminiParts(parts: unknown): ProviderContent {
+  if (!Array.isArray(parts)) return EMPTY_PROVIDER_CONTENT
+  let content = ''
+  let reasoning = ''
+  for (const part of parts) {
+    if (!part || typeof part !== 'object') continue
+    const value = part as Record<string, unknown>
+    if (value.thought === true) reasoning += appendText(value.text)
+    else content += appendText(value.text)
+  }
+  return { content, reasoning }
+}
+
+function textParts(parts: unknown): string {
   if (!Array.isArray(parts)) return ''
-  return parts.map((part) => {
-    if (!part || typeof part !== 'object') return ''
-    return typeof (part as { text?: unknown }).text === 'string' ? (part as { text: string }).text : ''
-  }).join('')
+  return parts.map((part) => part && typeof part === 'object' ? appendText((part as Record<string, unknown>).text) : '').join('')
 }
 
-export function extractProviderText(protocol: TavernApiProtocol, payload: unknown): string {
-  if (!payload || typeof payload !== 'object') return ''
+export function extractProviderContent(protocol: TavernApiProtocol, payload: unknown): ProviderContent {
+  if (!payload || typeof payload !== 'object') return EMPTY_PROVIDER_CONTENT
   const value = payload as Record<string, any>
-  if (protocol === 'anthropic-messages') return partsText(value.content)
+  if (protocol === 'anthropic-messages') return anthropicParts(value.content)
   if (protocol === 'gemini' || protocol === 'vertex-gemini') {
-    return (Array.isArray(value.candidates) ? value.candidates : [])
-      .map((candidate: any) => partsText(candidate?.content?.parts))
-      .join('')
+    return (Array.isArray(value.candidates) ? value.candidates : []).reduce((result: ProviderContent, candidate: any) => {
+      const next = geminiParts(candidate?.content?.parts)
+      result.content += next.content
+      result.reasoning += next.reasoning
+      return result
+    }, { content: '', reasoning: '' })
   }
-  if (protocol === 'cohere-v2') return partsText(value.message?.content)
+  if (protocol === 'cohere-v2') return { content: textParts(value.message?.content), reasoning: '' }
   if (protocol === 'cloudflare-workers-ai') {
-    if (typeof value.result?.response === 'string') return value.result.response
-    if (typeof value.response === 'string') return value.response
+    if (typeof value.result?.response === 'string') return { content: value.result.response, reasoning: '' }
+    if (typeof value.response === 'string') return { content: value.response, reasoning: '' }
   }
-  return value.choices?.[0]?.message?.content ?? value.choices?.[0]?.delta?.content ?? ''
+  const message = value.choices?.[0]?.message ?? value.choices?.[0]?.delta ?? {}
+  return {
+    content: appendText(message.content),
+    reasoning: appendText(message.reasoning_content) || appendText(message.reasoning) || appendText(message.thinking),
+  }
 }
 
-export function extractProviderSseDelta(protocol: TavernApiProtocol, payload: unknown): string {
-  if (!payload || typeof payload !== 'object') return ''
+export function extractProviderSseContent(protocol: TavernApiProtocol, payload: unknown): ProviderContent {
+  if (!payload || typeof payload !== 'object') return EMPTY_PROVIDER_CONTENT
   const value = payload as Record<string, any>
   if (protocol === 'anthropic-messages') {
-    return value.type === 'content_block_delta' && value.delta?.type === 'text_delta' && typeof value.delta.text === 'string'
-      ? value.delta.text
-      : ''
+    if (value.type !== 'content_block_delta') return EMPTY_PROVIDER_CONTENT
+    if (value.delta?.type === 'thinking_delta') return { content: '', reasoning: appendText(value.delta.thinking) }
+    if (value.delta?.type === 'text_delta') return { content: appendText(value.delta.text), reasoning: '' }
+    return EMPTY_PROVIDER_CONTENT
   }
   if (protocol === 'cohere-v2') {
-    return value.type === 'content-delta' && typeof value.delta?.message?.content?.text === 'string'
-      ? value.delta.message.content.text
-      : ''
+    return value.type === 'content-delta'
+      ? { content: appendText(value.delta?.message?.content?.text), reasoning: '' }
+      : EMPTY_PROVIDER_CONTENT
   }
   if (protocol === 'cloudflare-workers-ai') {
-    if (typeof value.response === 'string') return value.response
-    if (typeof value.result?.response === 'string') return value.result.response
+    if (typeof value.response === 'string') return { content: value.response, reasoning: '' }
+    if (typeof value.result?.response === 'string') return { content: value.result.response, reasoning: '' }
   }
-  return extractProviderText(protocol, payload)
+  return extractProviderContent(protocol, payload)
+}
+
+/** @deprecated 使用 extractProviderContent，以免丢失供应商推理字段。 */
+export function extractProviderText(protocol: TavernApiProtocol, payload: unknown): string {
+  return extractProviderContent(protocol, payload).content
+}
+
+/** @deprecated 使用 extractProviderSseContent，以免丢失供应商推理字段。 */
+export function extractProviderSseDelta(protocol: TavernApiProtocol, payload: unknown): string {
+  return extractProviderSseContent(protocol, payload).content
 }
 
 export function extractProviderModels(payload: unknown): string[] {

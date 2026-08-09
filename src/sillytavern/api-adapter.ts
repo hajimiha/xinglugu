@@ -3,8 +3,8 @@ import {
   buildProviderModelsRequest,
   buildProviderRequest,
   extractProviderModels,
-  extractProviderSseDelta,
-  extractProviderText,
+  extractProviderContent,
+  extractProviderSseContent,
 } from './protocol-adapters'
 import type { TavernApiAdapter, TavernApiConfig, TavernApiProtocol, TavernPreparedRequest, TavernRequest, TavernStreamEvent } from './types'
 
@@ -187,8 +187,9 @@ async function* streamSse(response: Response, protocol: TavernApiProtocol): Asyn
         break
       }
       try {
-        const content = extractProviderSseDelta(protocol, JSON.parse(data))
-        if (content) yield { type: 'delta', text: content }
+        const extracted = extractProviderSseContent(protocol, JSON.parse(data))
+        if (extracted.reasoning) yield { type: 'reasoning-delta', text: extracted.reasoning }
+        if (extracted.content) yield { type: 'content-delta', text: extracted.content }
       } catch {
         throw new TavernApiRequestError('模型服务返回了无法解析的流式数据。', 'TAVERN_API_INVALID_RESPONSE')
       }
@@ -209,9 +210,10 @@ async function* streamResponse(response: Response, protocol: TavernApiProtocol):
   } catch {
     throw new TavernApiRequestError('模型服务返回的内容不是有效 JSON。', 'TAVERN_API_INVALID_RESPONSE')
   }
-  const content = extractProviderText(protocol, payload)
-  if (!content) throw new TavernApiRequestError('模型响应中没有可显示的正文。', 'TAVERN_API_INVALID_RESPONSE')
-  yield { type: 'delta', text: content }
+  const extracted = extractProviderContent(protocol, payload)
+  if (!extracted.content && !extracted.reasoning) throw new TavernApiRequestError('模型响应中没有可识别的正文或推理字段。', 'TAVERN_API_INVALID_RESPONSE')
+  if (extracted.reasoning) yield { type: 'reasoning-delta', text: extracted.reasoning }
+  if (extracted.content) yield { type: 'content-delta', text: extracted.content }
   yield { type: 'done' }
 }
 
@@ -253,7 +255,8 @@ export async function testTavernApiConnection(
     if (!response.ok) throw await providerError(response)
     let payload: unknown
     try { payload = await response.json() } catch { throw new TavernApiRequestError('连接成功，但响应格式无法识别。', 'TAVERN_API_INVALID_RESPONSE') }
-    if (!extractProviderText(getTavernProvider(config.provider).protocol, payload)) {
+    const extracted = extractProviderContent(getTavernProvider(config.provider).protocol, payload)
+    if (!extracted.content && !extracted.reasoning) {
       throw new TavernApiRequestError('连接成功，但模型没有返回可识别的正文。', 'TAVERN_API_INVALID_RESPONSE')
     }
     return { models: [] }

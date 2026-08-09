@@ -29,6 +29,7 @@ interface SendTurnInput {
   memoryTags?: string[]
   signal?: AbortSignal
   onDelta?: (raw: string) => void
+  onReasoningDelta?: (reasoning: string) => void
 }
 
 interface TavernContextValue {
@@ -174,6 +175,7 @@ export function TavernProvider({ children, repository = tavernRepository }: { ch
       parsed: ParsedTags
       variablesAfter: Record<string, unknown>
       matchedEntryIds?: string[]
+      providerReasoning: string
     } = await createRemoteTurn({
       api,
       playerText: input.playerText,
@@ -187,6 +189,7 @@ export function TavernProvider({ children, repository = tavernRepository }: { ch
       regexScripts: currentSettings.regexScripts,
       signal: input.signal,
       onDelta: input.onDelta,
+      onReasoningDelta: input.onReasoningDelta,
     })
     const now = Date.now()
     const userMessage: ChatMessage = {
@@ -207,6 +210,7 @@ export function TavernProvider({ children, repository = tavernRepository }: { ch
       metadata: {
         processingTime: Math.round(performance.now() - startedAt),
         lorebookEntries: turn.matchedEntryIds,
+        providerReasoning: turn.providerReasoning || undefined,
       },
     }
     const next = {

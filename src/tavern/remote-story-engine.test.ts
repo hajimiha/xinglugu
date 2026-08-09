@@ -15,8 +15,9 @@ function createAdapter(response: string) {
     label: 'DeepSeek · deepseek-v4-flash',
     prepare,
     async *stream() {
-      yield { type: 'delta' as const, text: response.slice(0, 23) }
-      yield { type: 'delta' as const, text: response.slice(23) }
+      yield { type: 'reasoning-delta' as const, text: '核对角色卡' }
+      yield { type: 'content-delta' as const, text: response.slice(0, 23) }
+      yield { type: 'content-delta' as const, text: response.slice(23) }
       yield { type: 'done' as const }
     },
   }
@@ -36,6 +37,7 @@ describe('远程酒馆剧情引擎', () => {
     ].join('')
     const { adapter, prepare } = createAdapter(response)
     const streamed: string[] = []
+    const reasoning: string[] = []
 
     const result = await createRemoteTurn({
       api: adapter,
@@ -48,6 +50,7 @@ describe('远程酒馆剧情引擎', () => {
       variables: { affinity: 0, money: 500 },
       formatPrompt: defaults.settings.formatPromptTemplate,
       onDelta: (raw) => streamed.push(raw),
+      onReasoningDelta: (raw) => reasoning.push(raw),
     })
 
     expect(result.parsed.maintext).toBe('洛岚把今日的委托簿推到你面前。')
@@ -56,6 +59,8 @@ describe('远程酒馆剧情引擎', () => {
     expect(result.matchedEntryIds.length).toBeGreaterThan(0)
     expect(streamed).toHaveLength(2)
     expect(streamed.at(-1)).toBe(response)
+    expect(reasoning).toEqual(['核对角色卡'])
+    expect(result.providerReasoning).toBe('核对角色卡')
     expect(prepare).toHaveBeenCalledWith(expect.objectContaining({
       task: 'story',
       messages: expect.arrayContaining([

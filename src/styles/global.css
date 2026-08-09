@@ -852,6 +852,11 @@ h1, h2, h3, p { margin-top: 0; }
 @keyframes tavern-message-in { from { opacity: 0; transform: translate3d(0, 7px, 0); } }
 .dialogue-summary { display: block; margin-top: 7px; padding-top: 6px; color: var(--text-muted); border-top: 1px solid rgba(242, 229, 198, .07); font-size: 7px; line-height: 1.45; }
 .dialogue-message.is-working { border: 1px solid rgba(154, 122, 199, .16); }
+.tavern-reasoning { margin: 7px 0 5px; padding: 7px 9px; color: rgba(211, 196, 225, .82); border: 1px solid rgba(154, 122, 199, .2); border-radius: 7px; background: rgba(74, 55, 94, .11); font-size: 8px; }
+.tavern-reasoning.is-authored { color: rgba(192, 211, 198, .82); border-color: rgba(108, 157, 122, .2); background: rgba(54, 91, 66, .1); }
+.tavern-reasoning summary { cursor: pointer; color: inherit; font-weight: 700; letter-spacing: .03em; }
+.tavern-reasoning p { margin-top: 6px !important; color: inherit !important; font-size: 8px !important; line-height: 1.55 !important; }
+.tavern-reasoning-notice { margin: 0 18px 8px; color: var(--text-muted); font-size: 7px; line-height: 1.5; }
 .tavern-dialogue-skeleton { display: grid; gap: 8px; padding: 8px; }
 .tavern-dialogue-skeleton i { display: block; width: 76%; height: 44px; border-radius: 9px; background: linear-gradient(100deg, rgba(242, 229, 198, .035), rgba(242, 229, 198, .09), rgba(242, 229, 198, .035)); background-size: 200% 100%; animation: tavern-shimmer 1.4s ease-in-out infinite; }
 .tavern-dialogue-skeleton i:nth-child(2) { width: 54%; justify-self: end; }

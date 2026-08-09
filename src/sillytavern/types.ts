@@ -15,7 +15,8 @@ export interface TavernPreparedRequest {
 }
 
 export type TavernStreamEvent =
-  | { type: 'delta'; text: string }
+  | { type: 'content-delta'; text: string }
+  | { type: 'reasoning-delta'; text: string }
   | { type: 'done' }
 
 export interface TavernApiAdapter {
@@ -179,6 +180,7 @@ export interface ChatMessage {
     tokenCount?: number
     lorebookEntries?: string[]
     processingTime?: number
+    providerReasoning?: string
   }
   parsed?: ParsedTags
   variablesAfter?: Record<string, unknown>
