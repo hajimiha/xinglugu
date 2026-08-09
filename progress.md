@@ -1,5 +1,14 @@
 # Progress Log
 
+## 2026-08-09 · Phase 12
+- 运行 planning-with-files session catch-up，确认 `main`、`origin/main` 均位于 `b9b38d7`，工作区无未提交改动。
+- 完整读取 brainstorming、planning-with-files、writing-plans、TDD（含 writing-good-tests）、parallel dispatch、sillytavern-web 与 UI/UX Pro Max 约束。
+- 已建立 Phase 12 持久计划，开始核对现有领域模型和 UI 边界。
+- 初步源码扫描确认：固定田地、布尔牧场、无机器队列、无集中式物品来源/用途元数据；已记录改造边界。
+- 完成 UI/UX Pro Max 设计系统、响应式触控与 React 性能检索；确定沿用现有深绿金色像素控制台，不引入风格漂移。
+- 完整读取游戏类型、数据与 reducer，确认节日种子、同矿熔炼、龙娘最深层和动态田地的具体落点。
+- 完成农场、牧场、矿洞、铁匠、交易、背包、存档、酒馆默认内容、仓库迁移与角色立绘面板核对；开始编写集中式目录方案的设计规格。
+
 ## Session: 2026-08-08 · 最终审查补强
 
 ### 规则成本一致性
