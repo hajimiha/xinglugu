@@ -1,9 +1,11 @@
 import { createLorebookEngine } from './lorebook-engine'
+import { evaluateMacros } from './macro-engine'
 import { getPresetPromptDefinitions, getPresetPromptOrder, normalizePresetPromptRole } from './preset-compat'
 import type {
   ChatPreset,
   ChatSession,
   Lorebook,
+  MacroOperation,
   MatchedEntry,
   PromptCompilation,
   PromptTraceSegment,
@@ -29,21 +31,6 @@ function estimateTokens(content: string): number {
     (total, character) => total + (/^[\x00-\x7F]$/.test(character) ? 0.25 : 1),
     0,
   )))
-}
-
-function replaceBasicMacros(
-  template: string,
-  context: Pick<PromptCompileInput, 'userInput' | 'userName' | 'characterName' | 'variables'>,
-): string {
-  let result = template
-    .replace(/\{\{user\}\}/gi, context.userName)
-    .replace(/\{\{char\}\}/gi, context.characterName)
-    .replace(/\{\{original\}\}/gi, context.userInput)
-  result = result.replace(/\{\{([^{}]+)\}\}/g, (match, key: string) => {
-    const value = context.variables?.[key.trim()]
-    return value === undefined ? match : String(value)
-  })
-  return result
 }
 
 function traceSegment(
@@ -108,6 +95,23 @@ export function compileTavernTurn(input: PromptCompileInput): PromptCompilation 
   const messages: PromptCompilation['messages'] = []
   const segments: PromptTraceSegment[] = []
   const diagnostics: string[] = []
+  const macroOperations: MacroOperation[] = []
+  let macroVariables: Record<string, unknown> = { ...extraVariables, ...variables }
+  const macroContext = {
+    userName: input.userName,
+    characterName: input.characterName,
+    original: input.userInput,
+    lastUserMessage: [...input.history].reverse().find((message) => message.role === 'user')?.content ?? '',
+    lastCharacterMessage: [...input.history].reverse().find((message) => message.role === 'assistant')?.content ?? '',
+  }
+  const compileMacros = (raw: string) => {
+    const evaluation = evaluateMacros(raw, macroVariables, macroContext)
+    macroVariables = evaluation.variables
+    macroOperations.push(...evaluation.operations)
+    diagnostics.push(...evaluation.diagnostics)
+    diagnostics.push(...evaluation.unknownMacros.map((macro) => `未识别宏已原样保留：${macro}`))
+    return evaluation
+  }
   let systemAccumulator = ''
   let hasHistoryMarker = false
 
@@ -169,8 +173,8 @@ export function compileTavernTurn(input: PromptCompileInput): PromptCompilation 
     }
     const resolved = resolveContent(item.identifier)
     if (!resolved.content) continue
-    const compiled = replaceBasicMacros(resolved.content, input)
-    if (!compiled.trim()) continue
+    const evaluation = compileMacros(resolved.content)
+    const compiled = evaluation.text
     const role = normalizePresetPromptRole(item.role)
       || definitions.find((prompt) => prompt.identifier === item.identifier)?.role
       || 'system'
@@ -180,8 +184,13 @@ export function compileTavernTurn(input: PromptCompileInput): PromptCompilation 
       role,
       raw: resolved.content,
       compiled,
-      sent: true,
+      sent: Boolean(compiled.trim()),
+      diagnostics: [
+        ...evaluation.diagnostics,
+        ...evaluation.unknownMacros.map((macro) => `未识别宏已原样保留：${macro}`),
+      ],
     }))
+    if (!compiled.trim()) continue
     if (role === 'system') {
       systemAccumulator += `${systemAccumulator ? '\n\n' : ''}${compiled}`
     } else {
@@ -206,8 +215,17 @@ export function compileTavernTurn(input: PromptCompileInput): PromptCompilation 
     systemAccumulator += `${systemAccumulator ? '\n\n' : ''}${extraBlock}`
   }
   if (input.formatPrompt?.trim()) {
-    segments.push(traceSegment({ source: 'format', identifier: 'response-contract', role: 'system', raw: input.formatPrompt, compiled: input.formatPrompt, sent: true }))
-    systemAccumulator += `${systemAccumulator ? '\n\n' : ''}${input.formatPrompt}`
+    const evaluation = compileMacros(input.formatPrompt)
+    segments.push(traceSegment({
+      source: 'format',
+      identifier: 'response-contract',
+      role: 'system',
+      raw: input.formatPrompt,
+      compiled: evaluation.text,
+      sent: Boolean(evaluation.text.trim()),
+      diagnostics: evaluation.diagnostics,
+    }))
+    if (evaluation.text.trim()) systemAccumulator += `${systemAccumulator ? '\n\n' : ''}${evaluation.text}`
   }
   flushSystem()
 
@@ -217,7 +235,8 @@ export function compileTavernTurn(input: PromptCompileInput): PromptCompilation 
       segments.push(traceSegment({ source: 'history', identifier: historyMessage.id, role: historyMessage.role, raw: historyMessage.content, compiled: historyMessage.content, sent: true }))
     }
   }
-  const userInput = replaceBasicMacros(input.userInput, input)
+  const userEvaluation = compileMacros(input.userInput)
+  const userInput = userEvaluation.text
   messages.push({ role: 'user', content: userInput })
   segments.push(traceSegment({ source: 'user', identifier: 'current-user-input', role: 'user', raw: input.userInput, compiled: userInput, sent: true }))
 
@@ -225,7 +244,8 @@ export function compileTavernTurn(input: PromptCompileInput): PromptCompilation 
     messages,
     segments,
     matchedEntries,
-    macroVariables: { ...extraVariables, ...variables },
+    macroVariables,
+    macroOperations,
     diagnostics,
     systemPrompt: messages.filter((message) => message.role === 'system').map((message) => message.content).join('\n\n'),
   }

@@ -14,6 +14,7 @@ import type {
   ParsedTags,
   TavernSettings,
 } from '../sillytavern/types'
+import { variableDefinitionsToRecord } from '../sillytavern/variable-definitions'
 import { branchChat, truncateChatAt } from '../sillytavern/variables'
 import { createRemoteTurn } from './remote-story-engine'
 
@@ -152,9 +153,14 @@ export function TavernProvider({ children, repository = tavernRepository }: { ch
     const session = sessions.find((candidate) => candidate.id === input.sessionId)
       ?? await repository.getSession(input.sessionId)
     if (!session) throw new Error('找不到当前酒馆会话')
-    const variables = { ...session.variables, ...input.variables }
     const startedAt = performance.now()
     const currentSettings = settings ?? await repository.getSettings()
+    const variables = {
+      ...variableDefinitionsToRecord(currentSettings.globalVariables ?? []),
+      ...variableDefinitionsToRecord(session.variableDefinitions ?? []),
+      ...session.variables,
+      ...input.variables,
+    }
     const character = characters.find((candidate) => candidate.npcId === input.npcId)
       ?? (await repository.listCharacters()).find((candidate) => candidate.npcId === input.npcId)
     if (!character) throw new Error(`找不到 NPC 角色卡：${input.npcId}`)

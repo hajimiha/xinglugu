@@ -104,7 +104,7 @@ export async function createRemoteTurn(input: RemoteTurnInput): Promise<RemoteTu
   if (!raw.trim()) throw new Error('模型没有返回可显示的剧情文字。')
 
   const parsed = parseResponse(raw)
-  const { nextVariables } = applyParsedToChat(input.variables, parsed)
+  const { nextVariables } = applyParsedToChat(assembled.macroVariables, parsed)
   return {
     raw,
     parsed,

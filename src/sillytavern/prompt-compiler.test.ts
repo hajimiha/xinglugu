@@ -102,4 +102,25 @@ describe('严格酒馆提示词编译器', () => {
 
     expect(resolveSessionPreset(session, settings, [pinned, active])).toBe(pinned)
   })
+
+  it('按条目顺序执行 SillyTavern 宏并把最终结果真正放进出站消息', () => {
+    const macroPreset = preset('macro', '宏预设', '{{setvar::tone::温柔}}{{//仅本地注释}}{{trim}}', '语气={{getvar::tone}}；玩家={{user}}；上一句={{lastCharMessage}}')
+    const result = compileTavernTurn({
+      userInput: '继续',
+      history: [{ id: 'h1', role: 'assistant', content: '别担心，我在这里。', timestamp: now }],
+      preset: macroPreset,
+      lorebooks: [],
+      userName: '旅行者',
+      characterName: '洛岚',
+      variables: {},
+      extraVariables: {},
+    })
+
+    expect(result.messages).toContainEqual({
+      role: 'system',
+      content: '语气=温柔；玩家=旅行者；上一句=别担心，我在这里。',
+    })
+    expect(JSON.stringify(result.messages)).not.toContain('{{')
+    expect(result.macroVariables).toMatchObject({ tone: '温柔' })
+  })
 })

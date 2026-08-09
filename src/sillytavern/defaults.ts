@@ -339,6 +339,7 @@ export function createMistvaleDefaults(): MistvaleTavernDefaults {
     customTags: [...DEFAULT_TAGS],
     formatPromptTemplate: DEFAULT_FORMAT_PROMPT,
     thinkingDisplay: 'fold',
+    globalVariables: [],
     defaultContentVersion: DEFAULT_CONTENT_VERSION,
     updatedAt: now,
   }

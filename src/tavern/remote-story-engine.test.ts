@@ -83,4 +83,37 @@ describe('远程酒馆剧情引擎', () => {
 
     expect(result.parsed.maintext).toBe('洛岚抬眼看向你，示意你在壁炉边坐下。')
   })
+
+  it('把预设 setvar 的结果写入会话变量，并把 getvar 编译结果发送给模型', async () => {
+    const defaults = createMistvaleDefaults()
+    const { adapter, prepare } = createAdapter('<maintext>我会保持温柔。</maintext><vars>{}</vars>')
+    const result = await createRemoteTurn({
+      api: adapter,
+      playerText: '继续',
+      history: [],
+      preset: {
+        id: 'macro-preset', name: '宏预设', createdAt: 1, updatedAt: 1,
+        settings: {
+          prompts: [
+            { identifier: 'state', role: 'system', content: '{{setvar::tone::温柔}}{{trim}}' },
+            { identifier: 'main', role: 'system', content: '本轮语气={{getvar::tone}}' },
+          ],
+          prompt_order: [{ character_id: 100001, order: [
+            { identifier: 'state', enabled: true },
+            { identifier: 'main', enabled: true },
+          ] }],
+        },
+      },
+      lorebooks: [],
+      character: defaults.characters[0],
+      userName: '旅行者',
+      variables: {},
+      formatPrompt: '',
+    })
+
+    expect(result.variablesAfter).toMatchObject({ tone: '温柔' })
+    expect(prepare).toHaveBeenCalledWith(expect.objectContaining({
+      messages: expect.arrayContaining([expect.objectContaining({ role: 'system', content: expect.stringContaining('本轮语气=温柔') })]),
+    }))
+  })
 })

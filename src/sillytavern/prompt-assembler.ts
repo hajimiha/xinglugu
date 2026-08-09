@@ -21,11 +21,12 @@ export interface AssembleResult {
   messages: { role: 'system' | 'user' | 'assistant'; content: string }[];
   matchedEntries: MatchedEntry[];
   systemPrompt: string;
+  macroVariables: Record<string, unknown>;
 }
 
 export function assemblePrompt(options: AssembleOptions): AssembleResult {
   const result = compileTavernTurn(options)
-  return { messages: result.messages, matchedEntries: result.matchedEntries, systemPrompt: result.systemPrompt }
+  return { messages: result.messages, matchedEntries: result.matchedEntries, systemPrompt: result.systemPrompt, macroVariables: result.macroVariables }
 }
 
 interface MacroContext {

@@ -90,6 +90,53 @@ describe('酒馆中枢', () => {
     expect(screen.getByText('模型回复')).toBeVisible()
   })
 
+  it('变量中心支持类型、全局或会话作用域、范围校验与 JSON 导入导出', async () => {
+    const user = userEvent.setup()
+    database = createTavernDatabase(`mistvale-variable-center-${crypto.randomUUID()}`)
+    const repository = createTavernRepository(database)
+    await repository.initialize()
+    const now = Date.now()
+    await repository.saveSession({
+      id: 'variable-session',
+      name: '变量测试会话',
+      characterName: '洛岚',
+      userName: '旅行者',
+      presetId: null,
+      presetBinding: { mode: 'follow-active' },
+      lorebookIds: [],
+      variables: {},
+      messages: [],
+      createdAt: now,
+      updatedAt: now,
+    })
+    const settings = await repository.getSettings()
+    await repository.saveSettings({ ...settings, activeSessionId: 'variable-session' })
+    render(
+      <GameProvider>
+        <TavernProvider repository={repository}>
+          <TavernHubModal onClose={() => undefined} />
+        </TavernProvider>
+      </GameProvider>,
+    )
+
+    await screen.findByText('浏览器直连提醒')
+    await user.click(screen.getByRole('tab', { name: '变量' }))
+    expect(await screen.findByRole('heading', { name: '变量中心' })).toBeVisible()
+    expect(screen.getByRole('button', { name: '导入变量 JSON' })).toBeVisible()
+    expect(screen.getByRole('button', { name: '导出变量 JSON' })).toBeVisible()
+
+    await user.type(screen.getByLabelText('新变量名称'), 'affinityMultiplier')
+    await user.selectOptions(screen.getByLabelText('新变量类型'), 'number')
+    await user.selectOptions(screen.getByLabelText('新变量作用域'), 'global')
+    await user.clear(screen.getByLabelText('新变量初始值'))
+    await user.type(screen.getByLabelText('新变量初始值'), '1.5')
+    await user.click(screen.getByRole('button', { name: '添加变量' }))
+
+    expect(screen.getByText('affinityMultiplier')).toBeVisible()
+    expect(screen.getByText('全局', { selector: '.variable-scope-badge' })).toBeVisible()
+    expect(screen.getByLabelText('affinityMultiplier的值')).toHaveAttribute('type', 'number')
+  })
+
   it('点击关闭按钮后卸载角色卡编辑器', async () => {
     const user = userEvent.setup()
     database = createTavernDatabase(`mistvale-character-close-${crypto.randomUUID()}`)

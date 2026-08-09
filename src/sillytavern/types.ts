@@ -198,6 +198,7 @@ export interface ChatSession {
   presetBinding?: PresetBinding
   lorebookIds: string[]
   variables: Record<string, unknown>
+  variableDefinitions?: TavernVariableDefinition[]
   createdAt: number
   updatedAt: number
 }
@@ -220,11 +221,21 @@ export interface PromptTraceSegment {
   diagnostics: string[]
 }
 
+export type MacroOperationType = 'set' | 'add' | 'read' | 'random' | 'roll' | 'trim' | 'comment'
+
+export interface MacroOperation {
+  type: MacroOperationType
+  macro: string
+  key?: string
+  value?: unknown
+}
+
 export interface PromptCompilation {
   messages: TavernRequest['messages']
   segments: PromptTraceSegment[]
   matchedEntries: MatchedEntry[]
   macroVariables: Record<string, unknown>
+  macroOperations: MacroOperation[]
   diagnostics: string[]
   systemPrompt: string
 }
@@ -326,9 +337,24 @@ export interface TavernSettings {
   customTags: string[]
   formatPromptTemplate: string
   thinkingDisplay: 'fold' | 'hide' | 'inline'
+  globalVariables: TavernVariableDefinition[]
   contentPackVersion?: string
   defaultContentVersion?: number
   updatedAt: number
+}
+
+export type TavernVariableType = 'string' | 'number' | 'boolean'
+export type TavernVariableScope = 'global' | 'session'
+
+export interface TavernVariableDefinition {
+  key: string
+  label: string
+  type: TavernVariableType
+  value: string | number | boolean
+  scope: TavernVariableScope
+  min?: number
+  max?: number
+  description?: string
 }
 
 export const DEFAULT_FORMAT_PROMPT = `模型必须使用以下六段式酒馆结构：

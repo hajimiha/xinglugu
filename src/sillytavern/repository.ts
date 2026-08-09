@@ -5,6 +5,7 @@ import { tavernDatabase } from './database'
 import type { CharacterCard, ChatPreset, ChatSession, Lorebook, TavernSettings } from './types'
 import { loadRepositoryContentPack, mergeById, type TavernContentPack } from './content-pack'
 import { createDefaultPortraitSlots, legacyPortraitsToSlots, parsePortraitSlots } from './portrait-slots'
+import { parseVariableDefinitions } from './variable-definitions'
 
 export type TavernContentPackLoader = () => Promise<TavernContentPack | null>
 const defaultContentPackLoader: TavernContentPackLoader = import.meta.env.MODE === 'test'
@@ -28,6 +29,20 @@ function normalizeStoredCharacter(value: CharacterCard): CharacterCard {
 
   const { portraitByAffinity: _legacyPortraits, portraitSlots: _rawSlots, ...character } = raw
   return { ...character, portraitSlots }
+}
+
+function normalizeStoredSession(value: ChatSession): ChatSession {
+  if (value.variableDefinitions === undefined) return value
+  try {
+    return {
+      ...value,
+      variableDefinitions: parseVariableDefinitions(value.variableDefinitions)
+        .filter((definition) => definition.scope === 'session'),
+    }
+  } catch {
+    const { variableDefinitions: _invalidDefinitions, ...session } = value
+    return session
+  }
 }
 
 export interface TavernRepository {
@@ -173,9 +188,14 @@ class DexieTavernRepository implements TavernRepository {
   async saveCharacter(value: CharacterCard) { await this.database.characters.put(value) }
   async deleteCharacter(id: string) { await this.database.characters.delete(id) }
 
-  listSessions = () => this.database.sessions.orderBy('updatedAt').reverse().toArray()
-  getSession = (id: string) => this.database.sessions.get(id)
-  async saveSession(value: ChatSession) { await this.database.sessions.put(value) }
+  async listSessions() { return (await this.database.sessions.orderBy('updatedAt').reverse().toArray()).map(normalizeStoredSession) }
+  async getSession(id: string) { const value = await this.database.sessions.get(id); return value ? normalizeStoredSession(value) : undefined }
+  async saveSession(value: ChatSession) {
+    const variableDefinitions = value.variableDefinitions === undefined
+      ? undefined
+      : parseVariableDefinitions(value.variableDefinitions).filter((definition) => definition.scope === 'session')
+    await this.database.sessions.put({ ...value, variableDefinitions })
+  }
   async deleteSession(id: string) { await this.database.sessions.delete(id) }
 
   async getSettings(): Promise<TavernSettings> {

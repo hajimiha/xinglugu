@@ -1,5 +1,6 @@
 import { createMistvaleDefaults } from './defaults'
 import { getTavernProvider, isTavernApiProvider } from './provider-registry'
+import { parseVariableDefinitions } from './variable-definitions'
 import type { TavernApiConfig, TavernApiProvider, TavernProviderOptionKey, TavernSettings } from './types'
 
 type NumericApiField = 'contextLength' | 'maxResponseLength' | 'temperature' | 'frequencyPenalty' | 'presencePenalty' | 'topP'
@@ -99,6 +100,14 @@ export function normalizeTavernSettings(value: unknown): TavernSettings {
   else api.persistedApiKey = candidate.api.persistedApiKey.trim()
 
   const { adapterMode: _legacyAdapterMode, ...safeCandidate } = candidate
+  let globalVariables = defaults.globalVariables
+  if (Array.isArray(candidate.globalVariables)) {
+    try {
+      globalVariables = parseVariableDefinitions(candidate.globalVariables).filter((definition) => definition.scope === 'global')
+    } catch {
+      globalVariables = defaults.globalVariables
+    }
+  }
   return {
     ...defaults,
     ...safeCandidate,
@@ -106,5 +115,6 @@ export function normalizeTavernSettings(value: unknown): TavernSettings {
     api,
     activeLorebookIds: Array.isArray(candidate.activeLorebookIds) ? candidate.activeLorebookIds : defaults.activeLorebookIds,
     customTags: Array.isArray(candidate.customTags) ? candidate.customTags : defaults.customTags,
+    globalVariables,
   }
 }
