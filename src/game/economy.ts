@@ -1,5 +1,5 @@
 import { scaleReward } from './rules'
-import type { ElementType, LocationId, MonsterPartnerId, Season } from './types'
+import type { ElementType, LocationId, MachineId, MonsterPartnerId, Season } from './types'
 
 export type ItemCategory = 'seed' | 'crop' | 'material' | 'ore' | 'ingot' | 'product' | 'food' | 'bait' | 'tool' | 'potion' | 'gift'
 export type RetailCategory = 'seed' | 'material' | 'bait' | 'tool' | 'potion' | 'gift'
@@ -67,7 +67,6 @@ export const ITEM_CATALOG = defineCatalog({
 
 export type ItemId = keyof typeof ITEM_CATALOG
 
-export type MachineId = 'furnace' | 'mill'
 export interface MachineRecipe {
   id: string
   machine: MachineId

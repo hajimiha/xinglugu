@@ -139,10 +139,10 @@ h1, h2, h3, p { margin-top: 0; }
 .farm-stage { background: #17251e; }
 .farm-scene { position: absolute; inset: 0; z-index: -3; width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; filter: saturate(.92) brightness(.78) contrast(1.05); }
 .farm-vignette { position: absolute; inset: 0; z-index: -2; pointer-events: none; background: linear-gradient(180deg, rgba(7, 14, 12, .44) 0, transparent 28%, rgba(4, 11, 10, .2) 64%, rgba(4, 10, 9, .7)), radial-gradient(ellipse at 53% 62%, transparent 0 36%, rgba(3, 9, 8, .42) 100%); }
-.farm-stage-copy { position: absolute; bottom: 24px; left: 24px; z-index: 3; width: min(270px, 30%); padding: 14px 16px; border: 1px solid rgba(242, 229, 198, .14); border-radius: 11px; background: rgba(7, 18, 15, .78); box-shadow: 0 14px 38px rgba(0, 0, 0, .32); backdrop-filter: blur(8px); }
+.farm-stage-copy { position: absolute; bottom: 34%; left: 24px; z-index: 3; width: min(270px, 30%); padding: 14px 16px; border: 1px solid rgba(242, 229, 198, .14); border-radius: 11px; background: rgba(7, 18, 15, .78); box-shadow: 0 14px 38px rgba(0, 0, 0, .32); backdrop-filter: blur(8px); }
 .farm-stage-copy span { color: var(--copper-300); font-size: 9px; letter-spacing: .1em; }
 .farm-stage-copy strong { display: block; margin-top: 5px; font-family: var(--font-display); font-size: 14px; line-height: 1.55; }
-.farm-field-panel { position: absolute; top: 23%; right: 5%; bottom: 5%; z-index: 3; display: grid; width: 59%; min-width: 0; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; border: 1px solid rgba(221, 178, 91, .2); border-radius: 13px; background: rgba(7, 18, 15, .62); box-shadow: inset 0 0 34px rgba(27, 15, 9, .4), 0 16px 42px rgba(0, 0, 0, .32); backdrop-filter: blur(5px); }
+.farm-field-panel { position: absolute; top: 23%; right: 5%; bottom: 34%; z-index: 3; display: grid; width: 59%; min-width: 0; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; border: 1px solid rgba(221, 178, 91, .2); border-radius: 13px; background: rgba(7, 18, 15, .62); box-shadow: inset 0 0 34px rgba(27, 15, 9, .4), 0 16px 42px rgba(0, 0, 0, .32); backdrop-filter: blur(5px); }
 .farm-field-toolbar { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 10px; border-bottom: 1px solid rgba(221, 178, 91, .16); background: linear-gradient(90deg, rgba(11, 29, 24, .96), rgba(8, 22, 18, .86)); }
 .farm-field-toolbar > div { min-width: 0; }
 .farm-field-toolbar span, .farm-field-toolbar small { display: block; color: var(--text-muted); font-size: 8px; }
@@ -156,6 +156,39 @@ h1, h2, h3, p { margin-top: 0; }
 .farm-expand-button:disabled { cursor: not-allowed; opacity: .48; }
 .farm-grid { display: flex; min-width: 0; min-height: 0; flex-direction: column; gap: clamp(4px, .55vw, 8px); padding: 10px; overflow: auto; scrollbar-color: rgba(221, 178, 91, .58) rgba(6, 17, 14, .54); scrollbar-width: thin; overscroll-behavior: contain; touch-action: pan-x pan-y; transform: perspective(1100px) rotateX(1.5deg); transform-origin: center top; }
 .farm-row { display: grid; min-width: max(100%, calc(var(--farm-columns) * 48px)); min-height: 54px; flex: 0 0 54px; grid-template-columns: repeat(var(--farm-columns), minmax(42px, 1fr)); gap: clamp(4px, .55vw, 8px); }
+.farm-workshop { position: absolute; right: 3%; bottom: 3%; left: 3%; z-index: 12; display: grid; min-width: 0; height: 27%; min-height: 132px; grid-template-columns: minmax(190px, 24%) minmax(0, 1fr); overflow: hidden; border: 1px solid rgba(221, 178, 91, .24); border-radius: 12px; background: linear-gradient(125deg, rgba(8, 24, 20, .97), rgba(10, 19, 18, .94)); box-shadow: 0 18px 46px rgba(0, 0, 0, .42); backdrop-filter: blur(10px); }
+.farm-workshop-header { display: flex; min-width: 0; flex-direction: column; justify-content: space-between; padding: 12px; border-right: 1px solid var(--border-muted); background: radial-gradient(circle at 15% 0, rgba(221, 178, 91, .11), transparent 48%); }
+.farm-workshop-header span { color: var(--copper-300); font-size: 7px; letter-spacing: .12em; }
+.farm-workshop-header h2 { margin: 3px 0; font-size: 14px; }
+.farm-workshop-header p { margin: 0; color: var(--text-muted); font-size: 7px; line-height: 1.5; }
+.workshop-resource-strip { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 7px; }
+.workshop-resource-strip span { padding: 3px 5px; color: var(--text-muted); border: 1px solid var(--border-muted); border-radius: 4px; background: rgba(2, 10, 8, .36); letter-spacing: 0; }
+.workshop-resource-strip b { color: var(--text-primary); font-family: var(--font-numeric); }
+.farm-workshop-track { display: flex; min-width: 0; gap: 8px; padding: 8px; overflow: auto hidden; scrollbar-color: rgba(221, 178, 91, .58) rgba(6, 17, 14, .54); scrollbar-width: thin; overscroll-behavior-inline: contain; touch-action: pan-x; }
+.workshop-machine-card { min-width: min(350px, 76vw); padding: 9px; overflow: auto; border: 1px solid var(--border-muted); border-radius: 9px; background: linear-gradient(145deg, rgba(242, 229, 198, .04), rgba(4, 14, 12, .22)); }
+.workshop-machine-card > header { display: flex; align-items: center; gap: 8px; }
+.machine-mark { display: grid; width: 34px; height: 34px; flex: 0 0 auto; place-items: center; color: var(--copper-300); border: 1px solid rgba(221, 178, 91, .25); border-radius: 7px; background: rgba(221, 178, 91, .07); }
+.workshop-machine-card header small { color: var(--copper-300); font-size: 7px; }
+.workshop-machine-card h3 { margin: 1px 0 0; font-size: 11px; }
+.machine-blueprint p, .kitchen-card > p { margin: 6px 0; color: var(--text-muted); font-size: 7px; line-height: 1.45; }
+.machine-blueprint button, .kitchen-action button { min-height: 36px; padding: 0 10px; color: var(--text-primary); border: 1px solid rgba(221, 178, 91, .34); border-radius: 6px; background: rgba(112, 81, 40, .36); font-size: 8px; }
+.machine-power-line { display: grid; grid-template-columns: 16px 1fr auto; align-items: center; gap: 5px; margin: 6px 0; padding: 4px 6px; color: var(--text-muted); border-radius: 5px; background: rgba(2, 10, 8, .32); font-size: 7px; }
+.machine-power-line svg { color: var(--magic-300); }
+.machine-power-line b { color: var(--success-400); font-size: 7px; }
+.machine-recipe-list { display: grid; gap: 5px; }
+.machine-recipe-row { display: grid; grid-template-columns: minmax(120px, 1fr) 58px 48px; align-items: center; gap: 5px; padding-top: 5px; border-top: 1px solid rgba(242, 229, 198, .07); }
+.machine-recipe-row strong, .machine-recipe-row small { display: block; }
+.machine-recipe-row strong { font-size: 8px; }
+.machine-recipe-row small { color: var(--text-muted); font-size: 6px; }
+.machine-recipe-row label span, .kitchen-action label span { display: block; color: var(--text-muted); font-size: 6px; }
+.machine-recipe-row input, .kitchen-action input { width: 100%; min-height: 28px; padding: 0 6px; color: var(--text-primary); border: 1px solid var(--border-muted); border-radius: 5px; background: rgba(2, 10, 8, .55); font-family: var(--font-numeric); font-size: 8px; }
+.machine-recipe-row button { min-height: 32px; color: var(--text-primary); border: 1px solid rgba(221, 178, 91, .3); border-radius: 5px; background: rgba(112, 81, 40, .3); font-size: 7px; }
+.machine-job { display: flex; align-items: center; gap: 8px; margin-top: 7px; padding: 8px; border: 1px solid rgba(134, 184, 109, .23); border-radius: 7px; background: rgba(134, 184, 109, .07); }
+.machine-job > span { color: var(--success-400); }
+.machine-job strong, .machine-job small { display: block; }
+.machine-job strong { font-size: 9px; }
+.machine-job small { margin-top: 2px; color: var(--text-muted); font-size: 7px; }
+.kitchen-action { display: grid; grid-template-columns: 72px 1fr; gap: 7px; }
 .farm-plot { position: relative; min-width: 0; min-height: 44px; padding: 0; overflow: hidden; color: var(--text-primary); border: 1px solid rgba(203, 143, 77, .35); border-radius: 4px; background: repeating-linear-gradient(90deg, rgba(119, 74, 42, .94) 0 7px, rgba(94, 56, 34, .96) 7px 14px); box-shadow: inset 0 0 0 2px rgba(49, 29, 18, .36), 2px 3px 0 rgba(18, 16, 12, .38); transition: transform var(--duration-fast), border-color var(--duration-fast), filter var(--duration-fast); image-rendering: pixelated; }
 .farm-plot:hover, .farm-plot:focus-visible { z-index: 4; border-color: var(--copper-300); filter: brightness(1.14); transform: translateY(-3px) scale(1.03); }
 .farm-plot.is-empty { opacity: .8; }
@@ -914,12 +947,18 @@ h1, h2, h3, p { margin-top: 0; }
   .field-copy { padding: 18px; }
   .field-copy h2 { font-size: 18px; }
   .field-copy p { font-size: 11px; }
-  .farm-field-panel { top: 25%; right: 3%; bottom: 3%; width: 94%; }
+  .farm-field-panel { top: 23%; right: 3%; bottom: 42%; width: 94%; }
   .farm-field-toolbar { padding: 7px; }
   .farm-field-toolbar > div > small { max-width: 175px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   .farm-expand-button { min-width: 104px; min-height: 44px; }
   .farm-grid { gap: 5px; padding: 7px; transform: none; }
   .farm-row { min-width: max(100%, calc(var(--farm-columns) * 52px)); min-height: 50px; flex-basis: 50px; gap: 5px; }
+  .farm-workshop { right: 3%; bottom: 3%; left: 3%; height: 36%; min-height: 170px; grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
+  .farm-workshop-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; padding: 8px; border-right: 0; border-bottom: 1px solid var(--border-muted); }
+  .farm-workshop-header p { display: none; }
+  .workshop-resource-strip { align-self: center; justify-content: flex-end; margin-top: 0; }
+  .workshop-machine-card { min-width: 82vw; }
+  .machine-blueprint button, .kitchen-action button, .machine-recipe-row button { min-height: 44px; }
   .farm-stage-copy { display: none; }
   .plot-dialog { top: 76px; right: 8px; bottom: 8px; left: 8px; width: auto; }
   .location-story { right: 12px; bottom: 12px; left: 12px; width: auto; }

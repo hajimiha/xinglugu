@@ -21,6 +21,7 @@ export type NpcAction = 'chat' | 'gift' | 'trade' | 'quest' | 'profile'
 export type SkillId = 'fishing' | 'farming' | 'mining' | 'combat' | 'magic'
 export type EnergyCostMode = 'free' | 'normal' | 'double'
 export type MonsterPartnerId = 'cow-girl' | 'bee-girl' | 'spider-girl' | 'fire-slime-girl' | 'water-slime-girl' | 'dragon-girl'
+export type MachineId = 'furnace' | 'mill'
 
 export interface GameRuleSettings {
   experienceMultiplier: number
@@ -185,6 +186,20 @@ export interface BattleState {
   log: string[]
 }
 
+export interface MachineJob {
+  recipeId: string
+  batches: number
+  outputItemId: string
+  outputQuantity: number
+  completesAt: number
+  poweredBy: 'magic' | 'partner'
+}
+
+export interface FarmMachineState {
+  built: boolean
+  job?: MachineJob
+}
+
 export type ModalType =
   | 'inventory'
   | 'character'
@@ -233,6 +248,7 @@ export interface GameState {
     residents: MonsterPartnerId[]
     dragonStatus: 'wild' | 'promised' | 'resident'
   }
+  machines: Record<MachineId, FarmMachineState>
   battle?: BattleState
   tools: { hoe: number; rod: number; pickaxe: number }
   fishing: { active: boolean; lastCatch?: string }
@@ -266,6 +282,9 @@ export type GameAction =
   | { type: 'BUY_RANCH' }
   | { type: 'BUY_MONSTER_PARTNER'; partnerId: MonsterPartnerId }
   | { type: 'INVITE_DRAGON'; method: 'battle' | 'coins' }
+  | { type: 'BUILD_MACHINE'; machine: MachineId }
+  | { type: 'START_MACHINE_JOB'; recipeId: string; batches: number }
+  | { type: 'CRAFT_ITEM'; recipeId: 'berry-tart'; quantity: number }
   | { type: 'LEARN_SPELL'; spellId: string }
   | { type: 'ENTER_MINE_FLOOR'; floor: number }
   | { type: 'MINE_ORE'; floor: number }

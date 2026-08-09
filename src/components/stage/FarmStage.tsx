@@ -6,6 +6,7 @@ import { useGame } from '../../game/GameContext'
 import { getEnergyCost, scaleGrowthHours, scaleReward } from '../../game/rules'
 import type { GameAction, Plot } from '../../game/types'
 import { GameIcon } from '../icons/GameIcon'
+import { FarmWorkshop } from './FarmWorkshop'
 
 function formatRemaining(hours: number) {
   if (hours <= 0) return '已经成熟'
@@ -124,6 +125,8 @@ export function FarmStage() {
           ))}
         </div>
       </div>
+
+      <FarmWorkshop />
 
       {selected && (
         <section className="plot-dialog" role="dialog" aria-modal="false" aria-labelledby="plot-dialog-title">

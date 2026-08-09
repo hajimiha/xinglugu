@@ -191,25 +191,25 @@ Commit: `feat: 实现魔物娘牧场与每日生产`
 - Produces: actions `BUILD_MACHINE`, `START_MACHINE_JOB`, `CRAFT_ITEM`；`machines.furnace/mill`；`completeMachineJobs(state, absoluteMinute)`。
 - Consumes: `MACHINE_RECIPES`, `BUILD_RECIPES`, `knownSpells`, `ranch.residents`。
 
-- [ ] **Step 1: 写机器状态红灯测试**
+- [x] **Step 1: 写机器状态红灯测试**
 
 覆盖建造材料、金币、重复建造；无魔法/史莱姆阻止启动；魔法启动扣 1 精力；史莱姆启动不扣；批量扣料；完成前无产物、到时精确入库；跨日/旅行正常完成；莓果挞配方一次扣料产出。
 
-- [ ] **Step 2: 运行红灯并实现最小状态机**
+- [x] **Step 2: 运行红灯并实现最小状态机**
 
 Run: `pnpm test:run src/game/reducer.test.ts -t "熔炉|磨粉机|莓果挞|机器"`
 
 完成时间使用 `((year - 1) * 365 + day - 1) * 1440 + minutes`；队列输出由统一时间推进结算。
 
-- [ ] **Step 3: 写工坊组件红灯测试**
+- [x] **Step 3: 写工坊组件红灯测试**
 
 断言未建造配方、建造按钮、批数 stepper、三种熔炼配方、磨粉、能量来源、剩余时间和莓果挞制造按钮。
 
-- [ ] **Step 4: 实现 `FarmWorkshop`**
+- [x] **Step 4: 实现 `FarmWorkshop`**
 
 用本地字符串批数草稿避免空值被归零；按钮提交时校验最大可加工批数。卡片滚动区有 `aria-label="农场生产工坊"` 与 `aria-live="polite"` 状态。
 
-- [ ] **Step 5: 添加工坊 CSS 与集成**
+- [x] **Step 5: 添加工坊 CSS 与集成**
 
 农场在田区下方显示工坊横向卡片轨道；桌面滚轮/Shift+滚轮、手机触摸滑动可用，页面本身无横向溢出。
 

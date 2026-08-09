@@ -1,4 +1,4 @@
-import { MONSTER_PARTNERS, createInitialPlots, crops, getFarmExpansion, npcs, quests, shopItems, spells } from './data'
+import { BUILD_RECIPES, CRAFT_RECIPES, MACHINE_RECIPES, MONSTER_PARTNERS, createInitialPlots, crops, getFarmExpansion, npcs, quests, shopItems, spells } from './data'
 import { advanceCalendarClock, formatGameDate, getSeasonForDay, getWeekday, isNpcBirthday } from './calendar'
 import {
   DEFAULT_GAME_RULES,
@@ -90,10 +90,30 @@ export const initialGameState: GameState = {
   hospitalUsedToday: false,
   ownsMonsterRanch: false,
   ranch: { owned: false, residents: [], dragonStatus: 'wild' },
+  machines: { furnace: { built: false }, mill: { built: false } },
   tools: { hoe: 1, rod: 1, pickaxe: 1 },
   fishing: { active: false },
   activeModal: null,
   toasts: [],
+}
+
+export function getAbsoluteMinute(year: number, day: number, minutes: number) {
+  return ((year - 1) * 365 + day - 1) * 1440 + minutes
+}
+
+export function completeMachineJobs(state: GameState, absoluteMinute: number): Pick<GameState, 'inventory' | 'machines'> {
+  let inventory = state.inventory
+  let changed = false
+  const machines = { ...state.machines }
+  for (const machineId of ['furnace', 'mill'] as const) {
+    const machine = state.machines[machineId]
+    if (!machine.job || machine.job.completesAt > absoluteMinute) continue
+    if (!changed) inventory = { ...inventory }
+    changed = true
+    inventory[machine.job.outputItemId] = (inventory[machine.job.outputItemId] ?? 0) + machine.job.outputQuantity
+    machines[machineId] = { built: true }
+  }
+  return { inventory, machines: changed ? machines : state.machines }
 }
 
 export function advanceGameClock(state: GameState, elapsedMinutes: number): GameState {
@@ -111,6 +131,9 @@ export function advanceGameClock(state: GameState, elapsedMinutes: number): Game
     }])) as GameState['relationships']
     : state.relationships
 
+  const ranchInventory = advanceRanchProducts(state, crossedDays)
+  const completedMachines = completeMachineJobs({ ...state, inventory: ranchInventory }, getAbsoluteMinute(target.year, target.day, target.minutes))
+
   return {
     ...state,
     year: target.year,
@@ -121,7 +144,8 @@ export function advanceGameClock(state: GameState, elapsedMinutes: number): Game
     energy: crossedDays > 0 ? state.maxEnergy : state.energy,
     hospitalUsedToday: crossedDays > 0 ? false : state.hospitalUsedToday,
     relationships,
-    inventory: advanceRanchProducts(state, crossedDays),
+    inventory: completedMachines.inventory,
+    machines: completedMachines.machines,
     plots: advancePlots(state, actualElapsed),
   }
 }
@@ -388,6 +412,60 @@ function reduceGameState(state: GameState, action: GameAction): GameState {
         },
         toasts: [...state.toasts, makeToast({ tone: 'success', title: resident ? '龙娘入住' : '龙娘的约定', message: resident ? '龙娘已成为农场的矿脉守望者。' : '她答应在牧场建成后前来定居。' })],
       }
+    }
+    case 'BUILD_MACHINE': {
+      const recipe = BUILD_RECIPES[action.machine]
+      if (!recipe || state.machines[action.machine].built || state.money < recipe.money) return state
+      const materials = Object.entries(recipe.materials) as [string, number][]
+      if (materials.some(([itemId, quantity]) => (state.inventory[itemId] ?? 0) < quantity)) return state
+      const inventory = { ...state.inventory }
+      for (const [itemId, quantity] of materials) inventory[itemId] -= quantity
+      return {
+        ...state,
+        money: state.money - recipe.money,
+        inventory,
+        machines: { ...state.machines, [action.machine]: { built: true } },
+        toasts: [...state.toasts, makeToast({ tone: 'success', title: '设施建造完成', message: `${recipe.name}已经可以投入生产。` })],
+      }
+    }
+    case 'START_MACHINE_JOB': {
+      const recipe = MACHINE_RECIPES[action.recipeId]
+      const batches = Math.floor(action.batches)
+      if (!recipe || batches < 1) return state
+      const machine = state.machines[recipe.machine]
+      if (!machine.built || machine.job) return state
+      const hasPartner = state.ranch.residents.some((residentId) => MONSTER_PARTNERS[residentId].machineAssist === recipe.machine)
+      const hasMagic = state.knownSpells.some((spellId) => spells.some((spell) => spell.id === spellId && spell.element === recipe.requiredElement))
+      if (!hasPartner && !hasMagic) return state
+      const cost = hasPartner ? 0 : getEnergyCost(1, state.rules.energyCostMode)
+      const requiredInput = recipe.inputPerBatch * batches
+      if (state.energy < cost || (state.inventory[recipe.inputItemId] ?? 0) < requiredInput) return state
+      const outputQuantity = recipe.outputPerBatch * batches
+      const completesAt = getAbsoluteMinute(state.year, state.day, state.minutes) + recipe.minutesPerBatch * batches
+      return {
+        ...state,
+        energy: state.energy - cost,
+        inventory: { ...state.inventory, [recipe.inputItemId]: state.inventory[recipe.inputItemId] - requiredInput },
+        machines: {
+          ...state.machines,
+          [recipe.machine]: {
+            built: true,
+            job: { recipeId: recipe.id, batches, outputItemId: recipe.outputItemId, outputQuantity, completesAt, poweredBy: hasPartner ? 'partner' : 'magic' },
+          },
+        },
+        toasts: [...state.toasts, makeToast({ tone: 'success', title: '机器开始运转', message: `${recipe.name}共 ${batches} 批，等待加工完成即可收取。` })],
+      }
+    }
+    case 'CRAFT_ITEM': {
+      const recipe = CRAFT_RECIPES[action.recipeId]
+      const quantity = Math.floor(action.quantity)
+      if (!recipe || quantity < 1) return state
+      const materials = Object.entries(recipe.materials) as [string, number][]
+      if (materials.some(([itemId, amount]) => (state.inventory[itemId] ?? 0) < amount * quantity)) return state
+      const inventory = { ...state.inventory }
+      for (const [itemId, amount] of materials) inventory[itemId] -= amount * quantity
+      inventory[recipe.outputItemId] = (inventory[recipe.outputItemId] ?? 0) + recipe.outputQuantity * quantity
+      return { ...state, inventory, toasts: [...state.toasts, makeToast({ tone: 'success', title: '料理完成', message: `制作了 ${recipe.outputQuantity * quantity} 份莓果挞。` })] }
     }
     case 'TRAIN_COMBAT': {
       const cost = getEnergyCost(1, state.rules.energyCostMode)

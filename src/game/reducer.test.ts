@@ -315,4 +315,68 @@ describe('游戏状态变更', () => {
     expect(settled.ranch.dragonStatus).toBe('resident')
     expect(settled.ranch.residents).toContain('dragon-girl')
   })
+
+  it('建造熔炉与磨粉机时扣除准确材料和金币并禁止重复建造', () => {
+    const resources = { ...initialGameState, money: 2000, inventory: { stone: 50, wood: 30 } }
+    const furnace = gameReducer(resources, { type: 'BUILD_MACHINE', machine: 'furnace' } as never)
+    expect(furnace.machines.furnace.built).toBe(true)
+    expect(furnace.inventory.stone).toBe(25)
+    expect(gameReducer(furnace, { type: 'BUILD_MACHINE', machine: 'furnace' } as never)).toBe(furnace)
+
+    const mill = gameReducer(furnace, { type: 'BUILD_MACHINE', machine: 'mill' } as never)
+    expect(mill.machines.mill.built).toBe(true)
+    expect(mill.inventory).toMatchObject({ stone: 10, wood: 10 })
+    expect(mill.money).toBe(1400)
+  })
+
+  it('火系魔法启动批量熔炼并在完成时刻精确产出对应锭', () => {
+    const prepared: GameState = {
+      ...initialGameState,
+      energy: 5,
+      knownSpells: ['fire-arrow'],
+      inventory: { 'copper-ore': 6 },
+      machines: { furnace: { built: true }, mill: { built: false } },
+    }
+    const started = gameReducer(prepared, { type: 'START_MACHINE_JOB', recipeId: 'smelt-copper', batches: 2 } as never)
+    expect(started.energy).toBe(4)
+    expect(started.inventory['copper-ore']).toBe(0)
+    expect(started.machines.furnace.job).toMatchObject({ batches: 2, outputItemId: 'copper-ingot', outputQuantity: 2, poweredBy: 'magic' })
+
+    const early = gameReducer(started, { type: 'ADVANCE_TIME', minutes: 239, reason: '等待试炉' })
+    expect(early.inventory['copper-ingot'] ?? 0).toBe(0)
+    expect(early.machines.furnace.job).toBeDefined()
+    const complete = gameReducer(early, { type: 'ADVANCE_TIME', minutes: 1, reason: '完成试炉' })
+    expect(complete.inventory['copper-ingot']).toBe(2)
+    expect(complete.machines.furnace.job).toBeUndefined()
+  })
+
+  it('对应史莱姆娘可免精力启动机器，缺少魔法和伙伴时拒绝启动', () => {
+    const noPower: GameState = {
+      ...initialGameState,
+      inventory: { 'iron-ore': 3, 'sun-wheat': 2 },
+      machines: { furnace: { built: true }, mill: { built: true } },
+    }
+    expect(gameReducer(noPower, { type: 'START_MACHINE_JOB', recipeId: 'smelt-iron', batches: 1 } as never)).toBe(noPower)
+
+    const helpers: GameState = {
+      ...noPower,
+      energy: 0,
+      ranch: { owned: true, residents: ['fire-slime-girl', 'water-slime-girl'], dragonStatus: 'wild' },
+    }
+    const furnace = gameReducer(helpers, { type: 'START_MACHINE_JOB', recipeId: 'smelt-iron', batches: 1 } as never)
+    expect(furnace.energy).toBe(0)
+    expect(furnace.machines.furnace.job?.poweredBy).toBe('partner')
+    const mill = gameReducer(furnace, { type: 'START_MACHINE_JOB', recipeId: 'mill-flour', batches: 1 } as never)
+    expect(mill.energy).toBe(0)
+    expect(mill.machines.mill.job?.poweredBy).toBe('partner')
+  })
+
+  it('使用余烬莓、蜂蜜、面粉和牛奶制作莓果挞', () => {
+    const pantry = {
+      ...initialGameState,
+      inventory: { 'ember-berry': 4, honey: 2, flour: 2, milk: 2 },
+    }
+    const cooked = gameReducer(pantry, { type: 'CRAFT_ITEM', recipeId: 'berry-tart', quantity: 2 } as never)
+    expect(cooked.inventory).toMatchObject({ 'ember-berry': 0, honey: 0, flour: 0, milk: 0, 'berry-tart': 2 })
+  })
 })
