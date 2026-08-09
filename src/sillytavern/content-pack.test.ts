@@ -23,11 +23,12 @@ describe('仓库酒馆内容包', () => {
   it('拒绝缺少版本号或包含非图像立绘的仓库包', () => {
     expect(() => parseContentPack({ schemaVersion: 1, contentVersion: '', lorebooks: [], presets: [], characters: [] })).toThrow(/版本/)
     const defaults = createMistvaleDefaults()
+    const { portraitSlots: _slots, ...legacyCharacter } = defaults.characters[0]
     expect(() => createContentPack({
       contentVersion: 'bad-portrait',
       lorebooks: [],
       presets: [],
-      characters: [{ ...defaults.characters[0], portraitByAffinity: { stranger: 'javascript:alert(1)' } }],
+      characters: [{ ...legacyCharacter, portraitByAffinity: { stranger: 'javascript:alert(1)' } } as never],
     })).toThrow(/角色卡|立绘/)
   })
 
@@ -39,7 +40,7 @@ describe('仓库酒馆内容包', () => {
       contentVersion: 'large-portrait',
       lorebooks: [],
       presets: [],
-      characters: [{ ...defaults.characters[0], portraitByAffinity: { stranger: largePortrait } }],
+      characters: [{ ...defaults.characters[0], portraitSlots: [{ id: 'large', minAffinity: 0, maxAffinity: 100, source: largePortrait }] }],
     })).not.toThrow()
   })
 
@@ -51,7 +52,7 @@ describe('仓库酒馆内容包', () => {
       contentVersion: 'oversized-pack',
       lorebooks: [],
       presets: [],
-      characters: [{ ...defaults.characters[0], portraitByAffinity: { stranger: oversizedPortrait } }],
+      characters: [{ ...defaults.characters[0], portraitSlots: [{ id: 'oversized', minAffinity: 0, maxAffinity: 100, source: oversizedPortrait }] }],
     })).toThrow(/12 MB/)
   })
 
@@ -60,6 +61,38 @@ describe('仓库酒馆内容包', () => {
     expect(() => parseContentPack({ ...base, lorebooks: [null], presets: [], characters: [] })).toThrow(/世界书/)
     expect(() => parseContentPack({ ...base, lorebooks: [], presets: [{ id: 'bad', name: {}, settings: {} }], characters: [] })).toThrow(/预设/)
     expect(() => parseContentPack({ ...base, lorebooks: [], presets: [], characters: [{ id: 'bad', portraitByAffinity: {} }] })).toThrow(/角色卡/)
+  })
+
+  it('导入旧五阶段角色卡时转为连续区间并只导出新结构', () => {
+    const defaults = createMistvaleDefaults()
+    const { portraitSlots: _slots, ...legacyCharacter } = defaults.characters[0]
+    const pack = createContentPack({
+      contentVersion: 'legacy-portrait-migration',
+      lorebooks: [],
+      presets: [],
+      characters: [{
+        ...legacyCharacter,
+        portraitByAffinity: { stranger: '/early.webp', trusted: '/trusted.webp', bonded: '/bonded.webp' },
+      } as never],
+    })
+
+    expect(pack.characters[0].portraitSlots).toEqual([
+      { id: 'portrait-legacy-stranger', minAffinity: 0, maxAffinity: 44, source: '/early.webp' },
+      { id: 'portrait-legacy-trusted', minAffinity: 45, maxAffinity: 99, source: '/trusted.webp' },
+      { id: 'portrait-legacy-bonded', minAffinity: 100, maxAffinity: 100, source: '/bonded.webp' },
+    ])
+    expect(pack.characters[0]).not.toHaveProperty('portraitByAffinity')
+  })
+
+  it('拒绝重叠或留空洞的新版立绘槽位', () => {
+    const defaults = createMistvaleDefaults()
+    expect(() => createContentPack({
+      contentVersion: 'overlapping-slots', lorebooks: [], presets: [],
+      characters: [{ ...defaults.characters[0], portraitSlots: [
+        { id: 'one', minAffinity: 0, maxAffinity: 70, source: '' },
+        { id: 'two', minAffinity: 70, maxAffinity: 100, source: '' },
+      ] }],
+    })).toThrow(/立绘区间|角色卡/)
   })
 
   it('允许发布带角色槽位分组的 SillyTavern 官方预设', () => {

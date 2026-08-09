@@ -213,10 +213,17 @@ export interface CharacterCard {
   firstMessage: string
   exampleDialogue: string
   lorebookIds: string[]
-  portraitByAffinity: Record<string, string>
+  portraitSlots: PortraitSlot[]
   tags: string[]
   createdAt: number
   updatedAt: number
+}
+
+export interface PortraitSlot {
+  id: string
+  minAffinity: number
+  maxAffinity: number
+  source: string
 }
 
 export interface MistvaleTavernDefaults {

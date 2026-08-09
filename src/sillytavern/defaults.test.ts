@@ -24,7 +24,7 @@ describe('雾灯谷酒馆默认内容', () => {
     expect(defaults.presets[0].settings).not.toHaveProperty('apiKey')
     expect(defaults.presets[0].description).toContain('模型')
     expect(defaults.presets[0].description).not.toContain('本地剧情引擎')
-    expect(DEFAULT_CONTENT_VERSION).toBe(3)
+    expect(DEFAULT_CONTENT_VERSION).toBe(4)
   })
 
   it('提供六位共生伙伴角色卡与完整生产世界书', () => {
@@ -41,7 +41,8 @@ describe('雾灯谷酒馆默认内容', () => {
     expect(partnerCards).toHaveLength(6)
     expect(partnerCards.every((card) => card.tags.includes('女性角色') && card.tags.includes('共生伙伴'))).toBe(true)
     expect(partnerCards.every((card) => card.lorebookIds.includes(PRODUCTION_PARTNERS_ID))).toBe(true)
-    expect(partnerCards.every((card) => ['stranger', 'acquainted', 'trusted', 'intimate', 'bonded'].every((stage) => stage in card.portraitByAffinity))).toBe(true)
+    expect(partnerCards.every((card) => card.portraitSlots.length === 1)).toBe(true)
+    expect(partnerCards.every((card) => card.portraitSlots[0].minAffinity === 0 && card.portraitSlots[0].maxAffinity === 100)).toBe(true)
     expect(defaults.characters.every((card) => card.lorebookIds.includes(PRODUCTION_PARTNERS_ID))).toBe(true)
     expect(defaults.settings.activeLorebookIds).toContain(PRODUCTION_PARTNERS_ID)
   })
@@ -69,5 +70,9 @@ describe('雾灯谷酒馆默认内容', () => {
     })
     expect(loran?.firstMessage).toContain('雾灯谷')
     expect(loran?.lorebookIds).toEqual(expect.arrayContaining(['mistvale-world-rules']))
+    expect(loran?.portraitSlots).toEqual([
+      { id: 'portrait-0-100', minAffinity: 0, maxAffinity: 100, source: '' },
+    ])
+    expect(loran).not.toHaveProperty('portraitByAffinity')
   })
 })

@@ -146,7 +146,7 @@ describe('雾灯谷酒馆仓储', () => {
     await database.characters.put({
       ...loran,
       personality: '玩家自定义且必须保留',
-      portraitByAffinity: { ...loran.portraitByAffinity, stranger: '/portraits/custom-loran.webp' },
+      portraitSlots: [{ id: 'custom', minAffinity: 0, maxAffinity: 100, source: '/portraits/custom-loran.webp' }],
       lorebookIds: loran.lorebookIds.filter((id) => id !== PRODUCTION_PARTNERS_ID),
     })
     await database.sessions.put({
@@ -166,9 +166,34 @@ describe('雾灯谷酒馆仓储', () => {
     expect(await repository.getLorebook('mistvale-village-archive')).toBeUndefined()
     expect((await repository.listCharacters()).filter((card) => card.tags.includes('共生伙伴'))).toHaveLength(6)
     expect((await repository.getCharacter(loran.id))?.personality).toBe('玩家自定义且必须保留')
-    expect((await repository.getCharacter(loran.id))?.portraitByAffinity.stranger).toBe('/portraits/custom-loran.webp')
+    expect((await repository.getCharacter(loran.id))?.portraitSlots[0].source).toBe('/portraits/custom-loran.webp')
     expect((await repository.getCharacter(loran.id))?.lorebookIds).toContain(PRODUCTION_PARTNERS_ID)
     expect((await repository.getSettings()).activeLorebookIds).toContain(PRODUCTION_PARTNERS_ID)
     expect((await repository.getSession('v2-session'))?.lorebookIds).toContain(PRODUCTION_PARTNERS_ID)
+  })
+
+  it('从内容版本三迁移旧五阶段立绘并保留角色自定义资料', async () => {
+    database = createTavernDatabase(`mistvale-portrait-slot-migration-${crypto.randomUUID()}`)
+    const repository = createTavernRepository(database)
+    await repository.initialize()
+    const settings = await repository.getSettings()
+    const loran = (await repository.listCharacters()).find((card) => card.npcId === 'loran')!
+    const { portraitSlots: _slots, ...legacyLoran } = loran
+    await database.characters.put({
+      ...legacyLoran,
+      personality: '保留这段玩家自定义性格',
+      portraitByAffinity: { stranger: '/portraits/legacy-loran.webp' },
+    } as never)
+    await database.settings.put({ ...settings, defaultContentVersion: 3 })
+
+    await repository.initialize()
+
+    const migrated = await repository.getCharacter(loran.id)
+    expect(migrated?.personality).toBe('保留这段玩家自定义性格')
+    expect(migrated?.portraitSlots).toEqual([
+      { id: 'portrait-0-100', minAffinity: 0, maxAffinity: 100, source: '/portraits/legacy-loran.webp' },
+    ])
+    expect(migrated).not.toHaveProperty('portraitByAffinity')
+    expect((await repository.getSettings()).defaultContentVersion).toBe(4)
   })
 })

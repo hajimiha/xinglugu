@@ -4,11 +4,31 @@ import type { MistvaleTavernDatabase } from './database'
 import { tavernDatabase } from './database'
 import type { CharacterCard, ChatPreset, ChatSession, Lorebook, TavernSettings } from './types'
 import { loadRepositoryContentPack, mergeById, type TavernContentPack } from './content-pack'
+import { createDefaultPortraitSlots, legacyPortraitsToSlots, parsePortraitSlots } from './portrait-slots'
 
 export type TavernContentPackLoader = () => Promise<TavernContentPack | null>
 const defaultContentPackLoader: TavernContentPackLoader = import.meta.env.MODE === 'test'
   ? async () => null
   : loadRepositoryContentPack
+
+function normalizeStoredCharacter(value: CharacterCard): CharacterCard {
+  const raw = value as CharacterCard & { portraitSlots?: unknown; portraitByAffinity?: unknown }
+  let portraitSlots
+  try {
+    portraitSlots = raw.portraitSlots === undefined
+      ? legacyPortraitsToSlots(raw.portraitByAffinity)
+      : parsePortraitSlots(raw.portraitSlots)
+  } catch {
+    try {
+      portraitSlots = legacyPortraitsToSlots(raw.portraitByAffinity)
+    } catch {
+      portraitSlots = createDefaultPortraitSlots()
+    }
+  }
+
+  const { portraitByAffinity: _legacyPortraits, portraitSlots: _rawSlots, ...character } = raw
+  return { ...character, portraitSlots }
+}
 
 export interface TavernRepository {
   initialize(): Promise<void>
@@ -54,6 +74,7 @@ class DexieTavernRepository implements TavernRepository {
         const storedContentVersion = storedSettings?.defaultContentVersion ?? 1
         const shouldMigrateCalendar = storedContentVersion < 2
         const shouldMigrateProduction = storedContentVersion < 3
+        const shouldMigratePortraitSlots = storedContentVersion < 4
         const shouldMigrateDefaults = storedContentVersion < DEFAULT_CONTENT_VERSION
         const migrationLorebookIds = [
           ...(shouldMigrateCalendar ? [CALENDAR_FESTIVALS_ID] : []),
@@ -88,6 +109,10 @@ class DexieTavernRepository implements TavernRepository {
               const existingIds = new Set((await this.database.characters.toArray()).map((card) => card.id))
               const missingPartnerCards = defaults.characters.filter((card) => MONSTER_GIRL_CARD_IDS.includes(card.id) && !existingIds.has(card.id))
               if (missingPartnerCards.length) await this.database.characters.bulkAdd(missingPartnerCards)
+            }
+            if (shouldMigratePortraitSlots) {
+              const migratedPortraits = (await this.database.characters.toArray()).map(normalizeStoredCharacter)
+              if (migratedPortraits.length) await this.database.characters.bulkPut(migratedPortraits)
             }
           }
         }

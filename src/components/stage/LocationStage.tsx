@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
 import locationAtlas from '../../assets/pixel/location-atlas.webp'
 import { getNpcsAtLocation } from '../../game/calendar'
 import { locations, npcs } from '../../game/data'
 import { useGame } from '../../game/GameContext'
 import type { LocationId, ModalType } from '../../game/types'
+import { resolvePortraitSlot } from '../../sillytavern/portrait-slots'
+import { useTavern } from '../../tavern/TavernContext'
 import { DialogueView } from '../npc/DialogueView'
 import { NpcPanel } from '../npc/NpcPanel'
 import { NpcPortrait } from '../npc/NpcPortrait'
@@ -37,18 +38,39 @@ const primaryModal: Partial<Record<LocationId, { modal: Exclude<ModalType, null>
 
 export function LocationStage() {
   const { state, dispatch } = useGame()
-  const [uploads, setUploads] = useState<Record<string, string>>({})
+  const tavern = useTavern()
   const location = locations.find((item) => item.id === state.location)!
   const presentNpcs = getNpcsAtLocation(state.location, state.year, state.day, state.minutes)
   const selectedNpc = npcs.find((npc) => npc.id === state.selectedNpcId)
   const feature = primaryModal[state.location]
   const featureNpcId = location.npcIds.find((npcId) => presentNpcs.some((npc) => npc.id === npcId))
 
-  useEffect(() => () => Object.values(uploads).forEach((source) => URL.revokeObjectURL?.(source)), [uploads])
-
-  const upload = (npcId: string, file: File) => {
-    const source = URL.createObjectURL(file)
-    setUploads((current) => ({ ...current, [npcId]: source }))
+  const upload = async (npcId: string, slotId: string, file: File) => {
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      dispatch({ type: 'ADD_TOAST', toast: { tone: 'warning', title: '立绘格式不支持', message: '请选择 PNG、JPG 或 WebP 图片。' } })
+      return
+    }
+    const card = tavern.characters.find((candidate) => candidate.npcId === npcId)
+    if (!card) {
+      dispatch({ type: 'ADD_TOAST', toast: { tone: 'danger', title: '角色卡尚未就绪', message: '请稍后再试，或前往酒馆中枢检查角色卡。' } })
+      return
+    }
+    try {
+      const source = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('图片读取失败'))
+        reader.onerror = () => reject(reader.error ?? new Error('图片读取失败'))
+        reader.readAsDataURL(file)
+      })
+      await tavern.saveCharacter({
+        ...card,
+        portraitSlots: card.portraitSlots.map((slot) => slot.id === slotId ? { ...slot, source } : slot),
+        updatedAt: Date.now(),
+      })
+      dispatch({ type: 'ADD_TOAST', toast: { tone: 'success', title: '立绘已保存', message: `${card.name}的当前好感区间立绘已写入角色卡。` } })
+    } catch {
+      dispatch({ type: 'ADD_TOAST', toast: { tone: 'danger', title: '立绘保存失败', message: '图片读取或本机存储失败，请重试。' } })
+    }
   }
 
   return (
@@ -58,7 +80,13 @@ export function LocationStage() {
       <header className="stage-titlebar"><div><p className="eyebrow">{location.name} · {location.hours}</p><h1 id="stage-title">{location.subtitle}</h1></div><span className="weather-pill">{location.hours === '全天' ? '随时开放' : `开放 ${location.hours}`}</span></header>
       <div className="location-story"><span>{location.name}</span><p>{location.description}</p>{feature && <button id={`location-feature-${state.location}`} className="primary-button" type="button" onClick={() => dispatch({ type: 'OPEN_MODAL', modal: feature.modal, npcId: featureNpcId })}>{feature.label}</button>}</div>
       <div className={`npc-stage-list count-${presentNpcs.length}`} aria-label="当前地点人物">
-        {presentNpcs.map((npc) => <NpcPortrait key={npc.id} npc={npc} relationship={state.relationships[npc.id]} uploadedSource={uploads[npc.id]} onUpload={(file) => upload(npc.id, file)} onOpen={() => dispatch({ type: 'OPEN_MODAL', modal: 'npc', npcId: npc.id })} />)}
+        {presentNpcs.map((npc) => {
+          const relationship = state.relationships[npc.id]
+          const card = tavern.characters.find((candidate) => candidate.npcId === npc.id)
+          const slot = (card ? resolvePortraitSlot(card.portraitSlots, relationship.affinity) : undefined)
+            ?? { id: 'portrait-0-100', minAffinity: 0, maxAffinity: 100, source: '' }
+          return <NpcPortrait key={npc.id} npc={npc} relationship={relationship} source={slot.source} minAffinity={slot.minAffinity} maxAffinity={slot.maxAffinity} onUpload={(file) => void upload(npc.id, slot.id, file)} onOpen={() => dispatch({ type: 'OPEN_MODAL', modal: 'npc', npcId: npc.id })} />
+        })}
         {!presentNpcs.length && <div className="empty-location-state"><strong>此刻无人停留</strong><p>村民会依照每日行程与节日安排在不同地点活动。</p></div>}
       </div>
       {state.activeModal === 'npc' && selectedNpc && <NpcPanel npcId={selectedNpc.id} />}

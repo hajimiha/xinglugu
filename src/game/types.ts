@@ -49,7 +49,6 @@ export interface Npc {
   description: string
   availableActions: NpcAction[]
   preferredGifts: string[]
-  portraitByAffinity: Partial<Record<AffinityStage, string>>
   birthday: { month: number; day: number }
 }
 

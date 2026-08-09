@@ -1,5 +1,6 @@
 import type { CharacterCard, ChatPreset, Lorebook, LorebookEntry } from './types'
 import { validatePresetSettings } from './preset-compat'
+import { legacyPortraitsToSlots, parsePortraitSlots } from './portrait-slots'
 
 export const TAVERN_CONTENT_PACK_PATH = 'content/mistvale-content-pack.json'
 export const MAX_CONTENT_PACK_BYTES = 12 * 1024 * 1024
@@ -27,14 +28,6 @@ const isFiniteNumber = (value: unknown): value is number => typeof value === 'nu
 const isOptionalString = (value: unknown) => value === undefined || isString(value)
 const isOptionalNumber = (value: unknown) => value === undefined || isFiniteNumber(value)
 const isOptionalBoolean = (value: unknown) => value === undefined || typeof value === 'boolean'
-
-const isSafePortraitSource = (value: string) => !value
-  || value.startsWith('data:image/png;base64,')
-  || value.startsWith('data:image/jpeg;base64,')
-  || value.startsWith('data:image/webp;base64,')
-  || value.startsWith('/')
-  || value.startsWith('./')
-  || value.startsWith('https://')
 
 const positions = new Set<LorebookEntry['position']>(['before_char', 'after_char', 'before_example', 'after_example', 'at_depth', 'example_msg_top', 'example_msg_bottom', 'outlet'])
 const selectiveLogics = new Set<LorebookEntry['selectiveLogic']>(['and_any', 'not_all', 'not_any', 'and_all'])
@@ -84,16 +77,24 @@ function isPreset(value: unknown): value is ChatPreset {
     && isFiniteNumber(value.updatedAt)
 }
 
-function isCharacter(value: unknown): value is CharacterCard {
-  if (!isRecord(value) || !isRecord(value.portraitByAffinity)) return false
-  for (const source of Object.values(value.portraitByAffinity)) {
-    if (!isString(source) || !isSafePortraitSource(source)) return false
-  }
-  return ['id', 'npcId', 'name', 'role', 'locationId', 'description', 'personality', 'scenario', 'firstMessage', 'exampleDialogue'].every((key) => isString(value[key]))
+function parseCharacter(value: unknown): CharacterCard | null {
+  if (!isRecord(value)) return null
+  const hasValidFields = ['id', 'npcId', 'name', 'role', 'locationId', 'description', 'personality', 'scenario', 'firstMessage', 'exampleDialogue'].every((key) => isString(value[key]))
     && isStringArray(value.lorebookIds)
     && isStringArray(value.tags)
     && isFiniteNumber(value.createdAt)
     && isFiniteNumber(value.updatedAt)
+  if (!hasValidFields) return null
+
+  try {
+    const portraitSlots = value.portraitSlots === undefined
+      ? legacyPortraitsToSlots(value.portraitByAffinity)
+      : parsePortraitSlots(value.portraitSlots)
+    const { portraitByAffinity: _legacyPortraits, portraitSlots: _rawSlots, ...character } = value
+    return { ...character, portraitSlots } as unknown as CharacterCard
+  } catch {
+    return null
+  }
 }
 
 export function estimateContentPackBytes(value: unknown): number {
@@ -117,9 +118,11 @@ export function parseContentPack(value: unknown): TavernContentPack {
   if (!isString(value.exportedAt) || Number.isNaN(Date.parse(value.exportedAt))) throw new Error('内容包导出时间无效。')
   if (!Array.isArray(value.lorebooks) || !value.lorebooks.every(isLorebook)) throw new Error('内容包包含无效的世界书。')
   if (!Array.isArray(value.presets) || !value.presets.every(isPreset)) throw new Error('内容包包含无效的预设。')
-  if (!Array.isArray(value.characters) || !value.characters.every(isCharacter)) throw new Error('内容包包含无效的角色卡或立绘来源。')
+  if (!Array.isArray(value.characters)) throw new Error('内容包包含无效的角色卡或立绘区间。')
   if (estimateContentPackBytes(value) > MAX_CONTENT_PACK_BYTES) throw new Error('内容包超过 12 MB 发布预算，请改用仓库静态图片路径。')
-  return structuredClone(value) as unknown as TavernContentPack
+  const characters = value.characters.map(parseCharacter)
+  if (characters.some((character) => character === null)) throw new Error('内容包包含无效的角色卡或立绘区间。')
+  return structuredClone({ ...value, characters }) as unknown as TavernContentPack
 }
 
 export async function loadRepositoryContentPack(fetcher: typeof fetch = fetch): Promise<TavernContentPack | null> {

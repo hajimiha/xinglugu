@@ -1,6 +1,7 @@
 import { locations, MONSTER_PARTNERS, npcs } from '../game/data'
 import { festivals, formatClock, npcSchedules, WEEKDAYS } from '../game/calendar'
 import type { MonsterPartnerId, Npc } from '../game/types'
+import { createDefaultPortraitSlots } from './portrait-slots'
 import {
   createDefaultPreset,
   DEFAULT_FORMAT_PROMPT,
@@ -16,7 +17,7 @@ const WORLD_RULES_ID = 'mistvale-world-rules'
 const VILLAGE_ARCHIVE_ID = 'mistvale-village-archive'
 export const CALENDAR_FESTIVALS_ID = 'mistvale-calendar-festivals'
 export const PRODUCTION_PARTNERS_ID = 'mistvale-production-partners'
-export const DEFAULT_CONTENT_VERSION = 3
+export const DEFAULT_CONTENT_VERSION = 4
 export const MONSTER_GIRL_CARD_IDS = (Object.keys(MONSTER_PARTNERS) as MonsterPartnerId[]).map((id) => `mistvale-character-${id}`)
 
 function entry(
@@ -161,8 +162,6 @@ const monsterGirlVoice: Record<MonsterPartnerId, { description: string; personal
   },
 }
 
-const affinityPortraits = () => ({ stranger: '', acquainted: '', trusted: '', intimate: '', bonded: '' })
-
 function createCharacterCard(npc: Npc, now: number): CharacterCard {
   const voice = characterVoice[npc.id]
   const location = locations.find((candidate) => candidate.id === npc.locationId)
@@ -178,7 +177,7 @@ function createCharacterCard(npc: Npc, now: number): CharacterCard {
     firstMessage: voice.firstMessage,
     exampleDialogue: voice.example,
     lorebookIds: [WORLD_RULES_ID, VILLAGE_ARCHIVE_ID, CALENDAR_FESTIVALS_ID, PRODUCTION_PARTNERS_ID],
-    portraitByAffinity: { ...npc.portraitByAffinity },
+    portraitSlots: createDefaultPortraitSlots(),
     tags: [npc.role, location?.name ?? '雾灯谷', '女性角色'],
     createdAt: now,
     updatedAt: now,
@@ -200,7 +199,7 @@ function createMonsterGirlCard(id: MonsterPartnerId, now: number): CharacterCard
     firstMessage: voice.firstMessage,
     exampleDialogue: voice.example,
     lorebookIds: [WORLD_RULES_ID, VILLAGE_ARCHIVE_ID, CALENDAR_FESTIVALS_ID, PRODUCTION_PARTNERS_ID],
-    portraitByAffinity: affinityPortraits(),
+    portraitSlots: createDefaultPortraitSlots(),
     tags: [partner.role, '苔灯农场·共生牧场', '共生伙伴', '女性角色'],
     createdAt: now,
     updatedAt: now,

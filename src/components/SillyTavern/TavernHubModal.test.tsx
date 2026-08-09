@@ -111,7 +111,7 @@ describe('酒馆中枢', () => {
     expect(screen.queryByRole('button', { name: '关闭角色卡编辑' })).not.toBeInTheDocument()
   })
 
-  it('在角色编辑器首屏提供直达五阶段立绘上传区的入口', async () => {
+  it('在角色编辑器首屏提供直达好感区间立绘上传区的入口', async () => {
     const user = userEvent.setup()
     database = createTavernDatabase(`mistvale-character-portrait-${crypto.randomUUID()}`)
     render(
@@ -128,7 +128,8 @@ describe('酒馆中枢', () => {
 
     const shortcut = screen.getByRole('button', { name: '前往立绘上传' })
     expect(shortcut).toBeVisible()
-    expect(screen.getByRole('group', { name: '好感阶段立绘' })).toHaveAttribute('data-portrait-upload-target', 'true')
+    expect(screen.getByRole('group', { name: '好感区间立绘' })).toHaveAttribute('data-portrait-upload-target', 'true')
+    expect(screen.getByText('好感 0—100')).toBeVisible()
   })
 
   it('可载入超过 512 KB 的角色立绘', async () => {
@@ -147,9 +148,9 @@ describe('酒馆中枢', () => {
     await user.click((await screen.findAllByRole('button', { name: /编辑角色卡/ }))[0])
     const file = new File([new Uint8Array(600 * 1024)], 'large-portrait.webp', { type: 'image/webp' })
 
-    await user.upload(screen.getByLabelText('选择图片'), file)
+    await user.upload(screen.getByLabelText(/选择立绘/), file)
 
     expect(await screen.findByRole('status')).toHaveTextContent(/立绘已载入/)
-    expect(screen.getByAltText(/初识立绘预览/)).toHaveAttribute('src', expect.stringMatching(/^data:image\/webp;base64,/))
+    expect(screen.getByAltText(/好感0—100立绘预览/)).toHaveAttribute('src', expect.stringMatching(/^data:image\/webp;base64,/))
   })
 })
