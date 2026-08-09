@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { affinityStageNames, locations } from '../../../game/data'
 import type { AffinityStage } from '../../../game/types'
 import type { CharacterCard } from '../../../sillytavern/types'
-import { createContentPack, MAX_PORTRAIT_FILE_BYTES } from '../../../sillytavern/content-pack'
+import { createContentPack } from '../../../sillytavern/content-pack'
 import { exportToJson } from '../../../sillytavern/importer'
 import { useTavern } from '../../../tavern/TavernContext'
 import { GameIcon } from '../../icons/GameIcon'
@@ -37,11 +37,6 @@ export function CharacterPanel() {
       event.target.value = ''
       return
     }
-    if (file.size > MAX_PORTRAIT_FILE_BYTES) {
-      setNotice('立绘超过 512 KB。为保证手机端与 GitHub 发布稳定，请压缩为 WebP 后重新上传。')
-      event.target.value = ''
-      return
-    }
     const reader = new FileReader()
     reader.onload = () => {
       setDraft({ ...draft, portraitByAffinity: { ...draft.portraitByAffinity, [portraitStage]: String(reader.result) }, updatedAt: Date.now() })
@@ -72,7 +67,7 @@ export function CharacterPanel() {
         <label><span>当前场景</span><textarea id={`character-scenario-${draft.id}`} rows={3} value={draft.scenario} onChange={(event) => setDraft({ ...draft, scenario: event.target.value })} /></label>
         <label><span>首句</span><textarea id={`character-first-message-${draft.id}`} rows={4} value={draft.firstMessage} onChange={(event) => setDraft({ ...draft, firstMessage: event.target.value })} /></label>
         <label><span>示例对白</span><textarea id={`character-example-${draft.id}`} rows={3} value={draft.exampleDialogue} onChange={(event) => setDraft({ ...draft, exampleDialogue: event.target.value })} /></label>
-        <fieldset ref={portraitSectionRef} className="portrait-stage-editor" data-portrait-upload-target="true" tabIndex={-1}><legend>好感阶段立绘</legend><div className="portrait-stage-tabs">{stages.map((stage) => <button id={`portrait-stage-${draft.id}-${stage}`} key={stage} type="button" className={stage === portraitStage ? 'is-active' : ''} onClick={() => setPortraitStage(stage)}>{affinityStageNames[stage]}</button>)}</div><div className="portrait-upload-zone">{draft.portraitByAffinity[portraitStage] ? <img src={draft.portraitByAffinity[portraitStage]} alt={`${draft.name}${affinityStageNames[portraitStage]}立绘预览`} /> : <div><GameIcon name="upload" size={26} /><strong>尚未上传{affinityStageNames[portraitStage]}立绘</strong><p>支持 PNG、JPG、WebP，单张不超过 512 KB；大量立绘建议提交为仓库静态图片路径。</p></div>}<label htmlFor={`character-portrait-upload-${draft.id}-${portraitStage}`}>选择图片</label><input id={`character-portrait-upload-${draft.id}-${portraitStage}`} type="file" accept="image/png,image/jpeg,image/webp" onChange={upload} /></div></fieldset>
+        <fieldset ref={portraitSectionRef} className="portrait-stage-editor" data-portrait-upload-target="true" tabIndex={-1}><legend>好感阶段立绘</legend><div className="portrait-stage-tabs">{stages.map((stage) => <button id={`portrait-stage-${draft.id}-${stage}`} key={stage} type="button" className={stage === portraitStage ? 'is-active' : ''} onClick={() => setPortraitStage(stage)}>{affinityStageNames[stage]}</button>)}</div><div className="portrait-upload-zone">{draft.portraitByAffinity[portraitStage] ? <img src={draft.portraitByAffinity[portraitStage]} alt={`${draft.name}${affinityStageNames[portraitStage]}立绘预览`} /> : <div><GameIcon name="upload" size={26} /><strong>尚未上传{affinityStageNames[portraitStage]}立绘</strong><p>支持 PNG、JPG、WebP，单张不设容量上限；大图会增加本机存储与内容包体积。</p></div>}<label htmlFor={`character-portrait-upload-${draft.id}-${portraitStage}`}>选择图片</label><input id={`character-portrait-upload-${draft.id}-${portraitStage}`} type="file" accept="image/png,image/jpeg,image/webp" onChange={upload} /></div></fieldset>
       </div><footer><button id={`character-save-${draft.id}`} className="primary-button" type="button" onClick={() => void save()}><GameIcon name="upload" size={16} />保存角色卡</button></footer></aside>}
     </div>
   </section>

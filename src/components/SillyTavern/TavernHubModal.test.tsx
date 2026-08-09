@@ -130,4 +130,26 @@ describe('酒馆中枢', () => {
     expect(shortcut).toBeVisible()
     expect(screen.getByRole('group', { name: '好感阶段立绘' })).toHaveAttribute('data-portrait-upload-target', 'true')
   })
+
+  it('可载入超过 512 KB 的角色立绘', async () => {
+    const user = userEvent.setup()
+    database = createTavernDatabase(`mistvale-character-large-portrait-${crypto.randomUUID()}`)
+    render(
+      <GameProvider>
+        <TavernProvider repository={createTavernRepository(database)}>
+          <TavernHubModal onClose={() => undefined} />
+        </TavernProvider>
+      </GameProvider>,
+    )
+
+    await screen.findByText('浏览器直连提醒')
+    await user.click(screen.getByRole('tab', { name: '角色卡' }))
+    await user.click((await screen.findAllByRole('button', { name: /编辑角色卡/ }))[0])
+    const file = new File([new Uint8Array(600 * 1024)], 'large-portrait.webp', { type: 'image/webp' })
+
+    await user.upload(screen.getByLabelText('选择图片'), file)
+
+    expect(await screen.findByRole('status')).toHaveTextContent(/立绘已载入/)
+    expect(screen.getByAltText(/初识立绘预览/)).toHaveAttribute('src', expect.stringMatching(/^data:image\/webp;base64,/))
+  })
 })

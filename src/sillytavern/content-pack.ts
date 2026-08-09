@@ -2,7 +2,6 @@ import type { CharacterCard, ChatPreset, Lorebook, LorebookEntry } from './types
 import { validatePresetSettings } from './preset-compat'
 
 export const TAVERN_CONTENT_PACK_PATH = 'content/mistvale-content-pack.json'
-export const MAX_PORTRAIT_FILE_BYTES = 512 * 1024
 export const MAX_CONTENT_PACK_BYTES = 12 * 1024 * 1024
 
 export interface TavernContentPack {
@@ -89,7 +88,6 @@ function isCharacter(value: unknown): value is CharacterCard {
   if (!isRecord(value) || !isRecord(value.portraitByAffinity)) return false
   for (const source of Object.values(value.portraitByAffinity)) {
     if (!isString(source) || !isSafePortraitSource(source)) return false
-    if (source.startsWith('data:') && source.length > Math.ceil(MAX_PORTRAIT_FILE_BYTES * 4 / 3) + 128) return false
   }
   return ['id', 'npcId', 'name', 'role', 'locationId', 'description', 'personality', 'scenario', 'firstMessage', 'exampleDialogue'].every((key) => isString(value[key]))
     && isStringArray(value.lorebookIds)
@@ -119,7 +117,7 @@ export function parseContentPack(value: unknown): TavernContentPack {
   if (!isString(value.exportedAt) || Number.isNaN(Date.parse(value.exportedAt))) throw new Error('内容包导出时间无效。')
   if (!Array.isArray(value.lorebooks) || !value.lorebooks.every(isLorebook)) throw new Error('内容包包含无效的世界书。')
   if (!Array.isArray(value.presets) || !value.presets.every(isPreset)) throw new Error('内容包包含无效的预设。')
-  if (!Array.isArray(value.characters) || !value.characters.every(isCharacter)) throw new Error('内容包包含无效的角色卡或超限立绘。')
+  if (!Array.isArray(value.characters) || !value.characters.every(isCharacter)) throw new Error('内容包包含无效的角色卡或立绘来源。')
   if (estimateContentPackBytes(value) > MAX_CONTENT_PACK_BYTES) throw new Error('内容包超过 12 MB 发布预算，请改用仓库静态图片路径。')
   return structuredClone(value) as unknown as TavernContentPack
 }

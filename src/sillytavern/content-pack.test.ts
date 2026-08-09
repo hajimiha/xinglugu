@@ -31,6 +31,30 @@ describe('仓库酒馆内容包', () => {
     })).toThrow(/角色卡|立绘/)
   })
 
+  it('允许单张内嵌立绘超过 512 KB，只按整包发布预算校验', () => {
+    const defaults = createMistvaleDefaults()
+    const largePortrait = `data:image/webp;base64,${'A'.repeat(800_000)}`
+
+    expect(() => createContentPack({
+      contentVersion: 'large-portrait',
+      lorebooks: [],
+      presets: [],
+      characters: [{ ...defaults.characters[0], portraitByAffinity: { stranger: largePortrait } }],
+    })).not.toThrow()
+  })
+
+  it('仍拒绝超过 12 MB 发布预算的整包内嵌立绘', () => {
+    const defaults = createMistvaleDefaults()
+    const oversizedPortrait = `data:image/png;base64,${'A'.repeat(13 * 1024 * 1024)}`
+
+    expect(() => createContentPack({
+      contentVersion: 'oversized-pack',
+      lorebooks: [],
+      presets: [],
+      characters: [{ ...defaults.characters[0], portraitByAffinity: { stranger: oversizedPortrait } }],
+    })).toThrow(/12 MB/)
+  })
+
   it('拒绝会污染所有客户端的畸形世界书、预设与角色卡', () => {
     const base = { schemaVersion: 1, contentVersion: 'bad-shape', exportedAt: new Date().toISOString() }
     expect(() => parseContentPack({ ...base, lorebooks: [null], presets: [], characters: [] })).toThrow(/世界书/)
