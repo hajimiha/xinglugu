@@ -2,7 +2,9 @@ import { createLorebookEngine } from './lorebook-engine'
 import { evaluateMacros } from './macro-engine'
 import { applyRegexScripts, getPresetRegexScripts } from './regex-engine'
 import { getPresetPromptDefinitions, getPresetPromptOrder, normalizePresetPromptRole } from './preset-compat'
+import { projectCharacterPrompts } from './rolecard-projection'
 import type {
+  CharacterCard,
   ChatPreset,
   ChatSession,
   Lorebook,
@@ -23,6 +25,7 @@ export interface PromptCompileInput {
   lorebooks: Lorebook[]
   userName: string
   characterName: string
+  character?: CharacterCard
   variables?: Record<string, string | number>
   extraVariables?: Record<string, unknown>
   formatPrompt?: string
@@ -107,6 +110,7 @@ export function compileTavernTurn(input: PromptCompileInput): PromptCompilation 
     lastUserMessage: [...input.history].reverse().find((message) => message.role === 'user')?.content ?? '',
     lastCharacterMessage: [...input.history].reverse().find((message) => message.role === 'assistant')?.content ?? '',
   }
+  const characterPrompts = input.character ? projectCharacterPrompts(input.character) : undefined
   const regexScripts = [...(input.regexScripts ?? []), ...getPresetRegexScripts(preset.settings)]
   const compileMacros = (raw: string) => {
     const evaluation = evaluateMacros(raw, macroVariables, macroContext)
@@ -155,8 +159,9 @@ export function compileTavernTurn(input: PromptCompileInput): PromptCompilation 
     }
     if (identifier === 'bias') return { content: null, source: 'preset' }
     if (settingKeys[identifier]) {
+      const characterPrompt = characterPrompts?.[settingKeys[identifier]]
       return {
-        content: setting(settingKeys[identifier]),
+        content: characterPrompt?.trim() ? characterPrompt : setting(settingKeys[identifier]),
         source: identifier.startsWith('char') || identifier === 'scenario' || identifier === 'dialogueExamples'
           ? 'character'
           : 'preset',

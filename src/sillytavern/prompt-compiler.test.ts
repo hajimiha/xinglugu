@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ChatPreset, ChatSession, TavernSettings } from './types'
+import type { CharacterCard, ChatPreset, ChatSession, TavernSettings } from './types'
 import { compileTavernTurn, resolveSessionPreset } from './prompt-compiler'
 import { createMistvaleDefaults } from './defaults'
 
@@ -139,5 +139,42 @@ describe('严格酒馆提示词编译器', () => {
     })
 
     expect(result.matchedEntries.map((match) => match.entry.id)).toContain('mistvale-person-loran')
+  })
+
+  it('按启用的角色卡提示词顺序编译角色内容和宏，并保持当前输入最后', () => {
+    const character = {
+      ...createMistvaleDefaults().characters[0],
+      description: '描述 {{char}}',
+      personality: '性格 {{user}}',
+      scenario: '场景 {{original}}',
+      exampleDialogue: '示例',
+    } satisfies CharacterCard
+    const result = compileTavernTurn({
+      userInput: '当前输入',
+      history: [],
+      preset: {
+        ...preset('character', '角色卡预设', '', ''),
+        settings: {
+          ...preset('character', '角色卡预设', '', '').settings,
+          prompt_order: [{ character_id: 100001, order: [
+            { identifier: 'charDescription', enabled: true },
+            { identifier: 'charPersonality', enabled: false },
+            { identifier: 'scenario', enabled: true },
+            { identifier: 'dialogueExamples', enabled: true },
+          ] }],
+        },
+      },
+      lorebooks: [],
+      userName: '玩家',
+      characterName: character.name,
+      character,
+    })
+
+    expect(result.messages).toEqual([
+      { role: 'system', content: `描述 ${character.name}\n\n场景 当前输入\n\n示例` },
+      { role: 'user', content: '当前输入' },
+    ])
+    expect(result.segments.filter((segment) => segment.source === 'character' && segment.sent).map((segment) => segment.identifier))
+      .toEqual(['charDescription', 'scenario', 'dialogueExamples'])
   })
 })

@@ -290,6 +290,12 @@ export interface CharacterCard {
   updatedAt: number
 }
 
+export type CharacterPromptIdentifier =
+  | 'character_description'
+  | 'character_personality'
+  | 'scenario'
+  | 'dialogue_examples'
+
 export interface PortraitSlot {
   id: string
   minAffinity: number

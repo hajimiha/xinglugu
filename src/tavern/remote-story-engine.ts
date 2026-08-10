@@ -60,19 +60,6 @@ const REMOTE_RESPONSE_CONTRACT = `请只输出以下酒馆标签结构，不要�
 
 const PLAYER_IDENTITY_CONTRACT = `玩家姓名为“{{user}}”。{{char}}可以在符合人物性格与当前关系的时机自然称呼这个名字，但不要在每句话中机械重复。不得把玩家重新称作“旅行者”，也不得替玩家修改姓名。`
 
-function hydratePreset(preset: ChatPreset): ChatPreset {
-  return {
-    ...preset,
-    settings: {
-      ...preset.settings,
-      character_description: '',
-      character_personality: '',
-      scenario: '',
-      dialogue_examples: '',
-    },
-  }
-}
-
 function parseResponse(raw: string): ParsedTags {
   const parser = new StreamTagParser([...DEFAULT_TAGS], [...DEFAULT_OPAQUE_TAGS])
   const events: ParserEvent[] = []
@@ -97,10 +84,11 @@ export async function createRemoteTurn(input: RemoteTurnInput): Promise<RemoteTu
   const assembled = assemblePrompt({
     userInput: input.playerText,
     history: input.history,
-    preset: hydratePreset(input.preset),
+    preset: input.preset,
     lorebooks: input.lorebooks,
     userName: input.userName,
     characterName: input.character.name,
+    character: input.character,
     variables: primitiveVariables,
     extraVariables: input.variables,
     formatPrompt: `${input.formatPrompt}\n\n${PLAYER_IDENTITY_CONTRACT}\n\n${REMOTE_RESPONSE_CONTRACT}`,
