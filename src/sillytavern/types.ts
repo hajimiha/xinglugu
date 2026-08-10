@@ -119,6 +119,17 @@ export interface Lorebook {
   updatedAt: number
 }
 
+export interface LorebookRecursionContext {
+  depth: number
+  isRecursion: boolean
+  seen: ReadonlySet<string>
+}
+
+export interface LorebookMatchOptions {
+  random?: () => number
+  recursion?: LorebookRecursionContext
+}
+
 export interface SillyTavernLorebookExport {
   name: string
   description?: string
@@ -175,6 +186,12 @@ export interface MatchedEntry {
   entry: LorebookEntry
   score: number
   matchedKeywords: string[]
+  identity: string
+  lorebookId: string
+  entryId: string
+  depth: number
+  position: LorebookEntry['position']
+  effectiveDepth?: number
 }
 
 export interface ChatPreset {

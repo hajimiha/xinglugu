@@ -79,7 +79,7 @@ export function compileTavernTurn(input: PromptCompileInput): PromptCompilation 
   for (const lorebook of input.lorebooks) {
     allMatchedEntries.push(...createLorebookEngine(lorebook).recursiveScan(scanText, 3))
   }
-  const matchedEntries = Array.from(new Map(allMatchedEntries.map((match) => [match.entry.id, match])).values())
+  const matchedEntries = Array.from(new Map(allMatchedEntries.map((match) => [match.identity, match])).values())
     .sort((left, right) => left.score - right.score)
 
   const configuredContext = preset.settings.openai_max_context ?? preset.settings.max_length
@@ -100,7 +100,10 @@ export function compileTavernTurn(input: PromptCompileInput): PromptCompilation 
   const order = getPresetPromptOrder(preset.settings).items
   const messages: PromptCompilation['messages'] = []
   const segments: PromptTraceSegment[] = []
-  const diagnostics: string[] = []
+  const unsupportedPositions = Array.from(new Set(matchedEntries
+    .map((match) => match.position)
+    .filter((position) => !['before_char', 'after_char', 'before_example', 'after_example', 'at_depth'].includes(position))))
+  const diagnostics: string[] = unsupportedPositions.map((position) => `未支持的世界书注入位置：${position}`)
   const macroOperations: MacroOperation[] = []
   let macroVariables: Record<string, unknown> = { ...extraVariables, ...variables }
   const macroContext = {
@@ -143,8 +146,18 @@ export function compileTavernTurn(input: PromptCompileInput): PromptCompilation 
       const value = preset.settings[key]
       return typeof value === 'string' && value.trim() ? value : null
     }
-    if (identifier === 'worldInfoBefore' || identifier === 'worldInfoAfter') {
-      const content = matchedEntries.map((match) => match.entry.content).join('\n\n')
+    const placementByIdentifier: Record<string, MatchedEntry['position']> = {
+      worldInfoBefore: 'before_char',
+      worldInfoAfter: 'after_char',
+      worldInfoBeforeExamples: 'before_example',
+      worldInfoAfterExamples: 'after_example',
+      worldInfoAtDepth: 'at_depth',
+    }
+    if (placementByIdentifier[identifier]) {
+      const content = matchedEntries
+        .filter((match) => match.position === placementByIdentifier[identifier])
+        .map((match) => match.entry.content)
+        .join('\n\n')
       return { content: content || null, source: 'lorebook' }
     }
     const settingKeys: Record<string, string> = {

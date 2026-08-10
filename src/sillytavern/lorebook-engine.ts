@@ -1,163 +1,129 @@
-/**
- * Lorebook Matching Engine
- */
+/** Deterministic SillyTavern-style lorebook matching and recursion. */
 
-import type { Lorebook, LorebookEntry, MatchedEntry } from './types';
+import type {
+  Lorebook,
+  LorebookEntry,
+  LorebookMatchOptions,
+  LorebookRecursionContext,
+  MatchedEntry,
+} from './types'
+
+const DEFAULT_RECURSION: LorebookRecursionContext = { depth: 0, isRecursion: false, seen: new Set() }
 
 export class LorebookEngine {
-  private lorebook: Lorebook;
+  private lorebook: Lorebook
 
   constructor(lorebook: Lorebook) {
-    this.lorebook = lorebook;
+    this.lorebook = lorebook
   }
 
-  scan(text: string, additionalContext?: string): MatchedEntry[] {
-    const normalizedText = this.lorebook.caseSensitive ? text : text.toLowerCase();
-    const normalizedContext = additionalContext
-      ? this.lorebook.caseSensitive ? additionalContext : additionalContext.toLowerCase()
-      : normalizedText;
-
-    const matched: MatchedEntry[] = [];
-
+  scan(text: string, additionalContext?: string, options: LorebookMatchOptions = {}): MatchedEntry[] {
+    const recursion = options.recursion ?? DEFAULT_RECURSION
+    const matched: MatchedEntry[] = []
     for (const entry of this.lorebook.entries) {
-      if (entry.disabled || entry.excluded) continue;
+      if (entry.disabled || entry.excluded || (recursion.isRecursion && entry.excludeRecursion)) continue
+      const effective = this.effectiveOptions(entry)
       if (entry.constant) {
-        matched.push({ entry, score: -9999, matchedKeywords: ['constant'] });
-        continue;
+        matched.push(this.toMatch(entry, ['constant'], recursion.depth, effective.position))
+        continue
       }
-
-      if (Math.random() * 100 >= entry.probability) {
-        continue;
-      }
-
-      const isMatch = this.checkEntryMatch(entry, normalizedText, normalizedContext);
-
-      if (isMatch) {
-        matched.push({
-          entry,
-          score: entry.order,
-          matchedKeywords: entry.keys.filter(k =>
-            this.containsKeyword(normalizedText, this.normalizeKeyword(k))
-          ),
-        });
-      }
+      if (effective.useProbability && (options.random ?? Math.random)() * 100 >= effective.probability) continue
+      const entryText = this.normalize(text, effective.caseSensitive)
+      const contextText = this.normalize(additionalContext ?? text, effective.caseSensitive)
+      if (!this.checkEntryMatch(entry, entryText, contextText, effective)) continue
+      matched.push(this.toMatch(
+        entry,
+        entry.keys.filter((key) => this.containsKeyword(entryText, this.normalizeKeyword(key, effective.caseSensitive), effective.matchWholeWords)),
+        recursion.depth,
+        effective.position,
+      ))
     }
-
-    return matched.sort((a, b) => a.score - b.score);
+    return matched.sort((a, b) => a.score - b.score || a.identity.localeCompare(b.identity))
   }
 
-  recursiveScan(initialText: string, maxDepth: number = 3, additionalContext?: string): MatchedEntry[] {
-    if (!this.lorebook.recursiveScanning || maxDepth <= 0) {
-      return this.scan(initialText, additionalContext);
-    }
-
-    const allMatched = new Map<string, MatchedEntry>();
-    let currentText = initialText;
-    let depth = 0;
-
+  recursiveScan(initialText: string, maxDepth = 3, additionalContext?: string, options: LorebookMatchOptions = {}): MatchedEntry[] {
+    if (!this.lorebook.recursiveScanning || maxDepth <= 0) return this.scan(initialText, additionalContext, options)
+    const allMatched = new Map<string, MatchedEntry>()
+    let currentText = initialText
+    let depth = 0
     while (depth < maxDepth) {
-      const newMatches = this.scan(currentText, additionalContext);
-      let hasNewMatches = false;
-
+      const newMatches = this.scan(currentText, additionalContext, {
+        ...options,
+        recursion: { depth, isRecursion: depth > 0, seen: new Set(allMatched.keys()) },
+      })
+      let added = false
       for (const match of newMatches) {
-        if (!allMatched.has(match.entry.id)) {
-          allMatched.set(match.entry.id, match);
-          currentText += ' ' + match.entry.content;
-          hasNewMatches = true;
-        }
+        if (allMatched.has(match.identity) || (depth > 0 && match.entry.preventRecursion)) continue
+        allMatched.set(match.identity, match)
+        if (!match.entry.excludeRecursion) currentText += ` ${match.entry.content}`
+        added = true
       }
-
-      if (!hasNewMatches) break;
-      depth++;
+      if (!added) break
+      depth++
     }
-
-    return Array.from(allMatched.values()).sort((a, b) => a.score - b.score);
+    return Array.from(allMatched.values()).sort((a, b) => a.score - b.score || a.identity.localeCompare(b.identity))
   }
 
   groupByPosition(matched: MatchedEntry[]): Record<LorebookEntry['position'], MatchedEntry[]> {
     const grouped: Record<LorebookEntry['position'], MatchedEntry[]> = {
       before_char: [], after_char: [], before_example: [], after_example: [], at_depth: [],
       example_msg_top: [], example_msg_bottom: [], outlet: [],
-    };
-
-    for (const m of matched) {
-      grouped[m.entry.position].push(m);
     }
-
-    return grouped;
+    for (const item of matched) grouped[item.position].push(item)
+    return grouped
   }
 
   formatEntriesContent(entries: MatchedEntry[]): string {
-    if (entries.length === 0) return '';
-    return entries.map(e => e.entry.content).join('\n\n');
+    return entries.map((entry) => entry.entry.content).join('\n\n')
   }
 
-  private checkEntryMatch(entry: LorebookEntry, text: string, context: string): boolean {
-    const { keys, secondaryKeys, selective, selectiveLogic } = entry;
-
-    if (keys.length === 0) return false;
-
-    const primaryMatches = keys.map(k => this.containsKeyword(text, this.normalizeKeyword(k)));
-    const allPrimary = primaryMatches.every(m => m);
-    const anyPrimary = primaryMatches.some(m => m);
-
-    let primaryOk = false;
-    switch (selectiveLogic) {
-      case 'and_all':
-      case 'and_any':
-        primaryOk = anyPrimary; // For simple frontend integration, both and_any/and_all treat primary as OR-ish trigger
-        break;
-      case 'not_all':
-        primaryOk = !allPrimary;
-        break;
-      case 'not_any':
-        primaryOk = !anyPrimary;
-        break;
-      default:
-        primaryOk = anyPrimary;
-    }
-
-    if (!primaryOk) return false;
-
-    if (!selective || secondaryKeys.length === 0) {
-      return primaryOk;
-    }
-
-    const secondaryMatches = secondaryKeys.map(k =>
-      this.containsKeyword(context, this.normalizeKeyword(k))
-    );
-    const allSecondary = secondaryMatches.every(m => m);
-    const anySecondary = secondaryMatches.some(m => m);
-
-    switch (selectiveLogic) {
-      case 'and_all':
-        return allSecondary;
-      case 'not_all':
-        return allSecondary;
-      case 'and_any':
-      case 'not_any':
-      default:
-        return anySecondary;
+  private effectiveOptions(entry: LorebookEntry) {
+    return {
+      caseSensitive: entry.caseSensitive ?? this.lorebook.caseSensitive,
+      matchWholeWords: entry.matchWholeWords ?? this.lorebook.matchWholeWords,
+      useProbability: entry.useProbability ?? true,
+      probability: entry.probability,
+      position: entry.position,
     }
   }
 
-  private normalizeKeyword(keyword: string): string {
-    return this.lorebook.caseSensitive ? keyword : keyword.toLowerCase();
+  private toMatch(entry: LorebookEntry, matchedKeywords: string[], depth: number, position: LorebookEntry['position']): MatchedEntry {
+    return { entry, score: entry.order, matchedKeywords, identity: `${this.lorebook.id}:${entry.id}`, lorebookId: this.lorebook.id, entryId: entry.id, depth, position, effectiveDepth: entry.depth }
   }
 
-  private containsKeyword(text: string, keyword: string): boolean {
-    if (this.lorebook.matchWholeWords) {
-      const regex = new RegExp(`\\b${this.escapeRegex(keyword)}\\b`, 'i');
-      return regex.test(text);
+  private checkEntryMatch(entry: LorebookEntry, text: string, context: string, options: ReturnType<LorebookEngine['effectiveOptions']>): boolean {
+    const primary = entry.keys.map((key) => this.containsKeyword(text, this.normalizeKeyword(key, options.caseSensitive), options.matchWholeWords))
+    if (!primary.length || !primary.some(Boolean)) return false
+    if (!entry.selective || !entry.secondaryKeys.length) return true
+    const secondary = entry.secondaryKeys.map((key) => this.containsKeyword(context, this.normalizeKeyword(key, options.caseSensitive), options.matchWholeWords))
+    const any = secondary.some(Boolean)
+    const all = secondary.every(Boolean)
+    switch (entry.selectiveLogic) {
+      case 'and_all': return all
+      case 'not_any': return !any
+      case 'not_all': return !all
+      case 'and_any': return any
     }
-    return text.includes(keyword);
   }
 
-  private escapeRegex(str: string): string {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  private normalize(value: string, caseSensitive: boolean): string {
+    return caseSensitive ? value : value.toLowerCase()
+  }
+
+  private normalizeKeyword(keyword: string, caseSensitive: boolean): string {
+    return this.normalize(keyword, caseSensitive)
+  }
+
+  private containsKeyword(text: string, keyword: string, wholeWords: boolean): boolean {
+    if (!wholeWords) return text.includes(keyword)
+    return new RegExp(`\\b${this.escapeRegex(keyword)}\\b`).test(text)
+  }
+
+  private escapeRegex(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   }
 }
 
 export function createLorebookEngine(lorebook: Lorebook): LorebookEngine {
-  return new LorebookEngine(lorebook);
+  return new LorebookEngine(lorebook)
 }

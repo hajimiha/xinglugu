@@ -4,6 +4,9 @@ import { compileTavernTurn, resolveSessionPreset } from './prompt-compiler'
 import { createMistvaleDefaults } from './defaults'
 
 const now = 1
+const lorebookEntryDefaults = {
+  secondaryKeys: [], order: 1, selective: false, selectiveLogic: 'and_any' as const, constant: false, probability: 100, addMemo: true,
+}
 
 function preset(id: string, name: string, before = '前置规则', after = '历史后规则'): ChatPreset {
   return {
@@ -139,6 +142,44 @@ describe('严格酒馆提示词编译器', () => {
     })
 
     expect(result.matchedEntries.map((match) => match.entry.id)).toContain('mistvale-person-loran')
+  })
+
+  it('按世界书有效位置分别发射前置、后置和示例槽位，并报告不支持的位置', () => {
+    const result = compileTavernTurn({
+      userInput: '触发', history: [], preset: {
+        ...preset('placements', 'placements', '', ''), settings: {
+          prompts: [
+            { identifier: 'worldInfoBefore', role: 'system', content: '' },
+            { identifier: 'worldInfoAfter', role: 'system', content: '' },
+            { identifier: 'worldInfoBeforeExamples', role: 'system', content: '' },
+            { identifier: 'worldInfoAfterExamples', role: 'system', content: '' },
+          ],
+          prompt_order: [{ character_id: 100001, order: [
+            { identifier: 'worldInfoBefore', enabled: true },
+            { identifier: 'worldInfoAfter', enabled: true },
+            { identifier: 'worldInfoBeforeExamples', enabled: true },
+            { identifier: 'worldInfoAfterExamples', enabled: true },
+          ] }],
+        },
+      },
+      lorebooks: [{
+        id: 'placements', name: 'placements', recursiveScanning: false, caseSensitive: false, matchWholeWords: false, createdAt: 0, updatedAt: 0,
+        entries: [
+          { id: 'before', ...lorebookEntryDefaults, keys: ['触发'], position: 'before_char', content: 'BEFORE' },
+          { id: 'after', ...lorebookEntryDefaults, keys: ['触发'], position: 'after_char', content: 'AFTER' },
+          { id: 'example-before', ...lorebookEntryDefaults, keys: ['触发'], position: 'before_example', content: 'EXAMPLE_BEFORE' },
+          { id: 'example-after', ...lorebookEntryDefaults, keys: ['触发'], position: 'after_example', content: 'EXAMPLE_AFTER' },
+          { id: 'outlet', ...lorebookEntryDefaults, keys: ['触发'], position: 'outlet', content: 'UNSUPPORTED' },
+        ],
+      }],
+      userName: '玩家', characterName: '角色',
+    })
+    expect(result.systemPrompt).toContain('BEFORE')
+    expect(result.systemPrompt).toContain('AFTER')
+    expect(result.systemPrompt).toContain('EXAMPLE_BEFORE')
+    expect(result.systemPrompt).toContain('EXAMPLE_AFTER')
+    expect(result.systemPrompt).not.toContain('UNSUPPORTED')
+    expect(result.diagnostics).toContain('未支持的世界书注入位置：outlet')
   })
 
   it('按启用的角色卡提示词顺序编译角色内容和宏，并保持当前输入最后', () => {
