@@ -105,6 +105,6 @@ describe('NPC 关系与灵犀对话', () => {
     )
 
     await user.click(screen.getByRole('button', { name: '赠礼给岩雀' }))
-    expect(screen.getByRole('button', { name: /莓果挞/ })).toBeVisible()
+    expect(screen.getByRole('button', { name: /莓果挞.*好感 \+10/ })).toBeVisible()
   })
 })
