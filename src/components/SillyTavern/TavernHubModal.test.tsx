@@ -53,6 +53,10 @@ describe('酒馆中枢', () => {
     expect(screen.getAllByText(/苔灯农场·共生牧场/).length).toBeGreaterThan(0)
     expect(screen.getByRole('button', { name: '导出仓库内容包' })).toBeVisible()
     expect(screen.getByText(/public\/content\/mistvale-content-pack\.json/)).toBeVisible()
+    await user.click(screen.getAllByRole('button', { name: /编辑角色卡/ })[0])
+    expect(await screen.findByRole('heading', { name: /立绘资产/ })).toBeVisible()
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+    expect(screen.getAllByText(/人物文字设定请在世界书中维护/).length).toBeGreaterThan(0)
 
     await user.click(screen.getByRole('tab', { name: '检查器' }))
     expect(await screen.findByRole('heading', { name: '请求检查器' })).toBeVisible()

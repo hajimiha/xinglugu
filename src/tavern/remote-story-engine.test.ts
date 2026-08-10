@@ -64,10 +64,11 @@ describe('远程酒馆剧情引擎', () => {
     expect(streamed.at(-1)).toBe(response)
     expect(reasoning).toEqual(['核对角色卡'])
     expect(result.providerReasoning).toBe('核对角色卡')
+    expect(result.inspection.compilation.segments.filter((segment) => segment.source === 'character' && segment.sent)).toHaveLength(0)
     expect(prepare).toHaveBeenCalledWith(expect.objectContaining({
       task: 'story',
       messages: expect.arrayContaining([
-        expect.objectContaining({ role: 'system', content: expect.stringContaining(card.description) }),
+        expect.objectContaining({ role: 'system', content: expect.stringContaining('洛岚') }),
         { role: 'user', content: '今天有什么委托？' },
       ]),
     }))
