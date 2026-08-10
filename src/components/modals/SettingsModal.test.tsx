@@ -83,4 +83,12 @@ describe('游戏玩法设置', () => {
     await user.click(screen.getByRole('button', { name: '取消新建存档' }))
     expect(screen.queryByText('确认清除当前游戏进度')).not.toBeInTheDocument()
   })
+
+  it('提供本机 BGM 上传与三路音量控制', () => {
+    render(<GameProvider initialState={{ ...initialGameState, activeModal: 'settings' }}><ModalHost /></GameProvider>)
+    expect(screen.getByLabelText('上传背景音乐')).toHaveAttribute('accept', 'audio/*')
+    expect(screen.getByLabelText('主音量')).toHaveAttribute('id', 'settings-audio-master')
+    expect(screen.getByLabelText('背景音乐音量')).toHaveAttribute('id', 'settings-audio-bgm')
+    expect(screen.getByLabelText('点击音效音量')).toHaveAttribute('id', 'settings-audio-sfx')
+  })
 })

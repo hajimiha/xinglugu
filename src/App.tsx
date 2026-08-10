@@ -8,6 +8,7 @@ import { GameStage } from './components/stage/GameStage'
 import { ModalHost } from './components/modals/ModalHost'
 import { TavernProvider } from './tavern/TavernContext'
 import { PlayerNameGate } from './components/onboarding/PlayerNameGate'
+import { AudioProvider } from './audio/AudioContext'
 
 function AppContent() {
   return (
@@ -35,5 +36,5 @@ function GameBoundTavern({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  return <GameProvider><GameBoundTavern><AppContent /></GameBoundTavern></GameProvider>
+  return <AudioProvider><GameProvider><GameBoundTavern><AppContent /></GameBoundTavern></GameProvider></AudioProvider>
 }

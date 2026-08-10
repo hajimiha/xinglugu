@@ -11,6 +11,7 @@ import {
 import type { EnergyCostMode, GameRuleSettings } from '../../game/types'
 import { GameIcon } from '../icons/GameIcon'
 import { MAX_PLAYER_NAME_LENGTH, normalizePlayerName } from '../../game/player-profile'
+import { useAudio } from '../../audio/AudioContext'
 
 type MultiplierKey = Exclude<keyof GameRuleSettings, 'energyCostMode'>
 type MultiplierDrafts = Record<MultiplierKey, string>
@@ -62,6 +63,7 @@ function createMultiplierDrafts(rules: GameRuleSettings): MultiplierDrafts {
 
 export function SettingsModal() {
   const { state, dispatch, saveMeta, exportGameSave, importGameSave, resetGameSave } = useGame()
+  const audio = useAudio()
   const [draft, setDraft] = useState<GameRuleSettings>(() => ({ ...state.rules }))
   const [multiplierDrafts, setMultiplierDrafts] = useState<MultiplierDrafts>(() => createMultiplierDrafts(state.rules))
   const [pendingReset, setPendingReset] = useState(false)
@@ -148,6 +150,18 @@ export function SettingsModal() {
     setStatus(`姓名已更新为“${name}”`)
   }
 
+  const uploadBgm = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    try {
+      await audio.uploadBgm(file)
+      setStatus(`背景音乐“${file.name}”已保存到本机。`)
+    } catch (caught) {
+      setStatus(caught instanceof Error ? caught.message : '背景音乐无法载入。')
+    }
+  }
+
   return <div className="settings-console">
     <section className="settings-overview" aria-label="当前难度倾向">
       <div className="settings-overview-mark" aria-hidden="true"><GameIcon name="settings" size={28} weight="duotone" /></div>
@@ -166,6 +180,23 @@ export function SettingsModal() {
         <label htmlFor="settings-player-name">玩家姓名</label>
         <div><input id="settings-player-name" autoComplete="nickname" maxLength={MAX_PLAYER_NAME_LENGTH + 1} value={playerNameDraft} onChange={(event) => { setPlayerNameDraft(event.target.value); setPlayerNameError(''); setStatus('') }} aria-invalid={Boolean(playerNameError)} aria-describedby={playerNameError ? 'settings-player-name-error' : undefined} /><button id="settings-player-name-save" type="button" aria-label="保存玩家姓名" onClick={savePlayerName}><GameIcon name="save" size={16} />保存称呼</button></div>
         {playerNameError && <p id="settings-player-name-error" role="alert">{playerNameError}</p>}
+      </div>
+    </section>
+
+    <section className="settings-audio-console" aria-labelledby="settings-audio-title">
+      <div className="settings-audio-heading"><div className="settings-profile-mark" aria-hidden="true"><GameIcon name="settings" size={22} weight="duotone" /></div><div><span>LOCAL AUDIO MIXER</span><h4 id="settings-audio-title">音乐与界面音效</h4><p>BGM 文件保存在当前设备，点击音效由浏览器实时合成。不会上传到 API 或游戏存档。</p></div></div>
+      <div className="settings-audio-sliders">
+        {([
+          ['masterVolume', 'settings-audio-master', '主音量'],
+          ['bgmVolume', 'settings-audio-bgm', '背景音乐音量'],
+          ['sfxVolume', 'settings-audio-sfx', '点击音效音量'],
+        ] as const).map(([key, id, label]) => <label key={key} htmlFor={id}><span>{label}<em>{Math.round(audio.settings[key] * 100)}%</em></span><input id={id} aria-label={label} type="range" min="0" max="1" step="0.05" value={audio.settings[key]} onChange={(event) => audio.updateSettings({ [key]: Number(event.target.value) })} /></label>)}
+      </div>
+      <div className="settings-audio-actions">
+        <label htmlFor="settings-audio-upload"><GameIcon name="upload" size={17} />上传背景音乐<input id="settings-audio-upload" type="file" accept="audio/*" aria-label="上传背景音乐" onChange={(event) => void uploadBgm(event)} /></label>
+        <strong>{audio.bgmName || '尚未上传 BGM'}</strong>
+        {audio.bgmName && <button id="settings-audio-clear" className="danger-ghost" type="button" onClick={() => void audio.clearBgm().then(() => setStatus('本机背景音乐已移除。'))}><GameIcon name="trash" size={16} />移除 BGM</button>}
+        <label className="settings-audio-mute" htmlFor="settings-audio-muted"><input id="settings-audio-muted" type="checkbox" checked={audio.settings.muted} onChange={(event) => audio.updateSettings({ muted: event.target.checked })} /><span>全部静音</span></label>
       </div>
     </section>
 
