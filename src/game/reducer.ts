@@ -12,6 +12,7 @@ import {
 } from './rules'
 import type { GameAction, GameState, Relationship, ToastMessage } from './types'
 import { normalizePlayerName } from './player-profile'
+import { acceptQuest, createQuestInstance, getAbsoluteGameDay, refreshQuestsForDay } from './quest-engine'
 
 let toastSequence = 0
 const makeToast = (toast: Omit<ToastMessage, 'id'>): ToastMessage => ({
@@ -61,6 +62,7 @@ function advanceRanchProducts(state: GameState, crossedDays: number): GameState[
 
 export const initialGameState: GameState = {
   playerProfile: { name: '旅行者', hasConfirmedName: false },
+  worldSeed: 840517,
   year: 1,
   day: 1,
   season: '春',
@@ -86,7 +88,7 @@ export const initialGameState: GameState = {
   },
   plots: createInitialPlots(),
   relationships: initialRelationships,
-  quests: quests.map((quest) => ({ ...quest, status: 'available' })),
+  quests: [createQuestInstance(quests[0], 1)],
   knownSpells: [],
   mine: { currentFloor: 1, highestFloor: 1, unlockedElevators: [] },
   hospitalUsedToday: false,
@@ -136,6 +138,29 @@ export function advanceGameClock(state: GameState, elapsedMinutes: number): Game
 
   const ranchInventory = advanceRanchProducts(state, crossedDays)
   const completedMachines = completeMachineJobs({ ...state, inventory: ranchInventory }, getAbsoluteMinute(target.year, target.day, target.minutes))
+  let refreshedQuests = state.quests
+  let postedQuestTitle: string | undefined
+  let expiredQuestCount = 0
+  if (crossedDays > 0) {
+    const startDay = getAbsoluteGameDay(state.year, state.day)
+    for (let offset = 1; offset <= crossedDays; offset += 1) {
+      const refreshed = refreshQuestsForDay(refreshedQuests, quests, startDay + offset, state.worldSeed)
+      refreshedQuests = refreshed.quests
+      postedQuestTitle = refreshed.posted?.title ?? postedQuestTitle
+      expiredQuestCount += refreshed.expiredCount
+    }
+  }
+  const questNotices: ToastMessage[] = []
+  if (expiredQuestCount > 0) questNotices.push(makeToast({
+    tone: 'warning',
+    title: '委托已过期',
+    message: `${expiredQuestCount} 项未完成委托已从手册中移除。`,
+  }))
+  if (postedQuestTitle) questNotices.push(makeToast({
+    tone: 'info',
+    title: '委托板已更新',
+    message: `村长家张贴了新委托「${postedQuestTitle}」。`,
+  }))
 
   return {
     ...state,
@@ -150,6 +175,8 @@ export function advanceGameClock(state: GameState, elapsedMinutes: number): Game
     inventory: completedMachines.inventory,
     machines: completedMachines.machines,
     plots: advancePlots(state, actualElapsed),
+    quests: refreshedQuests,
+    toasts: questNotices.length ? [...state.toasts, ...questNotices] : state.toasts,
   }
 }
 
@@ -345,7 +372,8 @@ function reduceGameState(state: GameState, action: GameAction): GameState {
     }
     case 'SUBMIT_QUEST': {
       const quest = state.quests.find((item) => item.id === action.questId)
-      if (!quest || quest.status === 'completed' || (state.inventory[quest.requiredItemId] ?? 0) < quest.requiredAmount) {
+      const absoluteDay = getAbsoluteGameDay(state.year, state.day)
+      if (!quest || (quest.status !== 'active' && quest.status !== 'ready') || (quest.deadlineDay !== undefined && quest.deadlineDay < absoluteDay) || (state.inventory[quest.requiredItemId] ?? 0) < quest.requiredAmount) {
         return { ...state, toasts: [...state.toasts, makeToast({ tone: 'warning', title: '无法提交', message: '任务物品数量不足，或委托已经完成。' })] }
       }
       const issuer = state.relationships[quest.issuerId]
@@ -368,8 +396,10 @@ function reduceGameState(state: GameState, action: GameAction): GameState {
         toasts: [...state.toasts, makeToast({ tone: 'success', title: '委托完成', message: `获得 ${rewardMoney} 金币，发布者与村长的好感都提升了。` })],
       }
     }
-    case 'ACCEPT_QUEST':
-      return { ...state, quests: state.quests.map((quest) => quest.id === action.questId && quest.status === 'available' ? { ...quest, status: 'active' } : quest) }
+    case 'ACCEPT_QUEST': {
+      const absoluteDay = getAbsoluteGameDay(state.year, state.day)
+      return { ...state, quests: state.quests.map((quest) => quest.id === action.questId ? acceptQuest(quest, absoluteDay) : quest) }
+    }
     case 'BUY_ITEM': {
       if (action.quantity < 1 || state.money < action.total) return { ...state, toasts: [...state.toasts, makeToast({ tone: 'warning', title: '交易未完成', message: '金币不足，无法购买所选商品。' })] }
       const tools = action.itemId === 'tide-rod' ? { ...state.tools, rod: Math.max(2, state.tools.rod) } : state.tools

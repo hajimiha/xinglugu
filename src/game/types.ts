@@ -139,7 +139,7 @@ export interface ShopItem {
   festivalLocationId?: LocationId
 }
 
-export interface Quest {
+export interface QuestTemplate {
   id: string
   title: string
   issuerId: string
@@ -150,6 +150,14 @@ export interface Quest {
   rewardAffinity: number
   mayorAffinity: number
   expiresInDays: number
+}
+
+export interface Quest extends Omit<QuestTemplate, 'id'> {
+  id: string
+  templateId: string
+  postedDay: number
+  acceptedDay?: number
+  deadlineDay?: number
   status: 'available' | 'active' | 'ready' | 'completed'
 }
 
@@ -227,6 +235,7 @@ export type ModalType =
 
 export interface GameState {
   playerProfile: PlayerProfile
+  worldSeed: number
   year: number
   day: number
   season: Season

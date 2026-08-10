@@ -22,7 +22,7 @@ export function NpcPanel({ npcId }: { npcId: string }) {
   const presence = getNpcPresence(npcId, state.year, state.day, state.minutes)
   const presenceLocation = locations.find((location) => location.id === presence.locationId)
   const birthdayToday = isNpcBirthday(npcId, state.day)
-  const npcQuests = state.quests.filter((quest) => quest.issuerId === npcId)
+  const npcQuests = state.quests.filter((quest) => quest.issuerId === npcId && (quest.status === 'active' || quest.status === 'ready'))
   const giftItems = npc.preferredGifts.filter((itemId) => (state.inventory[itemId] ?? 0) > 0)
   const interactionCost = getEnergyCost(1, state.rules.energyCostMode)
   const preferredGiftAffinity = scaleReward(14 * (birthdayToday ? 2 : 1), state.rules.affinityMultiplier)

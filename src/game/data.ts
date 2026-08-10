@@ -1,4 +1,4 @@
-import type { Crop, Location, Npc, Plot, Quest, ShopItem, Spell } from './types'
+import type { Crop, Location, Npc, Plot, QuestTemplate, ShopItem, Spell } from './types'
 import {
   BUILD_RECIPES,
   CRAFT_RECIPES,
@@ -106,11 +106,11 @@ export const shopItems: ShopItem[] = Object.values(ITEM_CATALOG).flatMap((item) 
   }]
 })
 
-export const quests: Quest[] = [
-  { id:'q-mist-beans', title:'雾后新芽', issuerId:'freya', description:'为草药园带来三份雾荚豆。', requiredItemId:'mist-bean', requiredAmount:3, rewardMoney:420, rewardAffinity:18, mayorAffinity:6, expiresInDays:3, status:'active' },
-  { id:'q-copper', title:'羽火试炉', issuerId:'yanque', description:'收集五块铜矿石测试新熔炉。', requiredItemId:'copper-ore', requiredAmount:5, rewardMoney:560, rewardAffinity:16, mayorAffinity:5, expiresInDays:4, status:'available' },
-  { id:'q-carp', title:'逆潮的银光', issuerId:'chaoyin', description:'钓到两条银鳞鲫用于潮汐记录。', requiredItemId:'silver-carp', requiredAmount:2, rewardMoney:480, rewardAffinity:20, mayorAffinity:5, expiresInDays:2, status:'available' },
-  { id:'q-moonflower', title:'月下回信', issuerId:'mina', description:'寻找一朵月铃花装进远行信件。', requiredItemId:'moonflower', requiredAmount:1, rewardMoney:300, rewardAffinity:24, mayorAffinity:8, expiresInDays:5, status:'available' },
+export const quests: QuestTemplate[] = [
+  { id:'q-mist-beans', title:'雾后新芽', issuerId:'freya', description:'为草药园带来三份雾荚豆。', requiredItemId:'mist-bean', requiredAmount:3, rewardMoney:420, rewardAffinity:18, mayorAffinity:6, expiresInDays:3 },
+  { id:'q-copper', title:'羽火试炉', issuerId:'yanque', description:'收集五块铜矿石测试新熔炉。', requiredItemId:'copper-ore', requiredAmount:5, rewardMoney:560, rewardAffinity:16, mayorAffinity:5, expiresInDays:4 },
+  { id:'q-carp', title:'逆潮的银光', issuerId:'chaoyin', description:'钓到两条银鳞鲫用于潮汐记录。', requiredItemId:'silver-carp', requiredAmount:2, rewardMoney:480, rewardAffinity:20, mayorAffinity:5, expiresInDays:2 },
+  { id:'q-moonflower', title:'月下回信', issuerId:'mina', description:'寻找一朵月铃花装进远行信件。', requiredItemId:'moonflower', requiredAmount:1, rewardMoney:300, rewardAffinity:24, mayorAffinity:8, expiresInDays:5 },
 ]
 
 export const spells: Spell[] = [

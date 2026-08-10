@@ -1,10 +1,10 @@
-import { crops, locations, spells } from './data'
+import { crops, locations, quests as questTemplates, spells } from './data'
 import { getSeasonForDay, getWeekday, MAX_GAME_YEAR } from './calendar'
 import { ITEM_CATALOG, MACHINE_RECIPES, MINE_MAX_FLOOR, MONSTER_PARTNERS } from './economy'
 import { initialGameState } from './reducer'
 import { normalizeGameRules } from './rules'
 import { sanitizePlayerProfile } from './player-profile'
-import type { AffinityStage, FarmMachineState, GameState, LocationId, MachineId, MonsterPartnerId, Plot, Relationship, SkillId } from './types'
+import type { AffinityStage, FarmMachineState, GameState, LocationId, MachineId, MonsterPartnerId, Plot, Quest, Relationship, SkillId } from './types'
 
 export const GAME_SAVE_STORAGE_KEY = 'mistvale-game-save-v2'
 export const LEGACY_GAME_SAVE_STORAGE_KEY = 'mistvale-game-save-v1'
@@ -40,6 +40,9 @@ export function sanitizeGameState(value: Partial<GameState>): GameState {
 
   const validLocations = new Set(locations.map((location) => location.id))
   const location = validLocations.has(value.location as LocationId) ? value.location as LocationId : initialGameState.location
+  const year = Math.min(MAX_GAME_YEAR, integer(value.year, initialGameState.year, 1))
+  const day = Math.min(365, integer(value.day, initialGameState.day, 1))
+  const absoluteDay = (year - 1) * 365 + day
   const maxEnergy = integer(value.maxEnergy, initialGameState.maxEnergy, 1)
   const rawStats: Record<string, unknown> = isObject(value.stats) ? value.stats : {}
   const maxHealth = integer(rawStats.maxHealth, initialGameState.stats.maxHealth, 1)
@@ -116,11 +119,35 @@ export function sanitizeGameState(value: Partial<GameState>): GameState {
   })) as GameState['relationships']
 
   const rawQuests = Array.isArray(value.quests) ? value.quests : []
-  const questStatuses = new Set(['available', 'active', 'ready', 'completed'])
-  const quests = initialGameState.quests.map((fallback) => {
-    const raw = rawQuests.find((quest) => isObject(quest) && quest.id === fallback.id)
-    return { ...fallback, status: isObject(raw) && questStatuses.has(String(raw.status)) ? raw.status as typeof fallback.status : fallback.status }
-  })
+  const questStatuses = new Set<Quest['status']>(['available', 'active', 'ready', 'completed'])
+  const templateById = new Map(questTemplates.map((template) => [template.id, template]))
+  const quests: Quest[] = []
+  const seenQuestIds = new Set<string>()
+  for (const candidate of rawQuests) {
+    if (!isObject(candidate)) continue
+    const legacy = typeof candidate.templateId !== 'string'
+    const templateId = legacy ? candidate.id : candidate.templateId
+    if (typeof templateId !== 'string') continue
+    const template = templateById.get(templateId)
+    const status = questStatuses.has(candidate.status as Quest['status']) ? candidate.status as Quest['status'] : undefined
+    if (!template || !status) continue
+    if (status === 'available' && quests.some((quest) => quest.status === 'available')) continue
+    const postedDay = legacy
+      ? absoluteDay
+      : Math.min(absoluteDay, integer(candidate.postedDay, absoluteDay, 1))
+    const id = legacy ? `quest-${postedDay}-${template.id}` : String(candidate.id).slice(0, 160)
+    if (!id || seenQuestIds.has(id)) continue
+    const acceptedDay = status === 'active' || status === 'ready' || status === 'completed'
+      ? Math.min(absoluteDay, integer(candidate.acceptedDay, postedDay, 1))
+      : undefined
+    const deadlineDay = status === 'active' || status === 'ready'
+      ? Math.max(acceptedDay ?? postedDay, integer(candidate.deadlineDay, (acceptedDay ?? postedDay) + template.expiresInDays - 1, 1))
+      : undefined
+    if (deadlineDay !== undefined && deadlineDay < absoluteDay) continue
+    seenQuestIds.add(id)
+    quests.push({ ...template, id, templateId: template.id, postedDay, status, ...(acceptedDay !== undefined ? { acceptedDay } : {}), ...(deadlineDay !== undefined ? { deadlineDay } : {}) })
+  }
+  if (quests.length === 0 && absoluteDay === 1) quests.push({ ...initialGameState.quests[0] })
 
   const rawMine: Record<string, unknown> = isObject(value.mine) ? value.mine : {}
   const highestFloor = Math.min(MINE_MAX_FLOOR, integer(rawMine.highestFloor, initialGameState.mine.highestFloor, 1))
@@ -169,12 +196,10 @@ export function sanitizeGameState(value: Partial<GameState>): GameState {
   const machines: GameState['machines'] = { furnace: sanitizeMachine('furnace'), mill: sanitizeMachine('mill') }
   const rawFishing: Record<string, unknown> = isObject(value.fishing) ? value.fishing : {}
   const knownSpellIds = new Set(spells.map((spell) => spell.id))
-  const year = Math.min(MAX_GAME_YEAR, integer(value.year, initialGameState.year, 1))
-  const day = Math.min(365, integer(value.day, initialGameState.day, 1))
-
   return {
     ...initialGameState,
     playerProfile: sanitizePlayerProfile(value.playerProfile),
+    worldSeed: Math.min(2_147_483_647, integer(value.worldSeed, initialGameState.worldSeed, 1)),
     year,
     day,
     season: getSeasonForDay(day),

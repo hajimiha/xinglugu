@@ -36,7 +36,8 @@ describe('游戏状态变更', () => {
       && relationship.stage === 'stranger'
       && relationship.memoryTags.length === 0
     ))).toBe(true)
-    expect(initialGameState.quests.every((quest) => quest.status === 'available')).toBe(true)
+    expect(initialGameState.quests).toHaveLength(1)
+    expect(initialGameState.quests[0].status).toBe('available')
     expect(initialGameState.knownSpells).toEqual([])
     expect(initialGameState.mine).toEqual({ currentFloor: 1, highestFloor: 1, unlockedElevators: [] })
   })
@@ -96,10 +97,11 @@ describe('游戏状态变更', () => {
     expect(mined.inventory['iron-ore']).toBe(2)
     expect(mined.skills.mining.experience).toBe(34)
 
-    const quest = configured.quests[0]
+    const accepted = gameReducer(configured, { type: 'ACCEPT_QUEST', questId: configured.quests[0].id })
+    const quest = accepted.quests[0]
     const submitted = gameReducer({
-      ...configured,
-      inventory: { ...configured.inventory, [quest.requiredItemId]: quest.requiredAmount },
+      ...accepted,
+      inventory: { ...accepted.inventory, [quest.requiredItemId]: quest.requiredAmount },
     }, { type: 'SUBMIT_QUEST', questId: quest.id })
     expect(submitted.money).toBe(500 + Math.round(quest.rewardMoney * 1.5))
     expect(submitted.relationships[quest.issuerId].affinity).toBe(Math.round(quest.rewardAffinity * 1.5))
@@ -108,6 +110,15 @@ describe('游戏状态变更', () => {
       type: 'SELL_ITEM', itemId: 'stone', quantity: 1, total: 40,
     })
     expect(sold.money).toBe(560)
+  })
+
+  it('跨日时刷新委托并移除超过截止日的进行中委托', () => {
+    const accepted = gameReducer(initialGameState, { type: 'ACCEPT_QUEST', questId: initialGameState.quests[0].id })
+    const deadline = accepted.quests[0].deadlineDay!
+    const elapsedDays = deadline - 1 + 1
+    const expired = gameReducer(accepted, { type: 'ADVANCE_TIME', minutes: elapsedDays * 1440, reason: '等待委托期限' })
+    expect(expired.quests.some((quest) => quest.id === accepted.quests[0].id)).toBe(false)
+    expect(expired.toasts.some((toast) => toast.title === '委托已过期')).toBe(true)
   })
 
   it('将玩家伤害、敌方伤害与恢复倍率应用到战斗和医院', () => {
