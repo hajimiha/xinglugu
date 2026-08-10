@@ -183,6 +183,46 @@ describe('NPC 酒馆会话', () => {
     expect(JSON.stringify(audit)).not.toContain('session-secret')
   })
 
+  it('既有会话在玩家改名后使用最新姓名编译预设、世界书与真实请求', async () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: true }))
+    const response = '<maintext>云岚，欢迎回来。</maintext><option>继续</option><sum>洛岚称呼玩家的新名字。</sum><vars>{}</vars>'
+    const fetchMock = vi.fn().mockResolvedValue(new Response(`data: ${JSON.stringify({ choices: [{ delta: { content: response } }] })}\n\ndata: [DONE]\n\n`, {
+      headers: { 'content-type': 'text/event-stream' },
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    setSessionApiKey('session-secret')
+    database = createTavernDatabase(`mistvale-current-player-name-${crypto.randomUUID()}`)
+    const repository = createTavernRepository(database)
+    await repository.initialize()
+    const character = (await repository.listCharacters()).find((card) => card.npcId === 'loran')!
+    await repository.saveSession({
+      id: 'stale-name-session', name: '洛岚 · 旧姓名会话', npcId: 'loran', characterId: character.id,
+      characterName: character.name, userName: '旅行者', presetId: null, presetBinding: { mode: 'follow-active' },
+      lorebookIds: character.lorebookIds, variables: {},
+      messages: [{ id: 'opening-name', role: 'assistant', content: character.firstMessage, timestamp: 1 }],
+      createdAt: 1, updatedAt: Date.now() + 20,
+    })
+    const user = userEvent.setup()
+    const loran = npcs.find((npc) => npc.id === 'loran')!
+
+    render(
+      <GameProvider initialState={{ ...initialGameState, location: 'mayor-home', playerProfile: { name: '云岚', hasConfirmedName: true } }}>
+        <TavernProvider repository={repository} playerName="云岚"><TavernDialogue npc={loran} /></TavernProvider>
+      </GameProvider>,
+    )
+
+    const action = await screen.findByRole('button', { name: /选择行动：询问今日委托/ })
+    await waitFor(() => expect(action).toBeEnabled())
+    await user.click(action)
+    expect(await screen.findByText('云岚，欢迎回来。')).toBeVisible()
+    const body = String(fetchMock.mock.calls[0]?.[1]?.body)
+    expect(body).toContain('云岚')
+    expect(body).toContain('玩家姓名')
+    expect(body).not.toContain('与 旅行者')
+    expect(body).not.toContain('userName: 旅行者')
+    expect((await repository.listSessions())[0].userName).toBe('云岚')
+  })
+
   it('远程请求失败时保留玩家输入且不结算精力和好感', async () => {
     vi.stubGlobal('matchMedia', () => ({ matches: true }))
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('拒绝访问', { status: 401 })))

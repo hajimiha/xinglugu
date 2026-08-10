@@ -49,7 +49,7 @@ describe('远程酒馆剧情引擎', () => {
       preset: defaults.presets[0],
       lorebooks: defaults.lorebooks,
       character: card,
-      userName: '旅行者',
+      userName: '云岚',
       variables: { affinity: 0, money: 500 },
       formatPrompt: defaults.settings.formatPromptTemplate,
       onDelta: (raw) => streamed.push(raw),
@@ -71,6 +71,7 @@ describe('远程酒馆剧情引擎', () => {
         { role: 'user', content: '今天有什么委托？' },
       ]),
     }))
+    expect(JSON.stringify(prepare.mock.calls[0]?.[0])).toContain('玩家姓名为“云岚”')
   })
 
   it('模型未输出标签时仍将原始文字作为正文', async () => {

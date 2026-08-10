@@ -41,7 +41,7 @@ export function HistoryDrawer({ session, onClose, onBranch, onTruncate }: Histor
           <li key={message.id}>
             <div className="history-node" aria-hidden="true"><i /></div>
             <article>
-              <span>{message.role === 'assistant' ? session.characterName : message.role === 'user' ? '旅行者' : '系统记录'}</span>
+              <span>{message.role === 'assistant' ? session.characterName : message.role === 'user' ? session.userName : '系统记录'}</span>
               <p>{message.content}</p>
               <time>{new Date(message.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</time>
             </article>

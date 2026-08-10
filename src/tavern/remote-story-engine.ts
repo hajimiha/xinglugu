@@ -58,6 +58,8 @@ const REMOTE_RESPONSE_CONTRACT = `请只输出以下酒馆标签结构，不要�
 <vars>{"需要更新的变量":"新值"}</vars>
 正文必须使用简体中文；不要替玩家做出未选择的决定；变量没有变化时输出空对象。`
 
+const PLAYER_IDENTITY_CONTRACT = `玩家姓名为“{{user}}”。{{char}}可以在符合人物性格与当前关系的时机自然称呼这个名字，但不要在每句话中机械重复。不得把玩家重新称作“旅行者”，也不得替玩家修改姓名。`
+
 function hydratePreset(preset: ChatPreset, character: CharacterCard): ChatPreset {
   return {
     ...preset,
@@ -101,7 +103,7 @@ export async function createRemoteTurn(input: RemoteTurnInput): Promise<RemoteTu
     characterName: input.character.name,
     variables: primitiveVariables,
     extraVariables: input.variables,
-    formatPrompt: `${input.formatPrompt}\n\n${REMOTE_RESPONSE_CONTRACT}`,
+    formatPrompt: `${input.formatPrompt}\n\n${PLAYER_IDENTITY_CONTRACT}\n\n${REMOTE_RESPONSE_CONTRACT}`,
     regexScripts: input.regexScripts,
   })
   const prepared = input.api.prepare({

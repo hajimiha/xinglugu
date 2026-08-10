@@ -18,6 +18,7 @@ import type {
 import { variableDefinitionsToRecord } from '../sillytavern/variable-definitions'
 import { branchChat, truncateChatAt } from '../sillytavern/variables'
 import { createRemoteTurn, type RemoteTurnInspection, type RemoteTurnResult } from './remote-story-engine'
+import { DEFAULT_PLAYER_NAME, normalizePlayerName } from '../game/player-profile'
 
 type TavernStatus = 'loading' | 'ready' | 'error'
 
@@ -70,7 +71,7 @@ function replaceById<T extends { id: string }>(items: T[], value: T): T[] {
   return exists ? items.map((item) => item.id === value.id ? value : item) : [value, ...items]
 }
 
-export function TavernProvider({ children, repository = tavernRepository }: { children: ReactNode; repository?: TavernRepository }) {
+export function TavernProvider({ children, repository = tavernRepository, playerName }: { children: ReactNode; repository?: TavernRepository; playerName?: string }) {
   const [status, setStatus] = useState<TavernStatus>('loading')
   const [error, setError] = useState<string | null>(null)
   const [lorebooks, setLorebooks] = useState<Lorebook[]>([])
@@ -79,6 +80,7 @@ export function TavernProvider({ children, repository = tavernRepository }: { ch
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const [settings, setSettings] = useState<TavernSettings | null>(null)
   const [requestAudits, setRequestAudits] = useState<TavernRequestAudit[]>([])
+  const currentPlayerName = normalizePlayerName(playerName) ?? normalizePlayerName(settings?.userName) ?? DEFAULT_PLAYER_NAME
 
   useEffect(() => {
     let cancelled = false
@@ -118,6 +120,13 @@ export function TavernProvider({ children, repository = tavernRepository }: { ch
     setSettings(await repository.getSettings())
   }, [repository, settings])
 
+  useEffect(() => {
+    if (status !== 'ready' || !settings || !normalizePlayerName(playerName) || settings.userName === currentPlayerName) return
+    void persistSettings({ userName: currentPlayerName }).catch((caught) => {
+      setError(caught instanceof Error ? caught.message : '玩家姓名同步到酒馆设置失败')
+    })
+  }, [status, settings, playerName, currentPlayerName, persistSettings])
+
   const saveSession = useCallback(async (value: ChatSession) => {
     await repository.saveSession(value)
     setSessions((current) => replaceById(current, value).sort((a, b) => b.updatedAt - a.updatedAt))
@@ -130,13 +139,13 @@ export function TavernProvider({ children, repository = tavernRepository }: { ch
     const existing = sessions
       .filter((session) => session.npcId === npcId)
       .sort((a, b) => b.updatedAt - a.updatedAt)[0]
-    const session = existing ?? {
+    const baseSession = existing ?? {
       id: crypto.randomUUID(),
       name: `${card.name} · 初次会话`,
       characterId: card.id,
       npcId,
       characterName: card.name,
-      userName: settings?.userName ?? '旅行者',
+      userName: currentPlayerName,
       presetId: null,
       presetBinding: { mode: 'follow-active' as const },
       lorebookIds: [...card.lorebookIds],
@@ -151,10 +160,11 @@ export function TavernProvider({ children, repository = tavernRepository }: { ch
       createdAt: Date.now(),
       updatedAt: Date.now(),
     }
-    if (!existing) await saveSession(session)
+    const session = baseSession.userName === currentPlayerName ? baseSession : { ...baseSession, userName: currentPlayerName }
+    if (!existing || session !== baseSession) await saveSession(session)
     await persistSettings({ activeCharacterId: card.id, activeSessionId: session.id })
     return session
-  }, [characters, sessions, settings, repository, persistSettings, saveSession])
+  }, [characters, sessions, currentPlayerName, repository, persistSettings, saveSession])
 
   const sendTurn = useCallback(async (input: SendTurnInput) => {
     const session = sessions.find((candidate) => candidate.id === input.sessionId)
@@ -167,6 +177,8 @@ export function TavernProvider({ children, repository = tavernRepository }: { ch
       ...variableDefinitionsToRecord(session.variableDefinitions ?? []),
       ...session.variables,
       ...input.variables,
+      playerName: currentPlayerName,
+      userName: currentPlayerName,
     }
     const character = characters.find((candidate) => candidate.npcId === input.npcId)
       ?? (await repository.listCharacters()).find((candidate) => candidate.npcId === input.npcId)
@@ -206,7 +218,7 @@ export function TavernProvider({ children, repository = tavernRepository }: { ch
         preset,
         lorebooks: activeLorebooks,
         character,
-        userName: session.userName,
+        userName: currentPlayerName,
         variables,
         formatPrompt: currentSettings.formatPromptTemplate,
         regexScripts: currentSettings.regexScripts,
@@ -252,6 +264,7 @@ export function TavernProvider({ children, repository = tavernRepository }: { ch
     }
     const next = {
       ...session,
+      userName: currentPlayerName,
       messages: [...session.messages, userMessage, assistantMessage],
       variables: turn.variablesAfter,
       updatedAt: now + 1,
@@ -260,7 +273,7 @@ export function TavernProvider({ children, repository = tavernRepository }: { ch
     await repository.saveRequestAudit(succeeded)
     setRequestAudits(await repository.listRequestAudits())
     return next
-  }, [sessions, repository, settings, characters, presets, lorebooks, saveSession])
+  }, [sessions, repository, settings, characters, presets, lorebooks, saveSession, currentPlayerName])
 
   const clearRequestAudits = useCallback(async () => {
     await repository.clearRequestAudits()
@@ -300,34 +313,35 @@ export function TavernProvider({ children, repository = tavernRepository }: { ch
   const branchSession = useCallback(async (sessionId: string, messageIndex: number, name: string) => {
     const source = sessions.find((session) => session.id === sessionId) ?? await repository.getSession(sessionId)
     if (!source) throw new Error('找不到要分支的会话')
-    const branch = branchChat(source, messageIndex, {
+    const branch = { ...branchChat(source, messageIndex, {
       name,
       presetId: source.presetId,
       presetBinding: source.presetBinding,
       lorebookIds: source.lorebookIds,
-    })
+    }), userName: currentPlayerName }
     await saveSession(branch)
     await persistSettings({ activeSessionId: branch.id, activeCharacterId: branch.characterId ?? null })
     return branch
-  }, [sessions, repository, saveSession, persistSettings])
+  }, [sessions, repository, saveSession, persistSettings, currentPlayerName])
 
   const truncateSession = useCallback(async (sessionId: string, messageIndex: number) => {
     const source = sessions.find((session) => session.id === sessionId) ?? await repository.getSession(sessionId)
     if (!source) throw new Error('找不到要截断的会话')
-    const next = { ...truncateChatAt(source, messageIndex + 1), updatedAt: Date.now() }
+    const next = { ...truncateChatAt(source, messageIndex + 1), userName: currentPlayerName, updatedAt: Date.now() }
     await saveSession(next)
     return next
-  }, [sessions, repository, saveSession])
+  }, [sessions, repository, saveSession, currentPlayerName])
 
   const updateVariables = useCallback(async (sessionId: string, variables: Record<string, unknown>) => {
     const source = sessions.find((session) => session.id === sessionId) ?? await repository.getSession(sessionId)
     if (!source) throw new Error('找不到要更新变量的会话')
-    const next = { ...source, variables, updatedAt: Date.now() }
+    const next = { ...source, userName: currentPlayerName, variables, updatedAt: Date.now() }
     await saveSession(next)
     return next
-  }, [sessions, repository, saveSession])
+  }, [sessions, repository, saveSession, currentPlayerName])
 
-  const activeSession = sessions.find((session) => session.id === settings?.activeSessionId) ?? null
+  const presentedSessions = useMemo(() => sessions.map((session) => session.userName === currentPlayerName ? session : { ...session, userName: currentPlayerName }), [sessions, currentPlayerName])
+  const activeSession = presentedSessions.find((session) => session.id === settings?.activeSessionId) ?? null
   const apiLabel = settings
     ? `${getTavernProvider(settings.api.provider).label} · ${settings.api.model || '未选择模型'}`
     : '模型配置载入中'
@@ -346,7 +360,7 @@ export function TavernProvider({ children, repository = tavernRepository }: { ch
     lorebooks,
     presets,
     characters,
-    sessions,
+    sessions: presentedSessions,
     requestAudits,
     settings,
     activeSession,
@@ -365,7 +379,7 @@ export function TavernProvider({ children, repository = tavernRepository }: { ch
     truncateSession,
     updateVariables,
     clearRequestAudits,
-  }), [status, error, apiLabel, apiReady, apiReadinessError, lorebooks, presets, characters, sessions, requestAudits, settings, activeSession, openNpcSession, sendTurn, selectSession, persistSettings, saveLorebook, deleteLorebook, savePreset, deletePreset, saveCharacter, saveSession, deleteSession, branchSession, truncateSession, updateVariables, clearRequestAudits])
+  }), [status, error, apiLabel, apiReady, apiReadinessError, lorebooks, presets, characters, presentedSessions, requestAudits, settings, activeSession, openNpcSession, sendTurn, selectSession, persistSettings, saveLorebook, deleteLorebook, savePreset, deletePreset, saveCharacter, saveSession, deleteSession, branchSession, truncateSession, updateVariables, clearRequestAudits])
 
   return <TavernContext.Provider value={value}>{children}</TavernContext.Provider>
 }

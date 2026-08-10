@@ -521,3 +521,4 @@
 - 设计规格与八任务测试驱动实施计划已写入 `docs/superpowers/specs/2026-08-10-player-identity-quests-audio-fishing-design.md` 与 `docs/superpowers/plans/2026-08-10-player-identity-quests-audio-fishing.md`。
 - Task 1 红灯已确认：姓名领域模块和首次登记组件尚不存在，Reducer/存档/顶栏/设置页均不识别玩家档案；6 个目标测试文件共出现 6 项预期失败，失败原因与需求完全对应。
 - Task 1 已转绿：新增姓名领域净化、首次登记覆盖层、设置页改名与顶栏身份标签；游戏存档升级为 v2，同时继续读取并迁移旧 `mistvale-game-save-v1`，清除存档时两代键都会移除。6 个目标文件 54 项测试全部通过。
+- Task 2 红灯确认三处真实缺口：既有会话仍以创建时的“旅行者”编译请求、历史抽屉硬编码“旅行者”、最终提示词缺少明确姓名约束。实现已改为由游戏档案向 `TavernProvider` 注入当前姓名，每次发送都覆盖会话署名并加入 `playerName/userName` 变量和自然称呼约束。

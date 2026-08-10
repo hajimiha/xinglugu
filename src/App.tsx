@@ -1,4 +1,4 @@
-import { GameProvider } from './game/GameContext'
+import { GameProvider, useGame } from './game/GameContext'
 import { ContextRail } from './components/shell/ContextRail'
 import { StoryRail } from './components/shell/StoryRail'
 import { TopHud } from './components/shell/TopHud'
@@ -29,6 +29,11 @@ function AppContent() {
   )
 }
 
+function GameBoundTavern({ children }: { children: React.ReactNode }) {
+  const { state } = useGame()
+  return <TavernProvider playerName={state.playerProfile.name}>{children}</TavernProvider>
+}
+
 export default function App() {
-  return <GameProvider><TavernProvider><AppContent /></TavernProvider></GameProvider>
+  return <GameProvider><GameBoundTavern><AppContent /></GameBoundTavern></GameProvider>
 }

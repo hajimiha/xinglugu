@@ -29,6 +29,8 @@ function createDialogueVariables(state: GameState, npc: Npc, affinity: number) {
   const festival = getFestivalOnDay(state.day)
   const presence = getNpcPresence(npc.id, state.year, state.day, state.minutes)
   return {
+    playerName: state.playerProfile.name,
+    userName: state.playerProfile.name,
     affinity,
     money: state.money,
     energy: state.energy,
@@ -216,7 +218,7 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
           {!session && <div className="tavern-dialogue-skeleton"><i /><i /><i /></div>}
           {displayedMessages.map((message) => (
             <article key={message.id} className={`dialogue-message is-${message.role === 'user' ? 'player' : 'npc'}`}>
-              <span>{message.role === 'assistant' ? npc.name : '你'}</span>
+              <span>{message.role === 'assistant' ? npc.name : state.playerProfile.name}</span>
               {message.role === 'assistant' && renderReasoning('供应商返回的推理内容', message.metadata?.providerReasoning, 'provider')}
               {message.role === 'assistant' && renderReasoning('模型自行输出的思考标签', message.parsed?.thinking, 'authored')}
               <p>{message.displayContent}</p>
