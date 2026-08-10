@@ -31,6 +31,7 @@ export function TopHud() {
         <div>
           <p className="eyebrow">MISTVALE CHRONICLES</p>
           <strong>雾灯谷纪事</strong>
+          <span className="hud-player-name">{state.playerProfile.name}</span>
         </div>
       </div>
 

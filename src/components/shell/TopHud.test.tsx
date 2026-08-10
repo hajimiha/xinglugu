@@ -15,6 +15,7 @@ describe('顶部游戏状态栏', () => {
     expect(screen.getByText('第1年 · 春')).toBeVisible()
     expect(screen.getByText(/1月1日/)).toBeVisible()
     expect(screen.getAllByTestId(/^hud-skill-/)).toHaveLength(5)
+    expect(screen.getByText('旅行者')).toBeVisible()
   })
 
   it('点击时间区打开岁时手册', async () => {

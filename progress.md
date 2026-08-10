@@ -519,3 +519,5 @@
 - 已完成本轮现状调查与范围收敛：姓名必须贯穿 GameState、存档、会话署名、宏变量和真实出站请求；委托必须通过统一日界线处理概率刷新和过期；角色文字只进入世界书；音频使用 IndexedDB BGM 与 Web Audio 合成音效；五鱼目录与通用礼物由同一经济数据源驱动。
 - 已完成 UI/UX Pro Max 检索并沿用雾灯谷深绿鎏金像素酒馆设计系统；新增控件遵守 44px 触控、可见焦点、移动端无横向滚动和音量上下文 memoize 约束。
 - 设计规格与八任务测试驱动实施计划已写入 `docs/superpowers/specs/2026-08-10-player-identity-quests-audio-fishing-design.md` 与 `docs/superpowers/plans/2026-08-10-player-identity-quests-audio-fishing.md`。
+- Task 1 红灯已确认：姓名领域模块和首次登记组件尚不存在，Reducer/存档/顶栏/设置页均不识别玩家档案；6 个目标测试文件共出现 6 项预期失败，失败原因与需求完全对应。
+- Task 1 已转绿：新增姓名领域净化、首次登记覆盖层、设置页改名与顶栏身份标签；游戏存档升级为 v2，同时继续读取并迁移旧 `mistvale-game-save-v1`，清除存档时两代键都会移除。6 个目标文件 54 项测试全部通过。

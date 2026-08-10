@@ -7,6 +7,7 @@ import { ToastRegion } from './components/feedback/ToastRegion'
 import { GameStage } from './components/stage/GameStage'
 import { ModalHost } from './components/modals/ModalHost'
 import { TavernProvider } from './tavern/TavernContext'
+import { PlayerNameGate } from './components/onboarding/PlayerNameGate'
 
 function AppContent() {
   return (
@@ -23,6 +24,7 @@ function AppContent() {
       </div>
       <ModalHost />
       <ToastRegion />
+      <PlayerNameGate />
     </div>
   )
 }

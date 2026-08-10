@@ -35,6 +35,11 @@ export interface GameRuleSettings {
   energyCostMode: EnergyCostMode
 }
 
+export interface PlayerProfile {
+  name: string
+  hasConfirmedName: boolean
+}
+
 export interface SkillProgress {
   level: number
   experience: number
@@ -221,6 +226,7 @@ export type ModalType =
   | null
 
 export interface GameState {
+  playerProfile: PlayerProfile
   year: number
   day: number
   season: Season
@@ -259,6 +265,7 @@ export interface GameState {
 }
 
 export type GameAction =
+  | { type: 'SET_PLAYER_NAME'; name: string }
   | { type: 'SPEND_ENERGY'; amount: number; reason: string }
   | { type: 'ADD_TOAST'; toast: Omit<ToastMessage, 'id'> }
   | { type: 'DISMISS_TOAST'; id: string }

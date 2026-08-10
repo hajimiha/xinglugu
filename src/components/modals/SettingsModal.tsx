@@ -10,6 +10,7 @@ import {
 } from '../../game/rules'
 import type { EnergyCostMode, GameRuleSettings } from '../../game/types'
 import { GameIcon } from '../icons/GameIcon'
+import { MAX_PLAYER_NAME_LENGTH, normalizePlayerName } from '../../game/player-profile'
 
 type MultiplierKey = Exclude<keyof GameRuleSettings, 'energyCostMode'>
 type MultiplierDrafts = Record<MultiplierKey, string>
@@ -66,6 +67,8 @@ export function SettingsModal() {
   const [pendingReset, setPendingReset] = useState(false)
   const [pendingNewGame, setPendingNewGame] = useState(false)
   const [status, setStatus] = useState('')
+  const [playerNameDraft, setPlayerNameDraft] = useState(state.playerProfile.name)
+  const [playerNameError, setPlayerNameError] = useState('')
   const dirty = JSON.stringify(draft) !== JSON.stringify(state.rules)
   const profile = useMemo(() => {
     const support = (draft.experienceMultiplier + draft.affinityMultiplier + draft.dropMultiplier + draft.moneyMultiplier + draft.recoveryMultiplier) / 5
@@ -133,6 +136,18 @@ export function SettingsModal() {
     setPendingNewGame(false)
   }
 
+  const savePlayerName = () => {
+    const name = normalizePlayerName(playerNameDraft)
+    if (!name) {
+      setPlayerNameError(`请输入 1–${MAX_PLAYER_NAME_LENGTH} 个有效字符。`)
+      return
+    }
+    dispatch({ type: 'SET_PLAYER_NAME', name })
+    setPlayerNameDraft(name)
+    setPlayerNameError('')
+    setStatus(`姓名已更新为“${name}”`)
+  }
+
   return <div className="settings-console">
     <section className="settings-overview" aria-label="当前难度倾向">
       <div className="settings-overview-mark" aria-hidden="true"><GameIcon name="settings" size={28} weight="duotone" /></div>
@@ -142,6 +157,16 @@ export function SettingsModal() {
         <div><dt>掉落</dt><dd>×{draft.dropMultiplier.toFixed(2)}</dd></div>
         <div><dt>行动</dt><dd>{getEnergyCost(1, draft.energyCostMode)} 精力</dd></div>
       </dl>
+    </section>
+
+    <section className="settings-profile-card" aria-labelledby="settings-player-profile-title">
+      <div className="settings-profile-mark" aria-hidden="true"><GameIcon name="profile" size={24} weight="duotone" /></div>
+      <div className="settings-profile-copy"><span>PLAYER PROFILE</span><h4 id="settings-player-profile-title">玩家档案</h4><p>村民称呼、酒馆宏变量和 AI 请求会同步使用此姓名。</p></div>
+      <div className="settings-profile-control">
+        <label htmlFor="settings-player-name">玩家姓名</label>
+        <div><input id="settings-player-name" autoComplete="nickname" maxLength={MAX_PLAYER_NAME_LENGTH + 1} value={playerNameDraft} onChange={(event) => { setPlayerNameDraft(event.target.value); setPlayerNameError(''); setStatus('') }} aria-invalid={Boolean(playerNameError)} aria-describedby={playerNameError ? 'settings-player-name-error' : undefined} /><button id="settings-player-name-save" type="button" aria-label="保存玩家姓名" onClick={savePlayerName}><GameIcon name="save" size={16} />保存称呼</button></div>
+        {playerNameError && <p id="settings-player-name-error" role="alert">{playerNameError}</p>}
+      </div>
     </section>
 
     <div className="settings-rule-groups">

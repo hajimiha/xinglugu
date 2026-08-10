@@ -11,6 +11,7 @@ import {
   scaleReward,
 } from './rules'
 import type { GameAction, GameState, Relationship, ToastMessage } from './types'
+import { normalizePlayerName } from './player-profile'
 
 let toastSequence = 0
 const makeToast = (toast: Omit<ToastMessage, 'id'>): ToastMessage => ({
@@ -59,6 +60,7 @@ function advanceRanchProducts(state: GameState, crossedDays: number): GameState[
 }
 
 export const initialGameState: GameState = {
+  playerProfile: { name: '旅行者', hasConfirmedName: false },
   year: 1,
   day: 1,
   season: '春',
@@ -155,6 +157,11 @@ function reduceGameState(state: GameState, action: GameAction): GameState {
   switch (action.type) {
     case 'REPLACE_GAME_STATE':
       return action.state
+    case 'SET_PLAYER_NAME': {
+      const name = normalizePlayerName(action.name)
+      if (!name) return state
+      return { ...state, playerProfile: { name, hasConfirmedName: true } }
+    }
     case 'UPDATE_GAME_RULES':
       return { ...state, rules: normalizeGameRules({ ...state.rules, ...action.rules }) }
     case 'RESET_GAME_RULES':

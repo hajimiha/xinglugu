@@ -12,6 +12,17 @@ function RuleObserver() {
 }
 
 describe('游戏玩法设置', () => {
+  it('允许在玩家档案区更改姓名', async () => {
+    const user = userEvent.setup()
+    render(<GameProvider initialState={{ ...initialGameState, activeModal: 'settings' }}><ModalHost /></GameProvider>)
+    const input = screen.getByLabelText('玩家姓名')
+    expect(input).toHaveAttribute('id', 'settings-player-name')
+    await user.clear(input)
+    await user.type(input, '星野')
+    await user.click(screen.getByRole('button', { name: '保存玩家姓名' }))
+    expect(screen.getByText('姓名已更新为“星野”')).toBeVisible()
+  })
+
   it('提供九项真实规则、实时示例，并仅在应用后更新游戏状态', async () => {
     const user = userEvent.setup()
     render(<GameProvider initialState={{ ...initialGameState, activeModal: 'settings' }}><RuleObserver /><ModalHost /></GameProvider>)

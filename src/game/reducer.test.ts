@@ -6,6 +6,12 @@ import { DEFAULT_GAME_RULES } from './rules'
 import type { GameState } from './types'
 
 describe('游戏状态变更', () => {
+  it('以单一动作保存已经净化的玩家姓名', () => {
+    const named = gameReducer(initialGameState, { type: 'SET_PLAYER_NAME', name: '  云岚  ' })
+    expect(named.playerProfile).toEqual({ name: '云岚', hasConfirmedName: true })
+    expect(gameReducer(named, { type: 'SET_PLAYER_NAME', name: '   ' })).toBe(named)
+  })
+
   it('以刚抵达小镇的新手数据开始游戏', () => {
     expect(initialGameState).toMatchObject({
       year: 1,

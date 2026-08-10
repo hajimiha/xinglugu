@@ -26,7 +26,7 @@ describe('版本化游戏自动存档', () => {
     }, localStorage, 123456)
 
     const loaded = loadGameSave(localStorage)
-    expect(loaded).toMatchObject({ schemaVersion: 1, savedAt: 123456 })
+    expect(loaded).toMatchObject({ schemaVersion: 2, savedAt: 123456 })
     expect(loaded?.state).toMatchObject({ day: 4, location: 'mine', money: 2345, activeModal: null, toasts: [] })
     expect(loaded?.state.selectedNpcId).toBeUndefined()
   })
@@ -36,6 +36,24 @@ describe('版本化游戏自动存档', () => {
     expect(parseGameSave(exported)).toMatchObject({ savedAt: 777, state: { day: 7, money: 8765 } })
     expect(parseGameSave('{bad json')).toBeNull()
     expect(parseGameSave(JSON.stringify({ schemaVersion: 99, state: {} }))).toBeNull()
+  })
+
+  it('把 v1 存档迁移为 v2 并要求玩家首次确认姓名', () => {
+    const legacy = parseGameSave(JSON.stringify({
+      schemaVersion: 1,
+      savedAt: 456,
+      state: { ...initialGameState, playerProfile: undefined, money: 3456 },
+    }))
+    expect(legacy).toMatchObject({
+      schemaVersion: 2,
+      savedAt: 456,
+      state: { money: 3456, playerProfile: { name: '旅行者', hasConfirmedName: false } },
+    })
+  })
+
+  it('保存并恢复已经确认的玩家姓名', () => {
+    const named = { ...initialGameState, playerProfile: { name: '云岚', hasConfirmedName: true } }
+    expect(parseGameSave(serializeGameSave(named))?.state.playerProfile).toEqual(named.playerProfile)
   })
 
   it('可清除自动存档', () => {
