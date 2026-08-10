@@ -22,6 +22,8 @@ export class LorebookEngine {
     const matched: MatchedEntry[] = []
     for (const entry of this.lorebook.entries) {
       if (entry.disabled || entry.excluded || (recursion.isRecursion && entry.excludeRecursion)) continue
+      const identity = this.identity(entry)
+      if (recursion.seen.has(identity)) continue
       const effective = this.effectiveOptions(entry)
       if (entry.constant) {
         matched.push(this.toMatch(entry, ['constant'], recursion.depth, effective.position))
@@ -55,7 +57,7 @@ export class LorebookEngine {
       for (const match of newMatches) {
         if (allMatched.has(match.identity) || (depth > 0 && match.entry.preventRecursion)) continue
         allMatched.set(match.identity, match)
-        if (!match.entry.excludeRecursion) currentText += ` ${match.entry.content}`
+        if (!match.entry.excludeRecursion && !match.entry.preventRecursion) currentText += ` ${match.entry.content}`
         added = true
       }
       if (!added) break
@@ -81,14 +83,18 @@ export class LorebookEngine {
     return {
       caseSensitive: entry.caseSensitive ?? this.lorebook.caseSensitive,
       matchWholeWords: entry.matchWholeWords ?? this.lorebook.matchWholeWords,
-      useProbability: entry.useProbability ?? true,
+      useProbability: entry.useProbability ?? false,
       probability: entry.probability,
       position: entry.position,
     }
   }
 
   private toMatch(entry: LorebookEntry, matchedKeywords: string[], depth: number, position: LorebookEntry['position']): MatchedEntry {
-    return { entry, score: entry.order, matchedKeywords, identity: `${this.lorebook.id}:${entry.id}`, lorebookId: this.lorebook.id, entryId: entry.id, depth, position, effectiveDepth: entry.depth }
+    return { entry, score: entry.order, matchedKeywords, identity: this.identity(entry), lorebookId: this.lorebook.id, entryId: entry.id, depth, position, effectiveDepth: entry.depth }
+  }
+
+  private identity(entry: LorebookEntry): string {
+    return JSON.stringify([this.lorebook.id, entry.id])
   }
 
   private checkEntryMatch(entry: LorebookEntry, text: string, context: string, options: ReturnType<LorebookEngine['effectiveOptions']>): boolean {

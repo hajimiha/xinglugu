@@ -21,11 +21,18 @@ function match(logic: LorebookEntry['selectiveLogic'], text: string, context: st
 }
 
 describe('deterministic lorebook matching', () => {
-  it.each([
-    ['and_any', 1, 0], ['and_all', 1, 0], ['not_any', 0, 1], ['not_all', 0, 1],
-  ] as const)('%s applies the primary and secondary truth table', (logic, matching, nonMatching) => {
-    expect(match(logic, 'alpha beta', 'gate lock')).toBe(matching)
-    expect(match(logic, 'alpha beta', 'other')).toBe(nonMatching)
+  it('distinguishes and_any from and_all with partial primary and secondary matches', () => {
+    expect(match('and_any', 'alpha', 'gate')).toBe(1)
+    expect(match('and_all', 'alpha', 'gate')).toBe(0)
+    expect(match('and_any', 'alpha', 'gate lock')).toBe(1)
+    expect(match('and_all', 'alpha', 'gate lock')).toBe(1)
+  })
+
+  it('distinguishes not_any from not_all with partial primary and secondary matches', () => {
+    expect(match('not_any', 'alpha', 'gate')).toBe(0)
+    expect(match('not_all', 'alpha', 'gate')).toBe(1)
+    expect(match('not_any', 'alpha', 'other')).toBe(1)
+    expect(match('not_all', 'alpha', 'other')).toBe(1)
   })
 
   it('uses entry matching overrides without changing unrelated imported fields', () => {
@@ -39,6 +46,9 @@ describe('deterministic lorebook matching', () => {
     expect(createLorebookEngine(book('book', [{ ...entryDefaults, keys: ['Cat'], secondaryKeys: [], selective: false }], { caseSensitive: true })).scan('cat')).toHaveLength(0)
     expect(createLorebookEngine(book('book', [{ ...entryDefaults, keys: ['cat'], secondaryKeys: [], selective: false }], { matchWholeWords: true })).scan('scatter')).toHaveLength(0)
     expect(createLorebookEngine(book('book', [{ ...entryDefaults, keys: ['cat'], secondaryKeys: [], selective: false }], { matchWholeWords: true })).scan('a cat')).toHaveLength(1)
+    expect(createLorebookEngine(book('book', [{ ...entryDefaults, keys: ['cat'], secondaryKeys: [], selective: false, caseSensitive: true }], { caseSensitive: false })).scan('CAT')).toHaveLength(0)
+    expect(createLorebookEngine(book('book', [{ ...entryDefaults, keys: ['cat'], secondaryKeys: [], selective: false, matchWholeWords: true }], { matchWholeWords: false })).scan('scatter')).toHaveLength(0)
+    expect(createLorebookEngine(book('book', [{ ...entryDefaults, keys: ['cat'], secondaryKeys: [], selective: false, matchWholeWords: false }], { matchWholeWords: true })).scan('scatter')).toHaveLength(1)
   })
 
   it('only invokes injected probability when useProbability is enabled', () => {
@@ -50,13 +60,20 @@ describe('deterministic lorebook matching', () => {
     const probabilistic = createLorebookEngine(book('book', [{ ...entryDefaults, probability: 0, useProbability: true }]))
     expect(probabilistic.scan('alpha gate', undefined, { random })).toHaveLength(0)
     expect(random).toHaveBeenCalledTimes(1)
+    const omitted = createLorebookEngine(book('book', [{ ...entryDefaults, probability: 0 }]))
+    expect(omitted.scan('alpha gate', undefined, { random })).toHaveLength(1)
   })
 
   it('keeps duplicate entry IDs distinct across books', () => {
     const entries = [entryDefaults]
     const result = [createLorebookEngine(book('one', entries)), createLorebookEngine(book('two', entries))]
       .flatMap((engine) => engine.scan('alpha gate'))
-    expect(result.map((item) => item.identity)).toEqual(['one:entry', 'two:entry'])
+    expect(result.map((item) => item.identity)).toEqual(['["one","entry"]', '["two","entry"]'])
+    const collisionSafe = [
+      createLorebookEngine(book('a:b', [{ ...entryDefaults, id: 'c' }])),
+      createLorebookEngine(book('a', [{ ...entryDefaults, id: 'b:c' }])),
+    ].flatMap((engine) => engine.scan('alpha gate'))
+    expect(new Set(collisionSafe.map((item) => item.identity)).size).toBe(2)
   })
 
   it('honors recursion exclusion and terminates bounded cyclic recursion', () => {
@@ -71,5 +88,26 @@ describe('deterministic lorebook matching', () => {
     ], { recursiveScanning: true })).recursiveScan('seed', 5)
     expect(cyclic.map((item) => item.entry.id)).toEqual(['first', 'second'])
     expect(Math.max(...cyclic.map((item) => item.depth))).toBeLessThanOrEqual(1)
+  })
+
+  it('does not seed recursion from a depth-zero preventRecursion match', () => {
+    const seed = { ...entryDefaults, id: 'seed', keys: ['seed'], content: 'child', selective: false, preventRecursion: true }
+    const child = { ...entryDefaults, id: 'child', keys: ['child'], content: 'should-not-match', selective: false }
+    const result = createLorebookEngine(book('book', [seed, child], { recursiveScanning: true })).recursiveScan('seed', 3)
+    expect(result.map((item) => item.entry.id)).toEqual(['seed'])
+  })
+
+  it('does not return entries already present in the recursion context', () => {
+    const entry = { ...entryDefaults, selective: false }
+    const result = createLorebookEngine(book('book', [entry])).scan('alpha', undefined, {
+      recursion: { depth: 1, isRecursion: true, seen: new Set(['["book","entry"]']) },
+    })
+    expect(result).toHaveLength(0)
+  })
+
+  it('reports effective depth and position metadata without changing imported fields', () => {
+    const entry = { ...entryDefaults, depth: 4, position: 'at_depth' as const, selective: false, customImportedField: 'preserved' }
+    const result = createLorebookEngine(book('book', [entry])).scan('alpha')
+    expect(result[0]).toMatchObject({ depth: 0, effectiveDepth: 4, position: 'at_depth', entry: { customImportedField: 'preserved' } })
   })
 })

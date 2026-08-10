@@ -169,6 +169,7 @@ describe('严格酒馆提示词编译器', () => {
           { id: 'after', ...lorebookEntryDefaults, keys: ['触发'], position: 'after_char', content: 'AFTER' },
           { id: 'example-before', ...lorebookEntryDefaults, keys: ['触发'], position: 'before_example', content: 'EXAMPLE_BEFORE' },
           { id: 'example-after', ...lorebookEntryDefaults, keys: ['触发'], position: 'after_example', content: 'EXAMPLE_AFTER' },
+          { id: 'depth', ...lorebookEntryDefaults, keys: ['触发'], position: 'at_depth', depth: 3, content: 'DEPTH_UNSUPPORTED' },
           { id: 'outlet', ...lorebookEntryDefaults, keys: ['触发'], position: 'outlet', content: 'UNSUPPORTED' },
         ],
       }],
@@ -178,8 +179,28 @@ describe('严格酒馆提示词编译器', () => {
     expect(result.systemPrompt).toContain('AFTER')
     expect(result.systemPrompt).toContain('EXAMPLE_BEFORE')
     expect(result.systemPrompt).toContain('EXAMPLE_AFTER')
+    expect(result.systemPrompt).not.toContain('DEPTH_UNSUPPORTED')
     expect(result.systemPrompt).not.toContain('UNSUPPORTED')
+    expect(result.diagnostics).toContain('未支持的世界书注入位置：at_depth')
     expect(result.diagnostics).toContain('未支持的世界书注入位置：outlet')
+  })
+
+  it('orders equal-score matches by collision-safe identity across lorebooks', () => {
+    const lorebook = (id: string, content: string) => ({
+      id, name: id, recursiveScanning: false, caseSensitive: false, matchWholeWords: false, createdAt: 0, updatedAt: 0,
+      entries: [{ id: 'same', ...lorebookEntryDefaults, keys: ['trigger'], position: 'after_char' as const, order: 5, content }],
+    })
+    const result = compileTavernTurn({
+      userInput: 'trigger', history: [], preset: {
+        ...preset('identity-order', 'identity-order', '', ''), settings: {
+          prompts: [{ identifier: 'worldInfoAfter', role: 'system', content: '' }],
+          prompt_order: [{ character_id: 100001, order: [{ identifier: 'worldInfoAfter', enabled: true }] }],
+        },
+      },
+      lorebooks: [lorebook('z-book', 'Z'), lorebook('a-book', 'A')], userName: '玩家', characterName: '角色',
+    })
+    expect(result.matchedEntries.map((match) => match.identity)).toEqual(['["a-book","same"]', '["z-book","same"]'])
+    expect(result.systemPrompt).toContain('A\n\nZ')
   })
 
   it('按启用的角色卡提示词顺序编译角色内容和宏，并保持当前输入最后', () => {

@@ -80,7 +80,7 @@ export function compileTavernTurn(input: PromptCompileInput): PromptCompilation 
     allMatchedEntries.push(...createLorebookEngine(lorebook).recursiveScan(scanText, 3))
   }
   const matchedEntries = Array.from(new Map(allMatchedEntries.map((match) => [match.identity, match])).values())
-    .sort((left, right) => left.score - right.score)
+    .sort((left, right) => left.score - right.score || left.identity.localeCompare(right.identity))
 
   const configuredContext = preset.settings.openai_max_context ?? preset.settings.max_length
   const parsedContext = typeof configuredContext === 'number' ? configuredContext : Number(configuredContext)
@@ -102,7 +102,7 @@ export function compileTavernTurn(input: PromptCompileInput): PromptCompilation 
   const segments: PromptTraceSegment[] = []
   const unsupportedPositions = Array.from(new Set(matchedEntries
     .map((match) => match.position)
-    .filter((position) => !['before_char', 'after_char', 'before_example', 'after_example', 'at_depth'].includes(position))))
+    .filter((position) => !['before_char', 'after_char', 'before_example', 'after_example'].includes(position))))
   const diagnostics: string[] = unsupportedPositions.map((position) => `未支持的世界书注入位置：${position}`)
   const macroOperations: MacroOperation[] = []
   let macroVariables: Record<string, unknown> = { ...extraVariables, ...variables }
@@ -151,7 +151,6 @@ export function compileTavernTurn(input: PromptCompileInput): PromptCompilation 
       worldInfoAfter: 'after_char',
       worldInfoBeforeExamples: 'before_example',
       worldInfoAfterExamples: 'after_example',
-      worldInfoAtDepth: 'at_depth',
     }
     if (placementByIdentifier[identifier]) {
       const content = matchedEntries
