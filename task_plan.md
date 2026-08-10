@@ -212,6 +212,9 @@ Phase 18（默认世界书合册与预设槽位精简）正在进行。
 | 给滚动区添加 `min-height: 0` 后手机端高度仍为 2759px | 2 | 该假设未命中根因；停止继续叠加 CSS，改采集编辑器及祖先的 computed position/height/grid/overflow，定位是哪一层建立了错误的固定定位包含块 |
 | 移除手机端面板动画后编辑器高度恢复，但顶栏快捷按钮被酒馆总标题栏拦截 | 1 | 几何根因已明确：编辑器和总标题栏占用同一顶部区域且处于不同 stacking context；将手机编辑器顶部约束到 64px 酒馆标题栏下方，而非继续提高局部 z-index |
 | 一次调查命令引用了不存在的 `src/game/initialState.ts`，导致组合 `rg` 返回 1 | 1 | 已从实际 `reducer.ts` 与 `game-save-storage.ts` 获取好感数据流；后续先用 `rg --files` 确认路径，不重复该错误 |
+| Phase 18 首次把 Node 机械 JSON 改写脚本包在 PowerShell 单引号中，内部引号被命令行吞掉 | 1 | 改用 PowerShell 双引号包裹脚本、JavaScript 内使用单引号；只执行固定字段的机械变换并由内容包测试验证 |
+| Phase 18 首次裸跑组件 Vitest 没有 jsdom，导致 `document`/`localStorage` 不存在 | 1 | 不重复裸命令；改用项目 `pnpm test:run` 脚本注入 jsdom，目标组件 9 项测试通过 |
+| Phase 18 首次全量 jsdom 回归超过 120 秒工具上限 | 1 | 以 300 秒上限重跑得到完整结果；58 个文件通过并定位唯一旧册 ID 测试，改为读取合册后定向复测 |
 
 ## Notes
 - 所有用户可见文案必须中文化；Logo 可保留艺术化英文副标题。

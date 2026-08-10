@@ -14,8 +14,8 @@ describe('仓库酒馆内容包', () => {
     })
 
     expect(pack).toMatchObject({ schemaVersion: 1, contentVersion: '2026.08.08.2' })
-    expect(pack.lorebooks).toHaveLength(4)
-    expect(pack.lorebooks.map((book) => book.id)).toContain('mistvale-calendar-festivals')
+    expect(pack.lorebooks).toHaveLength(1)
+    expect(pack.lorebooks.map((book) => book.id)).toEqual(['mistvale-world-rules'])
     expect(pack.presets).toHaveLength(1)
     expect(pack.characters).toHaveLength(21)
   })
@@ -110,8 +110,9 @@ describe('仓库酒馆内容包', () => {
 
   it('仓库内置内容包可解析并发布六位共生伙伴', () => {
     const pack = parseContentPack(repositoryContentPack)
-    expect(pack.lorebooks.map((book) => book.id)).toContain('mistvale-production-partners')
+    expect(pack.lorebooks).toHaveLength(0)
     expect(pack.characters).toHaveLength(6)
     expect(pack.characters.every((card) => card.tags.includes('共生伙伴'))).toBe(true)
+    expect(pack.characters.every((card) => JSON.stringify(card.lorebookIds) === JSON.stringify(['mistvale-world-rules']))).toBe(true)
   })
 })

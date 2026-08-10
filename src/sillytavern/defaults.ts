@@ -3,6 +3,13 @@ import { festivals, formatClock, npcSchedules, WEEKDAYS } from '../game/calendar
 import type { MonsterPartnerId, Npc } from '../game/types'
 import { createDefaultPortraitSlots } from './portrait-slots'
 import {
+  CALENDAR_FESTIVALS_ID,
+  consolidateMistvaleLorebooks,
+  PRODUCTION_PARTNERS_ID,
+  VILLAGE_ARCHIVE_ID,
+  WORLD_RULES_ID,
+} from './lorebook-consolidation'
+import {
   createDefaultPreset,
   DEFAULT_FORMAT_PROMPT,
   DEFAULT_TAGS,
@@ -13,11 +20,14 @@ import {
   type TavernSettings,
 } from './types'
 
-export const WORLD_RULES_ID = 'mistvale-world-rules'
-export const VILLAGE_ARCHIVE_ID = 'mistvale-village-archive'
-export const CALENDAR_FESTIVALS_ID = 'mistvale-calendar-festivals'
-export const PRODUCTION_PARTNERS_ID = 'mistvale-production-partners'
-export const DEFAULT_CONTENT_VERSION = 6
+export {
+  CALENDAR_FESTIVALS_ID,
+  LEGACY_MISTVALE_LOREBOOK_IDS,
+  PRODUCTION_PARTNERS_ID,
+  VILLAGE_ARCHIVE_ID,
+  WORLD_RULES_ID,
+} from './lorebook-consolidation'
+export const DEFAULT_CONTENT_VERSION = 7
 export const MONSTER_GIRL_CARD_IDS = (Object.keys(MONSTER_PARTNERS) as MonsterPartnerId[]).map((id) => `mistvale-character-${id}`)
 
 function entry(
@@ -176,7 +186,7 @@ function createCharacterCard(npc: Npc, now: number): CharacterCard {
     scenario: `当前位于${location?.name ?? '雾灯谷'}。玩家可与${npc.name}聊天、送礼，并按其身份进行交易或委托互动。`,
     firstMessage: voice.firstMessage,
     exampleDialogue: voice.example,
-    lorebookIds: [WORLD_RULES_ID, VILLAGE_ARCHIVE_ID, CALENDAR_FESTIVALS_ID, PRODUCTION_PARTNERS_ID],
+    lorebookIds: [WORLD_RULES_ID],
     portraitSlots: createDefaultPortraitSlots(),
     tags: [npc.role, location?.name ?? '雾灯谷', '女性角色'],
     createdAt: now,
@@ -198,7 +208,7 @@ function createMonsterGirlCard(id: MonsterPartnerId, now: number): CharacterCard
     scenario: `当前位于苔灯农场的共生牧场。${partner.acquisition}；${partner.ability}所有互动必须尊重她作为共生伙伴的自主意愿。`,
     firstMessage: voice.firstMessage,
     exampleDialogue: voice.example,
-    lorebookIds: [WORLD_RULES_ID, VILLAGE_ARCHIVE_ID, CALENDAR_FESTIVALS_ID, PRODUCTION_PARTNERS_ID],
+    lorebookIds: [WORLD_RULES_ID],
     portraitSlots: createDefaultPortraitSlots(),
     tags: [partner.role, '苔灯农场·共生牧场', '共生伙伴', '女性角色'],
     createdAt: now,
@@ -312,11 +322,17 @@ function createProductionPartners(now: number): Lorebook {
   }
 }
 
+export function createMistvaleLorebookSections(now = Date.now()): Lorebook[] {
+  return [createWorldRules(now), createVillageArchive(now), createCalendarFestivals(now), createProductionPartners(now)]
+}
+
 export function createMistvaleDefaults(): MistvaleTavernDefaults {
   const now = Date.now()
   const presetSeed = createDefaultPreset()
   const presetId = 'mistvale-preset-narrative'
-  const lorebooks = [createWorldRules(now), createVillageArchive(now), createCalendarFestivals(now), createProductionPartners(now)]
+  const mergedLorebook = consolidateMistvaleLorebooks(createMistvaleLorebookSections(now), now)
+  if (!mergedLorebook) throw new Error('默认世界书合并失败')
+  const lorebooks = [mergedLorebook]
   const settings: TavernSettings = {
     key: 'mistvale-settings',
     api: {
@@ -359,4 +375,4 @@ export function createMistvaleDefaults(): MistvaleTavernDefaults {
   }
 }
 
-export const MISTVALE_LOREBOOK_IDS = [WORLD_RULES_ID, VILLAGE_ARCHIVE_ID, CALENDAR_FESTIVALS_ID, PRODUCTION_PARTNERS_ID] as const
+export const MISTVALE_LOREBOOK_IDS = [WORLD_RULES_ID] as const

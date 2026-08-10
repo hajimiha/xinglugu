@@ -5,7 +5,6 @@ import { exportPreset, exportToJson, importPreset } from '../../../sillytavern/i
 import {
   getPresetPromptDefinitions,
   getPresetPromptOrder,
-  getPresetPromptOrderGroups,
   updatePresetPrompt,
   updatePresetPromptOrder,
 } from '../../../sillytavern/preset-compat'
@@ -20,7 +19,6 @@ export function PresetPanel() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const original = tavern.presets.find((preset) => preset.id === selectedId) ?? null
   const [draft, setDraft] = useState<ChatPreset | null>(null)
-  const [selectedCharacterId, setSelectedCharacterId] = useState<number | null>(null)
   const [pendingDelete, setPendingDelete] = useState(false)
   const [notice, setNotice] = useState('')
 
@@ -29,12 +27,10 @@ export function PresetPanel() {
     if (!original) return
     const next = structuredClone(original)
     setDraft(next)
-    setSelectedCharacterId(getPresetPromptOrder(next.settings).characterId)
   }, [original?.id])
 
   const dirty = useMemo(() => !!draft && (!original || JSON.stringify(draft) !== JSON.stringify(original)), [draft, original])
-  const groups = useMemo(() => draft ? getPresetPromptOrderGroups(draft.settings) : [], [draft])
-  const selectedOrder = useMemo(() => draft ? getPresetPromptOrder(draft.settings, selectedCharacterId) : { characterId: null, items: [] }, [draft, selectedCharacterId])
+  const selectedOrder = useMemo(() => draft ? getPresetPromptOrder(draft.settings) : { characterId: null, items: [] }, [draft])
   const prompts = useMemo(() => draft ? getPresetPromptDefinitions(draft.settings) : [], [draft])
   const mainPrompt = prompts.find((prompt) => prompt.identifier === 'main')
   const scenarioPrompt = prompts.find((prompt) => prompt.identifier === 'scenario')
@@ -49,7 +45,6 @@ export function PresetPanel() {
     const next = { ...seed, id: crypto.randomUUID(), name: `叙事预设 ${tavern.presets.length + 1}`, createdAt: now, updatedAt: now }
     setSelectedId(next.id)
     setDraft(next)
-    setSelectedCharacterId(null)
   }
   const save = async () => {
     if (!draft) return
@@ -76,7 +71,6 @@ export function PresetPanel() {
       await tavern.savePreset(next)
       setSelectedId(next.id)
       setDraft(next)
-      setSelectedCharacterId(order.characterId)
       setNotice(`已导入“${next.name}”：${order.items.length} 个顺序项，${order.items.filter((item) => item.enabled !== false).length} 个已启用`)
     } catch (error) {
       const message = error instanceof Error ? error.message : '文件内容无法解析'
@@ -103,7 +97,7 @@ export function PresetPanel() {
           ['openai_max_tokens', '最大回复长度', 1, undefined, 1],
         ].map(([key, label, min, max, step]) => <label key={String(key)}><span>{label}</span><input id={`preset-generation-${String(key)}-${draft.id}`} aria-label={`预设${label}`} type="text" inputMode={Number(min) < 0 || Number(step) < 1 ? 'decimal' : 'numeric'} data-min={min} data-max={max} data-step={step} value={typeof draft.settings[String(key)] === 'number' || typeof draft.settings[String(key)] === 'string' ? String(draft.settings[String(key)]) : ''} placeholder="使用接口设置" onChange={(event) => patch({ [String(key)]: event.target.value || undefined })} onBlur={(event) => { const value = Number(event.target.value); if (event.target.value.trim() && Number.isFinite(value)) patch({ [String(key)]: value }) }} /></label>)}<label className="preset-stream-setting"><input id={`preset-generation-stream-${draft.id}`} type="checkbox" checked={typeof draft.settings.stream_openai === 'boolean' ? draft.settings.stream_openai : tavern.settings?.api.streaming ?? true} onChange={(event) => patch({ stream_openai: event.target.checked })} /><span>流式传输</span></label></div></section>
         <div className="preset-copy-grid"><label><span>主叙事规则</span><textarea id={`preset-main-${draft.id}`} rows={5} value={directMain || mainPrompt?.content || ''} onChange={(event) => directMain || !mainPrompt ? patch({ main: event.target.value }) : replaceSettings(updatePresetPrompt(draft.settings, 'main', { content: event.target.value }))} /></label><label><span>场景格式</span><textarea id={`preset-scenario-${draft.id}`} rows={5} value={directScenario || scenarioPrompt?.content || ''} onChange={(event) => directScenario || !scenarioPrompt ? patch({ scenario: event.target.value }) : replaceSettings(updatePresetPrompt(draft.settings, 'scenario', { content: event.target.value }))} /></label></div>
-        <div className="prompt-order-section"><header><div><span>PROMPT ORDER</span><h4>上下文装配顺序</h4></div><div className="prompt-order-slot-tools">{groups.length > 1 && <label htmlFor={`preset-character-slot-${draft.id}`}><span>预设角色槽位</span><select id={`preset-character-slot-${draft.id}`} value={selectedOrder.characterId ?? ''} onChange={(event) => setSelectedCharacterId(Number(event.target.value))}>{groups.map((group) => <option key={group.character_id} value={group.character_id}>{group.character_id}{group.character_id === 100001 ? ' · 默认' : ''}</option>)}</select></label>}<small>关闭项目会保留其位置与正文，导出仍兼容 SillyTavern。</small></div></header><PromptOrderEditor
+        <div className="prompt-order-section"><header><div><span>PROMPT ORDER</span><h4>上下文装配顺序</h4></div><div className="prompt-order-slot-tools"><small>自动使用默认顺序组；关闭项目会保留其位置与正文，其他分组也会在导出时完整保留。</small></div></header><PromptOrderEditor
           value={selectedOrder.items}
           prompts={prompts}
           onChange={(items) => replaceSettings(updatePresetPromptOrder(draft.settings, selectedOrder.characterId, items))}

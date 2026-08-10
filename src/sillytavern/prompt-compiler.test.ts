@@ -126,7 +126,7 @@ describe('严格酒馆提示词编译器', () => {
   })
 
   it('泛化首轮输入也会以当前角色名命中她的人物世界书档案', () => {
-    const archive = createMistvaleDefaults().lorebooks.find((book) => book.id === 'mistvale-village-archive')!
+    const archive = createMistvaleDefaults().lorebooks[0]
     const result = compileTavernTurn({
       userInput: '你好。',
       history: [],

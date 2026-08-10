@@ -4,7 +4,14 @@ import type { MistvaleTavernDatabase } from './database'
 import { createTavernDatabase } from './database'
 import { createTavernRepository } from './repository'
 import { createContentPack } from './content-pack'
-import { createMistvaleDefaults, PRODUCTION_PARTNERS_ID } from './defaults'
+import {
+  createMistvaleDefaults,
+  createMistvaleLorebookSections,
+  DEFAULT_CONTENT_VERSION,
+  LEGACY_MISTVALE_LOREBOOK_IDS,
+  PRODUCTION_PARTNERS_ID,
+  WORLD_RULES_ID,
+} from './defaults'
 
 let database: MistvaleTavernDatabase | undefined
 
@@ -28,10 +35,80 @@ describe('雾灯谷酒馆仓储', () => {
 
     await repository.initialize()
     expect((await repository.getCharacter(edited.id))?.personality).toBe('玩家自定义性格')
-    expect(await repository.listLorebooks()).toHaveLength(4)
+    expect(await repository.listLorebooks()).toHaveLength(1)
     const settings = await repository.getSettings()
     expect(settings).not.toHaveProperty('adapterMode')
     expect(settings.api.model).toBe('deepseek-v4-flash')
+  })
+
+  it('把版本六的四册默认世界书逐字段合并并迁移全部绑定', async () => {
+    database = createTavernDatabase(`mistvale-consolidation-${crypto.randomUUID()}`)
+    const repository = createTavernRepository(database)
+    await repository.initialize()
+    const settings = await repository.getSettings()
+    const loran = (await repository.listCharacters()).find((card) => card.npcId === 'loran')!
+    const sourceBooks = createMistvaleLorebookSections(100).map((book, index) => ({
+      ...book,
+      updatedAt: 200 + index,
+      entries: [
+        ...book.entries,
+        { ...book.entries[0], id: `player-entry-${index}`, comment: `玩家条目 ${index}`, content: `玩家保留正文 ${index}` },
+      ],
+    }))
+    const expectedEntries = structuredClone(sourceBooks.flatMap((book) => book.entries))
+    const playerBook = {
+      ...sourceBooks[0],
+      id: 'player-custom-book',
+      name: '玩家自建世界书',
+      entries: [{ ...sourceBooks[0].entries[0], id: 'player-only-entry', content: '不得被迁移修改。' }],
+    }
+
+    await database.lorebooks.clear()
+    await database.lorebooks.bulkPut([...sourceBooks, playerBook])
+    await database.characters.put({
+      ...loran,
+      lorebookIds: [...LEGACY_MISTVALE_LOREBOOK_IDS, 'player-custom-book', WORLD_RULES_ID],
+    })
+    await database.sessions.put({
+      id: 'consolidation-session', name: '合册会话', npcId: 'loran', characterId: loran.id, characterName: '洛岚', userName: '旅行者', presetId: null,
+      lorebookIds: [...LEGACY_MISTVALE_LOREBOOK_IDS, 'player-custom-book', WORLD_RULES_ID], variables: {}, messages: [], createdAt: 1, updatedAt: 1,
+    })
+    await database.settings.put({
+      ...settings,
+      defaultContentVersion: 6,
+      activeLorebookIds: [...LEGACY_MISTVALE_LOREBOOK_IDS, 'player-custom-book', WORLD_RULES_ID],
+    })
+
+    await repository.initialize()
+
+    const merged = (await repository.getLorebook(WORLD_RULES_ID))!
+    expect(merged.name).toBe('雾灯谷·全域设定集')
+    expect(merged.entries).toEqual(expectedEntries)
+    expect(await repository.getLorebook('mistvale-village-archive')).toBeUndefined()
+    expect(await repository.getLorebook('mistvale-calendar-festivals')).toBeUndefined()
+    expect(await repository.getLorebook('mistvale-production-partners')).toBeUndefined()
+    expect((await repository.getLorebook('player-custom-book'))?.entries[0].content).toBe('不得被迁移修改。')
+    expect((await repository.getCharacter(loran.id))?.lorebookIds).toEqual([WORLD_RULES_ID, 'player-custom-book'])
+    expect((await repository.getSession('consolidation-session'))?.lorebookIds).toEqual([WORLD_RULES_ID, 'player-custom-book'])
+    expect((await repository.getSettings()).activeLorebookIds).toEqual([WORLD_RULES_ID, 'player-custom-book'])
+    expect((await repository.getSettings()).defaultContentVersion).toBe(DEFAULT_CONTENT_VERSION)
+  })
+
+  it('合册时不会复活版本六玩家主动删除的默认册', async () => {
+    database = createTavernDatabase(`mistvale-consolidation-deleted-${crypto.randomUUID()}`)
+    const repository = createTavernRepository(database)
+    await repository.initialize()
+    const settings = await repository.getSettings()
+    const sourceBooks = createMistvaleLorebookSections(100).filter((book) => book.id !== 'mistvale-calendar-festivals')
+
+    await database.lorebooks.clear()
+    await database.lorebooks.bulkPut(sourceBooks)
+    await database.settings.put({ ...settings, defaultContentVersion: 6 })
+    await repository.initialize()
+
+    const mergedIds = (await repository.getLorebook(WORLD_RULES_ID))!.entries.map((entry) => entry.id)
+    expect(mergedIds.some((id) => id.startsWith('mistvale-festival-'))).toBe(false)
+    expect(await repository.getLorebook('mistvale-calendar-festivals')).toBeUndefined()
   })
 
   it('读取旧版设置时补全 API 配置且不会凭空保存密钥', async () => {
@@ -124,13 +201,15 @@ describe('雾灯谷酒馆仓储', () => {
 
     await repository.initialize()
 
-    expect(await repository.getLorebook(calendarId)).toBeDefined()
-    expect(await repository.getLorebook('mistvale-world-rules')).toBeUndefined()
+    const merged = await repository.getLorebook(WORLD_RULES_ID)
+    expect(merged).toBeDefined()
+    expect(merged?.entries.some((entry) => entry.id.startsWith('mistvale-festival-'))).toBe(true)
+    expect(await repository.getLorebook(calendarId)).toBeUndefined()
     expect(await repository.getLorebook('mistvale-village-archive')).toBeUndefined()
-    expect((await repository.getCharacter(loran.id))?.lorebookIds).toContain(calendarId)
+    expect((await repository.getCharacter(loran.id))?.lorebookIds).toContain(WORLD_RULES_ID)
     expect((await repository.getCharacter(loran.id))?.personality).toBe(customPersonality)
-    expect((await repository.getSettings()).activeLorebookIds).toContain(calendarId)
-    expect((await repository.getSession('legacy-session'))?.lorebookIds).toContain(calendarId)
+    expect((await repository.getSettings()).activeLorebookIds).toContain(WORLD_RULES_ID)
+    expect((await repository.getSession('legacy-session'))?.lorebookIds).toContain(WORLD_RULES_ID)
   })
 
   it('从内容版本二只补入生产世界书与六位伙伴，并保留删除和自定义内容', async () => {
@@ -161,15 +240,17 @@ describe('雾灯谷酒馆仓储', () => {
 
     await repository.initialize()
 
-    expect(await repository.getLorebook(PRODUCTION_PARTNERS_ID)).toBeDefined()
-    expect(await repository.getLorebook('mistvale-world-rules')).toBeUndefined()
+    const merged = await repository.getLorebook(WORLD_RULES_ID)
+    expect(merged).toBeDefined()
+    expect(merged?.entries.find((entry) => entry.id === 'mistvale-production-chain')).toBeDefined()
+    expect(await repository.getLorebook(PRODUCTION_PARTNERS_ID)).toBeUndefined()
     expect(await repository.getLorebook('mistvale-village-archive')).toBeUndefined()
     expect((await repository.listCharacters()).filter((card) => card.tags.includes('共生伙伴'))).toHaveLength(6)
     expect((await repository.getCharacter(loran.id))?.personality).toBe('玩家自定义且必须保留')
     expect((await repository.getCharacter(loran.id))?.portraitSlots[0].source).toBe('/portraits/custom-loran.webp')
-    expect((await repository.getCharacter(loran.id))?.lorebookIds).toContain(PRODUCTION_PARTNERS_ID)
-    expect((await repository.getSettings()).activeLorebookIds).toContain(PRODUCTION_PARTNERS_ID)
-    expect((await repository.getSession('v2-session'))?.lorebookIds).toContain(PRODUCTION_PARTNERS_ID)
+    expect((await repository.getCharacter(loran.id))?.lorebookIds).toContain(WORLD_RULES_ID)
+    expect((await repository.getSettings()).activeLorebookIds).toContain(WORLD_RULES_ID)
+    expect((await repository.getSession('v2-session'))?.lorebookIds).toContain(WORLD_RULES_ID)
   })
 
   it('从内容版本三迁移旧五阶段立绘并保留角色自定义资料', async () => {
@@ -194,7 +275,7 @@ describe('雾灯谷酒馆仓储', () => {
       { id: 'portrait-0-100', minAffinity: 0, maxAffinity: 100, source: '/portraits/legacy-loran.webp' },
     ])
     expect(migrated).not.toHaveProperty('portraitByAffinity')
-    expect((await repository.getSettings()).defaultContentVersion).toBe(6)
+    expect((await repository.getSettings()).defaultContentVersion).toBe(DEFAULT_CONTENT_VERSION)
   })
 
   it('将旧会话迁移为跟随当前激活预设，避免继续发送创建会话时的旧预设', async () => {
@@ -229,34 +310,38 @@ describe('雾灯谷酒馆仓储', () => {
     const repository = createTavernRepository(database)
     await repository.initialize()
     const settings = await repository.getSettings()
-    const worldRules = (await repository.getLorebook('mistvale-world-rules'))!
-    const villageArchive = (await repository.getLorebook('mistvale-village-archive'))!
+    const sourceBooks = createMistvaleLorebookSections(100)
+    const worldRules = sourceBooks.find((book) => book.id === WORLD_RULES_ID)!
+    const villageArchive = sourceBooks.find((book) => book.id === 'mistvale-village-archive')!
     const customEntry = { ...worldRules.entries[0], id: 'player-custom-rule', comment: '玩家自定义规则', content: '必须保留这条内容。' }
     const customAffinity = { ...worldRules.entries.find((item) => item.id === 'mistvale-rule-affinity')!, content: '玩家重写的关系规则也必须保留。' }
     const customMina = { ...villageArchive.entries.find((item) => item.id === 'mistvale-person-mina')!, content: '玩家重写的弥奈人物档案也必须保留。' }
 
-    await database.lorebooks.put({
-      ...worldRules,
-      entries: [...worldRules.entries.filter((item) => !['mistvale-rule-fishing', 'mistvale-rule-gifts', 'mistvale-rule-affinity'].includes(item.id)), customAffinity, customEntry],
-    })
-    await database.lorebooks.put({
-      ...villageArchive,
-      entries: [...villageArchive.entries.filter((item) => item.id !== 'mistvale-person-mina'), customMina, { ...customEntry, id: 'player-custom-person', comment: '玩家自定义人物' }],
-    })
+    await database.lorebooks.clear()
+    await database.lorebooks.bulkPut(sourceBooks.map((book) => book.id === WORLD_RULES_ID
+      ? {
+          ...worldRules,
+          entries: [...worldRules.entries.filter((item) => !['mistvale-rule-fishing', 'mistvale-rule-gifts', 'mistvale-rule-affinity'].includes(item.id)), customAffinity, customEntry],
+        }
+      : book.id === villageArchive.id
+        ? {
+            ...villageArchive,
+            entries: [...villageArchive.entries.filter((item) => item.id !== 'mistvale-person-mina'), customMina, { ...customEntry, id: 'player-custom-person', comment: '玩家自定义人物' }],
+          }
+        : book))
     await database.settings.put({ ...settings, defaultContentVersion: 5 })
 
     await repository.initialize()
 
     const migratedRules = (await repository.getLorebook('mistvale-world-rules'))!
-    const migratedArchive = (await repository.getLorebook('mistvale-village-archive'))!
     expect(migratedRules.entries.find((item) => item.id === 'mistvale-rule-fishing')?.content).toContain('雾湾巨鲶')
     expect(migratedRules.entries.find((item) => item.id === 'mistvale-rule-gifts')?.content).toContain('莓果挞')
     expect(migratedRules.entries.find((item) => item.id === 'mistvale-rule-affinity')?.content).toBe('玩家重写的关系规则也必须保留。')
     expect(migratedRules.entries.find((item) => item.id === 'player-custom-rule')?.content).toBe('必须保留这条内容。')
     expect(migratedRules.entries.find((item) => item.id === 'mistvale-rule-gifts')?.content).toContain('弥奈：月尾鱼、潮纹鲈')
-    expect(migratedArchive.entries.find((item) => item.id === 'mistvale-person-mina')?.content).toBe('玩家重写的弥奈人物档案也必须保留。')
-    expect(migratedArchive.entries.find((item) => item.id === 'player-custom-person')).toBeDefined()
-    expect((await repository.getSettings()).defaultContentVersion).toBe(6)
+    expect(migratedRules.entries.find((item) => item.id === 'mistvale-person-mina')?.content).toBe('玩家重写的弥奈人物档案也必须保留。')
+    expect(migratedRules.entries.find((item) => item.id === 'player-custom-person')).toBeDefined()
+    expect((await repository.getSettings()).defaultContentVersion).toBe(DEFAULT_CONTENT_VERSION)
   })
 
   it('只保留最近二十条无密钥的出站请求审计', async () => {

@@ -66,9 +66,10 @@ describe('酒馆中枢', () => {
   it('通过文件输入导入并展示 SillyTavern 分组预设', async () => {
     const user = userEvent.setup()
     database = createTavernDatabase(`mistvale-preset-import-${crypto.randomUUID()}`)
+    const repository = createTavernRepository(database)
     render(
       <GameProvider>
-        <TavernProvider repository={createTavernRepository(database)}>
+        <TavernProvider repository={repository}>
           <TavernHubModal onClose={() => undefined} />
         </TavernProvider>
       </GameProvider>,
@@ -97,6 +98,10 @@ describe('酒馆中枢', () => {
     expect(screen.getByText('1 个已启用')).toBeVisible()
     expect(screen.getByText('主提示词')).toBeVisible()
     expect(screen.getByText('模型回复')).toBeVisible()
+    expect(screen.queryByText('预设角色槽位')).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: '预设角色槽位' })).not.toBeInTheDocument()
+    const imported = (await repository.listPresets()).find((preset) => preset.name === '夏瑾 天琴座 Beta 1.0')
+    expect(imported?.settings.prompt_order).toEqual(JSON.parse(fileSource).prompt_order)
   })
 
   it('变量中心支持类型、全局或会话作用域、范围校验与 JSON 导入导出', async () => {

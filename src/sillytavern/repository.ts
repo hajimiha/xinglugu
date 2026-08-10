@@ -1,4 +1,4 @@
-import { CALENDAR_FESTIVALS_ID, createMistvaleDefaults, DEFAULT_CONTENT_VERSION, MONSTER_GIRL_CARD_IDS, PRODUCTION_PARTNERS_ID, WORLD_RULES_ID } from './defaults'
+import { createMistvaleDefaults, createMistvaleLorebookSections, DEFAULT_CONTENT_VERSION, MONSTER_GIRL_CARD_IDS } from './defaults'
 import { normalizeTavernSettings } from './api-config'
 import type { MistvaleTavernDatabase } from './database'
 import { tavernDatabase } from './database'
@@ -6,6 +6,14 @@ import type { CharacterCard, ChatPreset, ChatSession, Lorebook, TavernRequestAud
 import { loadRepositoryContentPack, mergeById, type TavernContentPack } from './content-pack'
 import { createDefaultPortraitSlots, legacyPortraitsToSlots, parsePortraitSlots } from './portrait-slots'
 import { parseVariableDefinitions } from './variable-definitions'
+import {
+  CALENDAR_FESTIVALS_ID,
+  consolidateMistvaleLorebooks,
+  LEGACY_MISTVALE_LOREBOOK_IDS,
+  mapConsolidatedLorebookIds,
+  PRODUCTION_PARTNERS_ID,
+  WORLD_RULES_ID,
+} from './lorebook-consolidation'
 
 export type TavernContentPackLoader = () => Promise<TavernContentPack | null>
 const defaultContentPackLoader: TavernContentPackLoader = import.meta.env.MODE === 'test'
@@ -78,6 +86,7 @@ class DexieTavernRepository implements TavernRepository {
 
   async initialize(): Promise<void> {
     const defaults = createMistvaleDefaults()
+    const defaultLorebookSections = createMistvaleLorebookSections()
     const contentPack = await this.contentPackLoader()
     await this.database.transaction(
       'rw',
@@ -95,6 +104,7 @@ class DexieTavernRepository implements TavernRepository {
         const shouldMigratePortraitSlots = storedContentVersion < 4
         const shouldMigratePresetBinding = storedContentVersion < 5
         const shouldMigrateFishingAndGifts = storedContentVersion < 6
+        const shouldConsolidateLorebooks = storedContentVersion < 7
         const shouldMigrateDefaults = storedContentVersion < DEFAULT_CONTENT_VERSION
         const migrationLorebookIds = [
           ...(shouldMigrateCalendar ? [CALENDAR_FESTIVALS_ID] : []),
@@ -105,12 +115,12 @@ class DexieTavernRepository implements TavernRepository {
         } else {
           if (shouldMigrateDefaults) {
             const existingIds = new Set((await this.database.lorebooks.toArray()).map((book) => book.id))
-            const missingMigrationBooks = defaults.lorebooks.filter((book) => migrationLorebookIds.includes(book.id) && !existingIds.has(book.id))
+            const missingMigrationBooks = defaultLorebookSections.filter((book) => migrationLorebookIds.includes(book.id) && !existingIds.has(book.id))
             if (missingMigrationBooks.length) await this.database.lorebooks.bulkAdd(missingMigrationBooks)
           }
           if (shouldMigrateFishingAndGifts) {
             const storedBook = await this.database.lorebooks.get(WORLD_RULES_ID)
-            const defaultBook = defaults.lorebooks.find((book) => book.id === WORLD_RULES_ID)
+            const defaultBook = defaultLorebookSections.find((book) => book.id === WORLD_RULES_ID)
             if (storedBook && defaultBook) {
               const existingEntryIds = new Set(storedBook.entries.map((item) => item.id))
               const newEntries = defaultBook.entries.filter((item) => (
@@ -126,6 +136,17 @@ class DexieTavernRepository implements TavernRepository {
             }
           }
           if (shouldPublishPack && contentPack?.lorebooks.length) await this.database.lorebooks.bulkPut(contentPack.lorebooks)
+          if (shouldConsolidateLorebooks) {
+            const storedSections = (await this.database.lorebooks.bulkGet([...LEGACY_MISTVALE_LOREBOOK_IDS]))
+              .filter((book): book is Lorebook => Boolean(book))
+            const merged = consolidateMistvaleLorebooks(storedSections)
+            if (merged) {
+              await this.database.lorebooks.put(merged)
+              await this.database.lorebooks.bulkDelete(
+                LEGACY_MISTVALE_LOREBOOK_IDS.filter((id) => id !== WORLD_RULES_ID),
+              )
+            }
+          }
         }
         if ((await this.database.presets.count()) === 0) {
           await this.database.presets.bulkAdd(mergeById(defaults.presets, contentPack?.presets ?? []))
@@ -151,6 +172,11 @@ class DexieTavernRepository implements TavernRepository {
               const migratedPortraits = (await this.database.characters.toArray()).map(normalizeStoredCharacter)
               if (migratedPortraits.length) await this.database.characters.bulkPut(migratedPortraits)
             }
+            if (shouldConsolidateLorebooks) {
+              const consolidatedCharacters = (await this.database.characters.toArray())
+                .map((card) => ({ ...card, lorebookIds: mapConsolidatedLorebookIds(card.lorebookIds) }))
+              if (consolidatedCharacters.length) await this.database.characters.bulkPut(consolidatedCharacters)
+            }
           }
         }
         if ((await this.database.sessions.count()) === 0 && defaults.sessions.length > 0) {
@@ -167,9 +193,14 @@ class DexieTavernRepository implements TavernRepository {
               )
               const next = {
                 ...session,
-                ...(shouldAddLorebooks
-                  ? { lorebookIds: Array.from(new Set([...session.lorebookIds, ...migrationLorebookIds])) }
-                  : {}),
+                lorebookIds: shouldConsolidateLorebooks
+                  ? mapConsolidatedLorebookIds([
+                      ...session.lorebookIds,
+                      ...(shouldAddLorebooks ? migrationLorebookIds : []),
+                    ])
+                  : (shouldAddLorebooks
+                      ? Array.from(new Set([...session.lorebookIds, ...migrationLorebookIds]))
+                      : session.lorebookIds),
                 ...(shouldMigratePresetBinding && !session.presetBinding
                   ? { presetId: null, presetBinding: { mode: 'follow-active' as const } }
                   : {}),
@@ -186,7 +217,9 @@ class DexieTavernRepository implements TavernRepository {
             ...(shouldPublishPack && contentPack ? { contentPackVersion: contentPack.contentVersion } : {}),
             ...(shouldMigrateDefaults ? {
               defaultContentVersion: DEFAULT_CONTENT_VERSION,
-              activeLorebookIds: Array.from(new Set([...(storedSettings?.activeLorebookIds ?? []), ...migrationLorebookIds])),
+              activeLorebookIds: shouldConsolidateLorebooks
+                ? mapConsolidatedLorebookIds([...(storedSettings?.activeLorebookIds ?? []), ...migrationLorebookIds])
+                : Array.from(new Set([...(storedSettings?.activeLorebookIds ?? []), ...migrationLorebookIds])),
             } : {}),
           })
         }

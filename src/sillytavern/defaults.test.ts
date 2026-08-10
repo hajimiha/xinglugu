@@ -1,15 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import { npcs } from '../game/data'
 import { DEFAULT_TAGS } from './types'
-import { createMistvaleDefaults, DEFAULT_CONTENT_VERSION, PRODUCTION_PARTNERS_ID } from './defaults'
+import { createMistvaleDefaults, createMistvaleLorebookSections, DEFAULT_CONTENT_VERSION, WORLD_RULES_ID } from './defaults'
 
 describe('雾灯谷酒馆默认内容', () => {
   it('创建完整且默认等待模型密钥的酒馆种子', () => {
     const defaults = createMistvaleDefaults()
+    const sourceBooks = createMistvaleLorebookSections(123)
     const comments = defaults.lorebooks.flatMap((book) => book.entries.map((entry) => entry.comment))
 
     expect(defaults.characters).toHaveLength(21)
-    expect(defaults.lorebooks).toHaveLength(4)
+    expect(defaults.lorebooks).toHaveLength(1)
+    expect(defaults.lorebooks[0]).toMatchObject({ id: WORLD_RULES_ID, name: '雾灯谷·全域设定集' })
+    expect(defaults.lorebooks[0].entries).toEqual(sourceBooks.flatMap((book) => book.entries))
+    expect(defaults.characters.every((card) => JSON.stringify(card.lorebookIds) === JSON.stringify([WORLD_RULES_ID]))).toBe(true)
+    expect(defaults.settings.activeLorebookIds).toEqual([WORLD_RULES_ID])
     expect(defaults.characters.slice(0, 15).map((card) => card.npcId)).toEqual(npcs.map((npc) => npc.id))
     expect(defaults.characters.every((card) => card.id === `mistvale-character-${card.npcId}`)).toBe(true)
     expect(comments).toEqual(expect.arrayContaining(['五行克制', '每日精力', '地点营业']))
@@ -24,13 +29,13 @@ describe('雾灯谷酒馆默认内容', () => {
     expect(defaults.presets[0].settings).not.toHaveProperty('apiKey')
     expect(defaults.presets[0].description).toContain('模型')
     expect(defaults.presets[0].description).not.toContain('本地剧情引擎')
-    expect(DEFAULT_CONTENT_VERSION).toBe(6)
+    expect(DEFAULT_CONTENT_VERSION).toBe(7)
   })
 
   it('把完整鱼类图鉴、通用礼物与每位角色的偏爱写入世界书', () => {
     const defaults = createMistvaleDefaults()
-    const worldRules = defaults.lorebooks.find((book) => book.id === 'mistvale-world-rules')
-    const villageArchive = defaults.lorebooks.find((book) => book.id === 'mistvale-village-archive')
+    const worldRules = defaults.lorebooks[0]
+    const villageArchive = defaults.lorebooks[0]
     const fishingEntry = worldRules?.entries.find((entry) => entry.id === 'mistvale-rule-fishing')
     const giftEntry = worldRules?.entries.find((entry) => entry.id === 'mistvale-rule-gifts')
     const minaEntry = villageArchive?.entries.find((entry) => entry.id === 'mistvale-person-mina')
@@ -46,7 +51,7 @@ describe('雾灯谷酒馆默认内容', () => {
 
   it('提供六位共生伙伴角色卡与完整生产世界书', () => {
     const defaults = createMistvaleDefaults()
-    const productionBook = defaults.lorebooks.find((book) => book.id === PRODUCTION_PARTNERS_ID)
+    const productionBook = defaults.lorebooks[0]
     const partnerIds = ['cow-girl', 'bee-girl', 'spider-girl', 'fire-slime-girl', 'water-slime-girl', 'dragon-girl']
     const partnerCards = defaults.characters.filter((card) => partnerIds.includes(card.npcId))
 
@@ -57,23 +62,23 @@ describe('雾灯谷酒馆默认内容', () => {
     expect(productionBook?.entries.find((item) => item.comment === '龙娘')?.content).toContain('第20层')
     expect(partnerCards).toHaveLength(6)
     expect(partnerCards.every((card) => card.tags.includes('女性角色') && card.tags.includes('共生伙伴'))).toBe(true)
-    expect(partnerCards.every((card) => card.lorebookIds.includes(PRODUCTION_PARTNERS_ID))).toBe(true)
+    expect(partnerCards.every((card) => card.lorebookIds.includes(WORLD_RULES_ID))).toBe(true)
     expect(partnerCards.every((card) => card.portraitSlots.length === 1)).toBe(true)
     expect(partnerCards.every((card) => card.portraitSlots[0].minAffinity === 0 && card.portraitSlots[0].maxAffinity === 100)).toBe(true)
-    expect(defaults.characters.every((card) => card.lorebookIds.includes(PRODUCTION_PARTNERS_ID))).toBe(true)
-    expect(defaults.settings.activeLorebookIds).toContain(PRODUCTION_PARTNERS_ID)
+    expect(defaults.characters.every((card) => card.lorebookIds.includes(WORLD_RULES_ID))).toBe(true)
+    expect(defaults.settings.activeLorebookIds).toEqual([WORLD_RULES_ID])
   })
 
   it('提供完整岁时世界书并挂载到每张角色卡', () => {
     const defaults = createMistvaleDefaults()
-    const calendarBook = defaults.lorebooks.find((book) => book.id === 'mistvale-calendar-festivals')
+    const calendarBook = defaults.lorebooks[0]
 
     expect(calendarBook?.entries.filter((entry) => entry.id.startsWith('mistvale-festival-'))).toHaveLength(12)
     expect(calendarBook?.entries.find((entry) => entry.comment === '迎岁灯会')?.content).toContain('点灯祈愿')
     expect(calendarBook?.entries.find((entry) => entry.comment === '迎岁灯会')?.content).toContain('壁炉共餐')
-    expect(defaults.characters.every((card) => card.lorebookIds.includes('mistvale-calendar-festivals'))).toBe(true)
-    expect(defaults.settings.activeLorebookIds).toContain('mistvale-calendar-festivals')
-    expect(defaults.lorebooks.find((book) => book.id === 'mistvale-village-archive')?.entries.find((entry) => entry.comment === '柳安档案')?.content).toContain('4月12日')
+    expect(defaults.characters.every((card) => card.lorebookIds.includes(WORLD_RULES_ID))).toBe(true)
+    expect(defaults.settings.activeLorebookIds).toEqual([WORLD_RULES_ID])
+    expect(defaults.lorebooks[0].entries.find((entry) => entry.comment === '柳安档案')?.content).toContain('4月12日')
   })
 
   it('为角色卡绑定所在地、首句和世界书', () => {
