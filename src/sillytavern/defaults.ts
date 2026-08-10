@@ -222,7 +222,8 @@ function createWorldRules(now: number): Lorebook {
       entry('mistvale-rule-business-hours', '地点营业', ['营业', '开放', '地点', '商店', '医院'], '各地点有独立营业时间与步行耗时。进入地点前应尊重游戏当前时间，非营业时段保留旅行选择但不可完成店内交易。', { order: 30 }),
       entry('mistvale-rule-skills', '技能成长', ['钓鱼', '农耕', '挖矿', '战斗', '魔法'], '钓鱼、农耕、挖矿等级提升对应收益；战斗等级提升生命与物理攻击；魔法等级提升魔力上限与魔法伤害，并限制图书馆可学法术等级。', { order: 40 }),
       entry('mistvale-rule-mine', '矿洞规则', ['矿洞', '电梯', '怪物', '挖矿'], '矿洞每层可挖矿，层数越深矿物越丰富。普通层存在怪物并进入回合制战斗；每逢五层为无怪电梯层，可返回或之后直达。战败会在次日复活。', { order: 50 }),
-      entry('mistvale-rule-affinity', '关系记忆', ['好感', '礼物', '关系', '记忆', '莓果挞', '月铃花'], `NPC好感分初识、相识、信赖、亲密、羁绊五阶段。对话需尊重当前阶段与历史记忆，不提前泄露高好感内容；喜爱礼物与完成委托可提升关系。${UNIVERSAL_GIFT_IDS.map(getItemName).join('、')}是所有角色都认可的通用礼物；月铃花只属于洛岚与芙蕾雅的个人偏爱，不应擅自扩展给其他角色。`, { order: 60 }),
+      entry('mistvale-rule-affinity', '关系记忆', ['好感', '礼物', '关系', '记忆'], 'NPC好感分初识、相识、信赖、亲密、羁绊五阶段。对话需尊重当前阶段与历史记忆，不提前泄露高好感内容；喜爱礼物与完成委托可提升关系。', { order: 60 }),
+      entry('mistvale-rule-gifts', '雾灯谷礼物偏好', ['礼物', '偏爱', '莓果挞', '月铃花', ...npcs.map((npc) => npc.name), ...Object.values(FISH_CATALOG).map((fish) => fish.name)], `${UNIVERSAL_GIFT_IDS.map(getItemName).join('、')}是所有角色都认可的通用礼物；月铃花只属于洛岚与芙蕾雅的个人偏爱。居民个人偏好：${npcs.map((npc) => `${npc.name}：${npc.preferredGifts.map(getItemName).join('、')}`).join('；')}。`, { order: 62 }),
       entry('mistvale-rule-fishing', '雾灯谷鱼类图鉴', ['钓鱼', ...Object.values(FISH_CATALOG).map((fish) => fish.name)], `雾灯谷共有五种常见鱼类：${Object.values(FISH_CATALOG).map((fish) => `${fish.name}为${fish.size === 'small' ? '小型' : fish.size === 'medium' ? '中型' : '大型'}鱼，可从${fish.sources.join('、')}获得，主要用途是${fish.uses.join('、')}`).join('；')}。大型鱼更稀有且售价更高。`, { order: 65 }),
     ],
   }

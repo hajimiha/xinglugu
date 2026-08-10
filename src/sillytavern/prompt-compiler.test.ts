@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ChatPreset, ChatSession, TavernSettings } from './types'
 import { compileTavernTurn, resolveSessionPreset } from './prompt-compiler'
+import { createMistvaleDefaults } from './defaults'
 
 const now = 1
 
@@ -122,5 +123,21 @@ describe('严格酒馆提示词编译器', () => {
     })
     expect(JSON.stringify(result.messages)).not.toContain('{{')
     expect(result.macroVariables).toMatchObject({ tone: '温柔' })
+  })
+
+  it('泛化首轮输入也会以当前角色名命中她的人物世界书档案', () => {
+    const archive = createMistvaleDefaults().lorebooks.find((book) => book.id === 'mistvale-village-archive')!
+    const result = compileTavernTurn({
+      userInput: '你好。',
+      history: [],
+      preset: preset('generic-first-turn', '泛化首轮预设'),
+      lorebooks: [archive],
+      userName: '镜川',
+      characterName: '洛岚',
+      variables: {},
+      extraVariables: { currentLocation: '图书馆' },
+    })
+
+    expect(result.matchedEntries.map((match) => match.entry.id)).toContain('mistvale-person-loran')
   })
 })

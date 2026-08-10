@@ -72,7 +72,7 @@ export function compileTavernTurn(input: PromptCompileInput): PromptCompilation 
     .filter((value): value is string | number => typeof value === 'string' || typeof value === 'number')
     .map(String)
     .join(' ')
-  const scanText = `${input.userInput} ${input.history.slice(-3).map((message) => message.content).join(' ')} ${variableScanText}`
+  const scanText = `${input.characterName} ${input.userInput} ${input.history.slice(-3).map((message) => message.content).join(' ')} ${variableScanText}`
   for (const lorebook of input.lorebooks) {
     allMatchedEntries.push(...createLorebookEngine(lorebook).recursiveScan(scanText, 3))
   }

@@ -232,14 +232,16 @@ describe('雾灯谷酒馆仓储', () => {
     const worldRules = (await repository.getLorebook('mistvale-world-rules'))!
     const villageArchive = (await repository.getLorebook('mistvale-village-archive'))!
     const customEntry = { ...worldRules.entries[0], id: 'player-custom-rule', comment: '玩家自定义规则', content: '必须保留这条内容。' }
+    const customAffinity = { ...worldRules.entries.find((item) => item.id === 'mistvale-rule-affinity')!, content: '玩家重写的关系规则也必须保留。' }
+    const customMina = { ...villageArchive.entries.find((item) => item.id === 'mistvale-person-mina')!, content: '玩家重写的弥奈人物档案也必须保留。' }
 
     await database.lorebooks.put({
       ...worldRules,
-      entries: [...worldRules.entries.filter((item) => item.id !== 'mistvale-rule-fishing'), customEntry],
+      entries: [...worldRules.entries.filter((item) => !['mistvale-rule-fishing', 'mistvale-rule-gifts', 'mistvale-rule-affinity'].includes(item.id)), customAffinity, customEntry],
     })
     await database.lorebooks.put({
       ...villageArchive,
-      entries: [...villageArchive.entries, { ...customEntry, id: 'player-custom-person', comment: '玩家自定义人物' }],
+      entries: [...villageArchive.entries.filter((item) => item.id !== 'mistvale-person-mina'), customMina, { ...customEntry, id: 'player-custom-person', comment: '玩家自定义人物' }],
     })
     await database.settings.put({ ...settings, defaultContentVersion: 5 })
 
@@ -248,9 +250,11 @@ describe('雾灯谷酒馆仓储', () => {
     const migratedRules = (await repository.getLorebook('mistvale-world-rules'))!
     const migratedArchive = (await repository.getLorebook('mistvale-village-archive'))!
     expect(migratedRules.entries.find((item) => item.id === 'mistvale-rule-fishing')?.content).toContain('雾湾巨鲶')
-    expect(migratedRules.entries.find((item) => item.id === 'mistvale-rule-affinity')?.content).toContain('莓果挞')
+    expect(migratedRules.entries.find((item) => item.id === 'mistvale-rule-gifts')?.content).toContain('莓果挞')
+    expect(migratedRules.entries.find((item) => item.id === 'mistvale-rule-affinity')?.content).toBe('玩家重写的关系规则也必须保留。')
     expect(migratedRules.entries.find((item) => item.id === 'player-custom-rule')?.content).toBe('必须保留这条内容。')
-    expect(migratedArchive.entries.find((item) => item.id === 'mistvale-person-mina')?.content).toContain('月尾鱼')
+    expect(migratedRules.entries.find((item) => item.id === 'mistvale-rule-gifts')?.content).toContain('弥奈：月尾鱼、潮纹鲈')
+    expect(migratedArchive.entries.find((item) => item.id === 'mistvale-person-mina')?.content).toBe('玩家重写的弥奈人物档案也必须保留。')
     expect(migratedArchive.entries.find((item) => item.id === 'player-custom-person')).toBeDefined()
     expect((await repository.getSettings()).defaultContentVersion).toBe(6)
   })

@@ -1,4 +1,4 @@
-import { CALENDAR_FESTIVALS_ID, createMistvaleDefaults, DEFAULT_CONTENT_VERSION, MONSTER_GIRL_CARD_IDS, PRODUCTION_PARTNERS_ID, VILLAGE_ARCHIVE_ID, WORLD_RULES_ID } from './defaults'
+import { CALENDAR_FESTIVALS_ID, createMistvaleDefaults, DEFAULT_CONTENT_VERSION, MONSTER_GIRL_CARD_IDS, PRODUCTION_PARTNERS_ID, WORLD_RULES_ID } from './defaults'
 import { normalizeTavernSettings } from './api-config'
 import type { MistvaleTavernDatabase } from './database'
 import { tavernDatabase } from './database'
@@ -109,19 +109,20 @@ class DexieTavernRepository implements TavernRepository {
             if (missingMigrationBooks.length) await this.database.lorebooks.bulkAdd(missingMigrationBooks)
           }
           if (shouldMigrateFishingAndGifts) {
-            const defaultBooks = new Map(defaults.lorebooks.map((book) => [book.id, book]))
-            for (const bookId of [WORLD_RULES_ID, VILLAGE_ARCHIVE_ID]) {
-              const storedBook = await this.database.lorebooks.get(bookId)
-              const defaultBook = defaultBooks.get(bookId)
-              if (!storedBook || !defaultBook) continue
-              const replacementEntries = bookId === WORLD_RULES_ID
-                ? defaultBook.entries.filter((item) => ['mistvale-rule-affinity', 'mistvale-rule-fishing'].includes(item.id))
-                : defaultBook.entries.filter((item) => item.id.startsWith('mistvale-person-'))
-              await this.database.lorebooks.put({
-                ...storedBook,
-                entries: mergeById(storedBook.entries, replacementEntries),
-                updatedAt: Date.now(),
-              })
+            const storedBook = await this.database.lorebooks.get(WORLD_RULES_ID)
+            const defaultBook = defaults.lorebooks.find((book) => book.id === WORLD_RULES_ID)
+            if (storedBook && defaultBook) {
+              const existingEntryIds = new Set(storedBook.entries.map((item) => item.id))
+              const newEntries = defaultBook.entries.filter((item) => (
+                ['mistvale-rule-gifts', 'mistvale-rule-fishing'].includes(item.id) && !existingEntryIds.has(item.id)
+              ))
+              if (newEntries.length) {
+                await this.database.lorebooks.put({
+                  ...storedBook,
+                  entries: [...storedBook.entries, ...newEntries],
+                  updatedAt: Date.now(),
+                })
+              }
             }
           }
           if (shouldPublishPack && contentPack?.lorebooks.length) await this.database.lorebooks.bulkPut(contentPack.lorebooks)
