@@ -1,4 +1,4 @@
-import { CALENDAR_FESTIVALS_ID, createMistvaleDefaults, DEFAULT_CONTENT_VERSION, MONSTER_GIRL_CARD_IDS, PRODUCTION_PARTNERS_ID } from './defaults'
+import { CALENDAR_FESTIVALS_ID, createMistvaleDefaults, DEFAULT_CONTENT_VERSION, MONSTER_GIRL_CARD_IDS, PRODUCTION_PARTNERS_ID, VILLAGE_ARCHIVE_ID, WORLD_RULES_ID } from './defaults'
 import { normalizeTavernSettings } from './api-config'
 import type { MistvaleTavernDatabase } from './database'
 import { tavernDatabase } from './database'
@@ -94,6 +94,7 @@ class DexieTavernRepository implements TavernRepository {
         const shouldMigrateProduction = storedContentVersion < 3
         const shouldMigratePortraitSlots = storedContentVersion < 4
         const shouldMigratePresetBinding = storedContentVersion < 5
+        const shouldMigrateFishingAndGifts = storedContentVersion < 6
         const shouldMigrateDefaults = storedContentVersion < DEFAULT_CONTENT_VERSION
         const migrationLorebookIds = [
           ...(shouldMigrateCalendar ? [CALENDAR_FESTIVALS_ID] : []),
@@ -106,6 +107,22 @@ class DexieTavernRepository implements TavernRepository {
             const existingIds = new Set((await this.database.lorebooks.toArray()).map((book) => book.id))
             const missingMigrationBooks = defaults.lorebooks.filter((book) => migrationLorebookIds.includes(book.id) && !existingIds.has(book.id))
             if (missingMigrationBooks.length) await this.database.lorebooks.bulkAdd(missingMigrationBooks)
+          }
+          if (shouldMigrateFishingAndGifts) {
+            const defaultBooks = new Map(defaults.lorebooks.map((book) => [book.id, book]))
+            for (const bookId of [WORLD_RULES_ID, VILLAGE_ARCHIVE_ID]) {
+              const storedBook = await this.database.lorebooks.get(bookId)
+              const defaultBook = defaultBooks.get(bookId)
+              if (!storedBook || !defaultBook) continue
+              const replacementEntries = bookId === WORLD_RULES_ID
+                ? defaultBook.entries.filter((item) => ['mistvale-rule-affinity', 'mistvale-rule-fishing'].includes(item.id))
+                : defaultBook.entries.filter((item) => item.id.startsWith('mistvale-person-'))
+              await this.database.lorebooks.put({
+                ...storedBook,
+                entries: mergeById(storedBook.entries, replacementEntries),
+                updatedAt: Date.now(),
+              })
+            }
           }
           if (shouldPublishPack && contentPack?.lorebooks.length) await this.database.lorebooks.bulkPut(contentPack.lorebooks)
         }

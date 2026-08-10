@@ -308,7 +308,7 @@ export type GameAction =
   | { type: 'START_BATTLE'; floor: number }
   | { type: 'BATTLE_ACTION'; action: 'physical' | 'spell' | 'defend' | 'item' | 'flee'; spellId?: string; itemId?: 'energy-tonic' | 'mana-potion' | 'fire-potion' }
   | { type: 'START_FISHING' }
-  | { type: 'CATCH_FISH'; result: 'silver-carp' | 'water-grass' | 'empty' }
+  | { type: 'CATCH_FISH'; result: 'silver-carp' | 'moon-tail' | 'moss-trout' | 'tide-bass' | 'mist-catfish' | 'water-grass' | 'empty' }
   | { type: 'UPGRADE_TOOL'; tool: 'hoe' | 'rod' | 'pickaxe'; price: number }
   | { type: 'BUY_PERMANENT_UPGRADE'; upgrade: 'energy' | 'mana'; price: number }
   | { type: 'PLAYER_DEFEATED' }

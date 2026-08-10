@@ -92,4 +92,19 @@ describe('NPC 关系与灵犀对话', () => {
     expect(screen.getByText('整理货架并经营柜台')).toBeVisible()
     expect(screen.getByText(/生日当天赠送偏爱礼物，好感收益翻倍/)).toBeVisible()
   })
+
+  it('所有角色的赠礼列表都会接受背包中的莓果挞', async () => {
+    const user = userEvent.setup()
+    render(
+      <GameProvider initialState={{
+        ...initialGameState,
+        inventory: { ...initialGameState.inventory, 'berry-tart': 1 },
+      }}>
+        <NpcPanel npcId="yanque" />
+      </GameProvider>,
+    )
+
+    await user.click(screen.getByRole('button', { name: '赠礼给岩雀' }))
+    expect(screen.getByRole('button', { name: /莓果挞/ })).toBeVisible()
+  })
 })

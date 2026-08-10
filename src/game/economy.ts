@@ -21,6 +21,20 @@ export interface ItemDefinition {
   festivalLocationId?: LocationId
 }
 
+export type FishId = 'silver-carp' | 'moon-tail' | 'moss-trout' | 'tide-bass' | 'mist-catfish'
+export type FishSize = 'small' | 'medium' | 'large'
+export interface FishDefinition extends ItemDefinition { id: FishId; size: FishSize }
+
+export const FISH_CATALOG: Record<FishId, FishDefinition> = {
+  'silver-carp': { id: 'silver-carp', name: '银鳞鲫', size: 'small', category: 'product', sellPrice: 95, description: '雾灯谷河湾常见的轻巧银色鱼类。', sources: ['薄雾海湾或旧木码头钓鱼'], uses: ['完成逆潮的银光委托', '出售或赠礼'] },
+  'moon-tail': { id: 'moon-tail', name: '月尾鱼', size: 'small', category: 'product', sellPrice: 120, description: '尾鳍像一弯淡月，常躲在林间河道的石影里。', sources: ['林间河道钓鱼'], uses: ['出售或赠送给偏爱小型鱼的角色'] },
+  'moss-trout': { id: 'moss-trout', name: '青苔鳟', size: 'medium', category: 'product', sellPrice: 180, description: '背部带有青苔般的斑纹，拉力稳定。', sources: ['林间河道钓鱼'], uses: ['出售或赠送给偏爱河鲜的角色'] },
+  'tide-bass': { id: 'tide-bass', name: '潮纹鲈', size: 'medium', category: 'product', sellPrice: 240, description: '鱼身潮纹会随着海水明暗变化。', sources: ['薄雾海湾钓鱼'], uses: ['出售或赠送给偏爱海鱼的角色'] },
+  'mist-catfish': { id: 'mist-catfish', name: '雾湾巨鲶', size: 'large', category: 'product', sellPrice: 480, description: '栖息在旧木码头深水下的大型鱼，收竿时需要耐心。', sources: ['旧木码头钓鱼'], uses: ['高价出售或作为珍贵礼物'] },
+}
+
+export const UNIVERSAL_GIFT_IDS = ['berry-tart'] as const
+
 const defineCatalog = <T extends Record<string, ItemDefinition>>(catalog: T): { [K in keyof T]: ItemDefinition } => catalog
 
 export const ITEM_CATALOG = defineCatalog({
@@ -38,8 +52,8 @@ export const ITEM_CATALOG = defineCatalog({
   'tide-lotus': { id: 'tide-lotus', name: '潮汐莲', category: 'crop', season: '夏', growthDays: 6, sellPrice: 220, description: '只在水汽充足的田地开放。', sources: ['种植并收获潮汐莲'], uses: ['出售换取金币', '作为珍贵礼物'] },
   'stone-pumpkin': { id: 'stone-pumpkin', name: '岩纹南瓜', category: 'crop', season: '秋', growthDays: 7, sellPrice: 260, description: '表皮坚硬、果肉绵甜的节庆作物。', sources: ['种植并收获岩纹南瓜'], uses: ['出售换取金币', '作为珍贵礼物'] },
 
-  moonflower: { id: 'moonflower', name: '月铃花', category: 'gift', sellPrice: 120, description: '开拓荒地时偶尔发现的清亮花朵。', sources: ['开拓农场田地时概率获得'], uses: ['完成月下回信委托', '赠送给偏爱花朵的角色'] },
-  'silver-carp': { id: 'silver-carp', name: '银鳞鲫', category: 'product', sellPrice: 95, description: '雾灯谷河湾常见的银色鱼类。', sources: ['在渔家消耗精力钓鱼'], uses: ['完成逆潮的银光委托', '出售或赠礼'] },
+  moonflower: { id: 'moonflower', name: '月铃花', category: 'gift', sellPrice: 120, description: '开拓荒地时偶尔发现的清亮花朵。', sources: ['开拓农场田地时概率获得'], uses: ['完成月下回信委托', '赠送给洛岚或芙蕾雅'] },
+  ...FISH_CATALOG,
   wood: { id: 'wood', name: '木头', category: 'material', sellPrice: 12, description: '清理农场荒地得到的结实木料。', sources: ['开拓农场田地'], uses: ['建造转动磨粉机'] },
   stone: { id: 'stone', name: '石头', category: 'material', sellPrice: 10, description: '可用于砌筑生产设施的石材。', sources: ['开拓农场田地', '矿洞挖矿'], uses: ['建造熔炉', '建造转动磨粉机'] },
   'copper-ore': { id: 'copper-ore', name: '铜矿石', category: 'ore', retailCategory: 'material', price: 120, sellPrice: 55, description: '浅层矿脉中常见的金属矿石。', sources: ['矿洞各层挖矿', '杂货店材料柜'], uses: ['投入熔炉烧制铜锭', '完成羽火试炉委托'] },
@@ -54,11 +68,11 @@ export const ITEM_CATALOG = defineCatalog({
   'thread-ball': { id: 'thread-ball', name: '线团', category: 'product', sellPrice: 105, description: '蜘蛛娘纺成的柔韧丝线。', sources: ['蜘蛛娘入驻共生牧场后每日生产'], uses: ['赠送给绮萝', '出售换取金币'] },
   'slime-gel': { id: 'slime-gel', name: '史莱姆粘液', category: 'product', sellPrice: 82, description: '火史莱姆娘和水史莱姆娘都会产生的炼金材料。', sources: ['火史莱姆娘或水史莱姆娘每日生产'], uses: ['赠送给喜欢魔物素材的角色', '出售换取金币'] },
   flour: { id: 'flour', name: '面粉', category: 'material', sellPrice: 95, description: '夕照麦经过磨粉机加工得到的细粉。', sources: ['转动磨粉机加工夕照麦'], uses: ['制作莓果挞'] },
-  'berry-tart': { id: 'berry-tart', name: '莓果挞', category: 'food', sellPrice: 420, description: '余烬莓、蜂蜜、面粉与牛奶烘成的节庆点心。', sources: ['使用余烬莓、蜂蜜、面粉和牛奶制作'], uses: ['出售换取金币', '赠送给偏爱甜点的角色'] },
+  'berry-tart': { id: 'berry-tart', name: '莓果挞', category: 'food', sellPrice: 420, description: '余烬莓、蜂蜜、面粉与牛奶烘成、所有角色都认可的节庆点心。', sources: ['使用余烬莓、蜂蜜、面粉和牛奶制作'], uses: ['出售换取金币', '作为所有角色的通用礼物'] },
 
   'moss-fertilizer': { id: 'moss-fertilizer', name: '苔肥', category: 'material', retailCategory: 'material', price: 80, sellPrice: 35, description: '令作物提前八小时成熟。', sources: ['杂货店材料柜'], uses: ['缩短田地作物成熟时间'] },
   'reed-bait': { id: 'reed-bait', name: '苇心鱼饵', category: 'bait', retailCategory: 'bait', price: 25, sellPrice: 10, description: '适合河湾常见鱼类。', sources: ['渔家购买'], uses: ['钓鱼时作为消耗品'] },
-  'tide-rod': { id: 'tide-rod', name: '潮汐钓竿', category: 'tool', retailCategory: 'tool', price: 980, sellPrice: 420, description: '装备后提高银鳞鲫收获数量与钓鱼经验。', sources: ['渔家购买'], uses: ['提高银鳞鲫收获数量与钓鱼经验'] },
+  'tide-rod': { id: 'tide-rod', name: '潮汐钓竿', category: 'tool', retailCategory: 'tool', price: 980, sellPrice: 420, description: '装备后提高所有渔获数量与钓鱼经验。', sources: ['渔家购买'], uses: ['提高所有鱼类的收获数量与钓鱼经验'] },
   'energy-tonic': { id: 'energy-tonic', name: '金盏恢复剂', category: 'potion', retailCategory: 'potion', price: 260, sellPrice: 110, description: '战斗中恢复生命。', sources: ['魔女之家购买'], uses: ['战斗中恢复生命值'] },
   'mana-potion': { id: 'mana-potion', name: '蓝雾魔力剂', category: 'potion', retailCategory: 'potion', price: 320, sellPrice: 140, element: 'water', description: '战斗中恢复魔力。', sources: ['魔女之家购买'], uses: ['战斗中恢复魔力值'] },
   'fire-potion': { id: 'fire-potion', name: '流火瓶', category: 'potion', retailCategory: 'potion', price: 380, sellPrice: 165, element: 'fire', description: '造成火属性伤害。', sources: ['魔女之家购买'], uses: ['战斗中造成火属性伤害', '赠送给偏爱火焰的角色'] },

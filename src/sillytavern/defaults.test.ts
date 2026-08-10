@@ -24,7 +24,23 @@ describe('雾灯谷酒馆默认内容', () => {
     expect(defaults.presets[0].settings).not.toHaveProperty('apiKey')
     expect(defaults.presets[0].description).toContain('模型')
     expect(defaults.presets[0].description).not.toContain('本地剧情引擎')
-    expect(DEFAULT_CONTENT_VERSION).toBe(5)
+    expect(DEFAULT_CONTENT_VERSION).toBe(6)
+  })
+
+  it('把完整鱼类图鉴、通用礼物与每位角色的偏爱写入世界书', () => {
+    const defaults = createMistvaleDefaults()
+    const worldRules = defaults.lorebooks.find((book) => book.id === 'mistvale-world-rules')
+    const villageArchive = defaults.lorebooks.find((book) => book.id === 'mistvale-village-archive')
+    const fishingEntry = worldRules?.entries.find((entry) => entry.id === 'mistvale-rule-fishing')
+    const affinityEntry = worldRules?.entries.find((entry) => entry.id === 'mistvale-rule-affinity')
+    const minaEntry = villageArchive?.entries.find((entry) => entry.id === 'mistvale-person-mina')
+
+    expect(fishingEntry?.content).toContain('银鳞鲫')
+    expect(fishingEntry?.content).toContain('雾湾巨鲶')
+    expect(affinityEntry?.content).toContain('莓果挞是所有角色都认可的通用礼物')
+    expect(affinityEntry?.content).toContain('月铃花只属于洛岚与芙蕾雅')
+    expect(minaEntry?.content).toContain('月尾鱼')
+    expect(minaEntry?.content).toContain('潮纹鲈')
   })
 
   it('提供六位共生伙伴角色卡与完整生产世界书', () => {

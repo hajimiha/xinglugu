@@ -194,7 +194,7 @@ describe('雾灯谷酒馆仓储', () => {
       { id: 'portrait-0-100', minAffinity: 0, maxAffinity: 100, source: '/portraits/legacy-loran.webp' },
     ])
     expect(migrated).not.toHaveProperty('portraitByAffinity')
-    expect((await repository.getSettings()).defaultContentVersion).toBe(5)
+    expect((await repository.getSettings()).defaultContentVersion).toBe(6)
   })
 
   it('将旧会话迁移为跟随当前激活预设，避免继续发送创建会话时的旧预设', async () => {
@@ -222,6 +222,37 @@ describe('雾灯谷酒馆仓储', () => {
       presetId: null,
       presetBinding: { mode: 'follow-active' },
     })
+  })
+
+  it('为版本五存档补入鱼类与礼物规则，同时保留玩家的自定义世界书条目', async () => {
+    database = createTavernDatabase(`mistvale-fishing-gift-migration-${crypto.randomUUID()}`)
+    const repository = createTavernRepository(database)
+    await repository.initialize()
+    const settings = await repository.getSettings()
+    const worldRules = (await repository.getLorebook('mistvale-world-rules'))!
+    const villageArchive = (await repository.getLorebook('mistvale-village-archive'))!
+    const customEntry = { ...worldRules.entries[0], id: 'player-custom-rule', comment: '玩家自定义规则', content: '必须保留这条内容。' }
+
+    await database.lorebooks.put({
+      ...worldRules,
+      entries: [...worldRules.entries.filter((item) => item.id !== 'mistvale-rule-fishing'), customEntry],
+    })
+    await database.lorebooks.put({
+      ...villageArchive,
+      entries: [...villageArchive.entries, { ...customEntry, id: 'player-custom-person', comment: '玩家自定义人物' }],
+    })
+    await database.settings.put({ ...settings, defaultContentVersion: 5 })
+
+    await repository.initialize()
+
+    const migratedRules = (await repository.getLorebook('mistvale-world-rules'))!
+    const migratedArchive = (await repository.getLorebook('mistvale-village-archive'))!
+    expect(migratedRules.entries.find((item) => item.id === 'mistvale-rule-fishing')?.content).toContain('雾湾巨鲶')
+    expect(migratedRules.entries.find((item) => item.id === 'mistvale-rule-affinity')?.content).toContain('莓果挞')
+    expect(migratedRules.entries.find((item) => item.id === 'player-custom-rule')?.content).toBe('必须保留这条内容。')
+    expect(migratedArchive.entries.find((item) => item.id === 'mistvale-person-mina')?.content).toContain('月尾鱼')
+    expect(migratedArchive.entries.find((item) => item.id === 'player-custom-person')).toBeDefined()
+    expect((await repository.getSettings()).defaultContentVersion).toBe(6)
   })
 
   it('只保留最近二十条无密钥的出站请求审计', async () => {

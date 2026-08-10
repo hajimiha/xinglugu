@@ -1,4 +1,4 @@
-import { BUILD_RECIPES, CRAFT_RECIPES, FORGE_RECIPES, MACHINE_RECIPES, MINE_MAX_FLOOR, MONSTER_PARTNERS, createInitialPlots, crops, getFarmExpansion, getMineYield, npcs, quests, shopItems, spells } from './data'
+import { BUILD_RECIPES, CRAFT_RECIPES, FISH_CATALOG, FORGE_RECIPES, MACHINE_RECIPES, MINE_MAX_FLOOR, MONSTER_PARTNERS, createInitialPlots, crops, getFarmExpansion, getMineYield, npcs, quests, shopItems, spells } from './data'
 import { advanceCalendarClock, formatGameDate, getSeasonForDay, getWeekday, isNpcBirthday } from './calendar'
 import {
   DEFAULT_GAME_RULES,
@@ -619,11 +619,13 @@ function reduceGameState(state: GameState, action: GameAction): GameState {
       return { ...state, energy: state.energy - getEnergyCost(1, state.rules.energyCostMode), fishing: { active: true } }
     case 'CATCH_FISH': {
       if (!state.fishing.active) return state
-      if (action.result === 'silver-carp') {
+      const fish = FISH_CATALOG[action.result as keyof typeof FISH_CATALOG]
+      if (fish) {
         const rodLevel = Math.max(1, state.tools.rod)
         const amount = scaleReward(rodLevel, state.rules.dropMultiplier)
-        const experience = scaleReward(16 + (rodLevel - 1) * 4, state.rules.experienceMultiplier)
-        return { ...state, fishing: { active: false, lastCatch: 'silver-carp' }, inventory: { ...state.inventory, 'silver-carp': (state.inventory['silver-carp'] ?? 0) + amount, 'reed-bait': Math.max(0, (state.inventory['reed-bait'] ?? 0) - 1) }, skills: { ...state.skills, fishing: { ...state.skills.fishing, experience: state.skills.fishing.experience + experience } }, toasts: [...state.toasts, makeToast({ tone: 'success', title: '钓到银鳞鲫', message: `钓鱼经验 +${experience}，获得鱼获 ${amount} 份。` })] }
+        const baseExperience = fish.size === 'large' ? 30 : fish.size === 'medium' ? 22 : 16
+        const experience = scaleReward(baseExperience + (rodLevel - 1) * 4, state.rules.experienceMultiplier)
+        return { ...state, fishing: { active: false, lastCatch: fish.id }, inventory: { ...state.inventory, [fish.id]: (state.inventory[fish.id] ?? 0) + amount, 'reed-bait': Math.max(0, (state.inventory['reed-bait'] ?? 0) - 1) }, skills: { ...state.skills, fishing: { ...state.skills.fishing, experience: state.skills.fishing.experience + experience } }, toasts: [...state.toasts, makeToast({ tone: 'success', title: `钓到${fish.name}`, message: `钓鱼经验 +${experience}，获得鱼获 ${amount} 份。` })] }
       }
       if (action.result === 'water-grass') {
         const experience = scaleReward(4, state.rules.experienceMultiplier)

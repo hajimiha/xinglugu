@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { formatClock, getNpcPresence, isNpcBirthday } from '../../game/calendar'
-import { affinityStageNames, itemDisplayNames, locations, npcs, shopItems } from '../../game/data'
+import { UNIVERSAL_GIFT_IDS, affinityStageNames, itemDisplayNames, locations, npcs, shopItems } from '../../game/data'
 import { useGame } from '../../game/GameContext'
 import { getEnergyCost, scaleReward } from '../../game/rules'
 import type { NpcAction } from '../../game/types'
@@ -23,7 +23,7 @@ export function NpcPanel({ npcId }: { npcId: string }) {
   const presenceLocation = locations.find((location) => location.id === presence.locationId)
   const birthdayToday = isNpcBirthday(npcId, state.day)
   const npcQuests = state.quests.filter((quest) => quest.issuerId === npcId && (quest.status === 'active' || quest.status === 'ready'))
-  const giftItems = npc.preferredGifts.filter((itemId) => (state.inventory[itemId] ?? 0) > 0)
+  const giftItems = [...new Set([...npc.preferredGifts, ...UNIVERSAL_GIFT_IDS])].filter((itemId) => (state.inventory[itemId] ?? 0) > 0)
   const interactionCost = getEnergyCost(1, state.rules.energyCostMode)
   const preferredGiftAffinity = scaleReward(14 * (birthdayToday ? 2 : 1), state.rules.affinityMultiplier)
 
