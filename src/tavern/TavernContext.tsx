@@ -165,7 +165,7 @@ export function TavernProvider({ children, repository = tavernRepository, player
       updatedAt: Date.now(),
     }
     const session = baseSession.userName === currentPlayerName ? baseSession : { ...baseSession, userName: currentPlayerName }
-    if (!existing || session !== baseSession) await saveSession(session)
+    if (!existing || session !== existing) await saveSession(session)
     await persistSettings({ activeCharacterId: card.id, activeSessionId: session.id })
     return session
   }, [characters, sessions, currentPlayerName, repository, persistSettings, saveSession])
@@ -296,7 +296,7 @@ export function TavernProvider({ children, repository = tavernRepository, player
       release()
       if (turnQueues.current.get(input.sessionId) === queued) turnQueues.current.delete(input.sessionId)
     }
-  }, [sessions, repository, settings, characters, presets, lorebooks, saveSession, currentPlayerName])
+  }, [sessions, repository, settings, characters, presets, lorebooks, currentPlayerName])
 
   const clearRequestAudits = useCallback(async () => {
     await repository.clearRequestAudits()
