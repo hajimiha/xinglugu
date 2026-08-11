@@ -77,3 +77,62 @@ export function inferVariableDefinitions(
 export function variableDefinitionsToRecord(definitions: TavernVariableDefinition[]): Record<string, string | number | boolean> {
   return Object.fromEntries(definitions.map((definition) => [definition.key, definition.value]))
 }
+
+export interface DefinedVariablePatchInput {
+  patch: Record<string, unknown>
+  globalDefinitions: TavernVariableDefinition[]
+  sessionDefinitions: TavernVariableDefinition[]
+  readOnlyKeys?: Iterable<string>
+}
+
+export interface DefinedVariablePatchResult {
+  globalDefinitions: TavernVariableDefinition[]
+  sessionDefinitions: TavernVariableDefinition[]
+  sessionVariables: Record<string, string | number | boolean>
+  diagnostics: string[]
+}
+
+/** Apply a model-authored patch without allowing it to invent or shadow state. */
+export function applyDefinedVariablePatch(input: DefinedVariablePatchInput): DefinedVariablePatchResult {
+  const globalDefinitions = input.globalDefinitions.map((definition) => ({ ...definition }))
+  const sessionDefinitions = input.sessionDefinitions.map((definition) => ({ ...definition }))
+  const readOnly = new Set(input.readOnlyKeys ?? [])
+  const diagnostics: string[] = []
+  const globalByKey = new Map(globalDefinitions.map((definition) => [definition.key, definition]))
+  const sessionByKey = new Map(sessionDefinitions.map((definition) => [definition.key, definition]))
+
+  for (const [key, rawValue] of Object.entries(input.patch)) {
+    if (readOnly.has(key)) {
+      diagnostics.push(`模型变量“${key}”是只读游戏镜像，已忽略更新。`)
+      continue
+    }
+    if (globalByKey.has(key) && sessionByKey.has(key)) {
+      diagnostics.push(`变量“${key}”同时存在于全局与会话作用域，已忽略歧义更新。`)
+      continue
+    }
+    const definition = sessionByKey.get(key) ?? globalByKey.get(key)
+    if (!definition) {
+      diagnostics.push(`模型返回了未声明变量“${key}”，已忽略更新。`)
+      continue
+    }
+    try {
+      let value = coerceVariableValue(definition.type, rawValue)
+      if (definition.type === 'number') {
+        const original = value as number
+        if (definition.min !== undefined) value = Math.max(definition.min, value as number)
+        if (definition.max !== undefined) value = Math.min(definition.max, value as number)
+        if (value !== original) diagnostics.push(`变量“${key}”已按定义范围限制为 ${value}。`)
+      }
+      definition.value = value
+    } catch (caught) {
+      diagnostics.push(`变量“${key}”更新无效，已保留原值：${caught instanceof Error ? caught.message : '无法转换类型'}`)
+    }
+  }
+
+  return {
+    globalDefinitions,
+    sessionDefinitions,
+    sessionVariables: variableDefinitionsToRecord(sessionDefinitions),
+    diagnostics,
+  }
+}

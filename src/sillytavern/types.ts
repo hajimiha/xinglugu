@@ -64,6 +64,7 @@ export interface TavernRequestAudit {
 
 export interface LorebookEntry {
   id: string
+  sillyTavernSource?: { entryKey: string; uid?: number }
   disabled?: boolean
   excluded?: boolean
   keys: string[]
@@ -121,6 +122,7 @@ export interface Lorebook {
   recursiveScanning: boolean
   caseSensitive: boolean
   matchWholeWords: boolean
+  compatibility?: { source: 'sillytavern'; raw: Record<string, unknown> }
   createdAt: number
   updatedAt: number
 }
@@ -446,6 +448,7 @@ export interface TavernRegexScript {
   maxDepth?: number
   scope: TavernRegexScope
   order: number
+  compatibility?: { dialect: 'sillytavern'; raw: Record<string, unknown> }
 }
 
 export interface TavernRegexMatch {

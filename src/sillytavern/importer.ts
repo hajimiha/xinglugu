@@ -72,10 +72,11 @@ function validateLorebookImport(value: unknown): SillyTavernLorebookExport {
 
 export function importLorebook(value: unknown): Omit<Lorebook, 'id' | 'createdAt' | 'updatedAt'> {
   const data = validateLorebookImport(value);
-  const rawEntries = Object.values(data.entries || {});
+  const rawEntries = Object.entries(data.entries || {});
   const entries: LorebookEntry[] = rawEntries
-    .map((e) => ({
+    .map(([entryKey, e]) => ({
       id: crypto.randomUUID(),
+      sillyTavernSource: { entryKey, ...(typeof e.uid === 'number' ? { uid: e.uid } : {}) },
       disabled: e.disable ?? false,
       excluded: e.excluded ?? false,
       keys: e.key || [],
@@ -120,14 +121,36 @@ export function importLorebook(value: unknown): Omit<Lorebook, 'id' | 'createdAt
     recursiveScanning: data.settings?.recursive_scanning ?? false,
     caseSensitive: data.settings?.case_sensitive ?? false,
     matchWholeWords: data.settings?.match_whole_words ?? false,
+    compatibility: { source: 'sillytavern', raw: structuredClone(value as Record<string, unknown>) },
   };
 }
 
 export function exportLorebook(lorebook: Lorebook): SillyTavernLorebookExport {
-  const entries: SillyTavernLorebookExport['entries'] = {};
-  lorebook.entries.forEach((e, index) => {
-    entries[String(index)] = {
-      uid: index,
+  const rawRoot = lorebook.compatibility?.source === 'sillytavern'
+    ? structuredClone(lorebook.compatibility.raw)
+    : {};
+  const rawEntries = isRecord(rawRoot.entries) ? rawRoot.entries : {};
+  const entries: Record<string, Record<string, unknown>> = {};
+  const reservedKeys = new Set(lorebook.entries.map((entry) => entry.sillyTavernSource?.entryKey).filter((key): key is string => Boolean(key)));
+  const rawUids = Object.values(rawEntries)
+    .filter(isRecord)
+    .map((entry) => entry.uid)
+    .filter((uid): uid is number => typeof uid === 'number' && Number.isFinite(uid));
+  let nextUid = Math.max(-1, ...rawUids, ...lorebook.entries.map((entry) => entry.sillyTavernSource?.uid ?? -1)) + 1;
+  let nextEntryKey = 0;
+  lorebook.entries.forEach((e) => {
+    let entryKey = e.sillyTavernSource?.entryKey;
+    if (!entryKey || entries[entryKey]) {
+      while (reservedKeys.has(String(nextEntryKey)) || entries[String(nextEntryKey)]) nextEntryKey += 1;
+      entryKey = String(nextEntryKey++);
+    }
+    const rawValue = rawEntries[entryKey];
+    const rawEntry: Record<string, unknown> = isRecord(rawValue) ? structuredClone(rawValue) : {};
+    const uid = e.sillyTavernSource?.uid
+      ?? (typeof rawEntry.uid === 'number' && Number.isFinite(rawEntry.uid) ? rawEntry.uid : nextUid++);
+    entries[entryKey] = {
+      ...rawEntry,
+      uid,
       key: e.keys,
       keysecondary: e.secondaryKeys || [],
       comment: e.comment || e.content.slice(0, 50),
@@ -166,16 +189,35 @@ export function exportLorebook(lorebook: Lorebook): SillyTavernLorebookExport {
     };
   });
 
+  const rawSettings = isRecord(rawRoot.settings) ? rawRoot.settings : {};
   return {
+    ...rawRoot,
     name: lorebook.name,
     description: lorebook.description,
-    entries,
+    entries: entries as SillyTavernLorebookExport['entries'],
     settings: {
+      ...rawSettings,
       recursive_scanning: lorebook.recursiveScanning,
       case_sensitive: lorebook.caseSensitive,
       match_whole_words: lorebook.matchWholeWords,
     },
-  };
+  } as SillyTavernLorebookExport;
+}
+
+export function getLorebookCompatibilityWarnings(lorebook: Pick<Lorebook, 'entries'>): string[] {
+  const warnings = new Set<string>();
+  for (const entry of lorebook.entries) {
+    if (!['before_char', 'after_char', 'before_example', 'after_example'].includes(entry.position)) warnings.add(`注入位置 ${entry.position}`);
+    if ((entry.sticky ?? 0) > 0) warnings.add('粘滞回合');
+    if ((entry.cooldown ?? 0) > 0) warnings.add('冷却回合');
+    if ((entry.delay ?? 0) > 0) warnings.add('延迟回合');
+    if ((entry.weight ?? 100) !== 100) warnings.add('权重排序');
+    if (entry.group || entry.useGroupScoring) warnings.add('分组评分');
+    if (entry.characterFilter) warnings.add('角色过滤器');
+    if (entry.matchPersonaDescription || entry.matchCharacterDescription || entry.matchCharacterPersonality
+      || entry.matchCharacterDepthPrompt || entry.matchScenario || entry.matchCreatorNotes) warnings.add('扩展扫描来源');
+  }
+  return [...warnings];
 }
 
 export function importPreset(value: unknown, fallbackName = '导入的预设'): Omit<ChatPreset, 'id' | 'createdAt' | 'updatedAt'> {

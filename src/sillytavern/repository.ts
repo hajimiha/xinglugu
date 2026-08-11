@@ -86,7 +86,7 @@ export interface TavernRepository {
   listSessions(): Promise<ChatSession[]>
   getSession(id: string): Promise<ChatSession | undefined>
   saveSession(value: ChatSession): Promise<void>
-  commitTurn(session: ChatSession, audit: TavernRequestAudit): Promise<void>
+  commitTurn(session: ChatSession, audit: TavernRequestAudit, settings?: TavernSettings): Promise<void>
   deleteSession(id: string): Promise<void>
   getSettings(): Promise<TavernSettings>
   saveSettings(value: TavernSettings): Promise<void>
@@ -252,7 +252,37 @@ class DexieTavernRepository implements TavernRepository {
   listPresets = () => this.database.presets.orderBy('updatedAt').reverse().toArray()
   getPreset = (id: string) => this.database.presets.get(id)
   async savePreset(value: ChatPreset) { await this.database.presets.put(value) }
-  async deletePreset(id: string) { await this.database.presets.delete(id) }
+  async deletePreset(id: string) {
+    await this.database.transaction(
+      'rw',
+      this.database.presets,
+      this.database.sessions,
+      this.database.settings,
+      async () => {
+        await this.database.presets.delete(id)
+        const now = Date.now()
+        const pinnedSessions = (await this.database.sessions.toArray()).filter((session) => (
+          session.presetBinding?.mode === 'pinned' && session.presetBinding.presetId === id
+        ))
+        if (pinnedSessions.length) {
+          await this.database.sessions.bulkPut(pinnedSessions.map((session) => ({
+            ...session,
+            presetId: null,
+            presetBinding: { mode: 'follow-active' as const },
+            updatedAt: now,
+          })))
+        }
+        const currentSettings = await this.database.settings.get('mistvale-settings')
+        if (currentSettings?.activePresetId === id) {
+          const fallback = await this.database.presets.orderBy('updatedAt').reverse().first()
+          await this.database.settings.update('mistvale-settings', {
+            activePresetId: fallback?.id ?? null,
+            updatedAt: now,
+          })
+        }
+      },
+    )
+  }
 
   listCharacters = () => this.database.characters.orderBy('name').toArray()
   getCharacter = (id: string) => this.database.characters.get(id)
@@ -267,12 +297,13 @@ class DexieTavernRepository implements TavernRepository {
       : parseVariableDefinitions(value.variableDefinitions).filter((definition) => definition.scope === 'session')
     await this.database.sessions.put({ ...value, variableDefinitions })
   }
-  async commitTurn(session: ChatSession, audit: TavernRequestAudit): Promise<void> {
+  async commitTurn(session: ChatSession, audit: TavernRequestAudit, settings?: TavernSettings): Promise<void> {
     const variableDefinitions = session.variableDefinitions === undefined
       ? undefined
       : parseVariableDefinitions(session.variableDefinitions).filter((definition) => definition.scope === 'session')
-    await this.database.transaction('rw', this.database.sessions, this.database.requestAudits, async () => {
+    await this.database.transaction('rw', this.database.sessions, this.database.requestAudits, this.database.settings, async () => {
       await this.database.sessions.put({ ...session, variableDefinitions })
+      if (settings) await this.database.settings.put(normalizeTavernSettings(settings))
       await this.database.requestAudits.put(audit)
       const expired = await this.database.requestAudits.orderBy('createdAt').reverse().offset(20).primaryKeys()
       if (expired.length) await this.database.requestAudits.bulkDelete(expired)

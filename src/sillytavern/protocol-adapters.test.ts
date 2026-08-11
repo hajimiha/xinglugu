@@ -102,9 +102,15 @@ describe('供应商协议适配', () => {
   })
 
   it('构造 Cohere 与 Cloudflare 请求并解析各自响应', () => {
-    const cohere = buildProviderRequest(config('cohere'), 'cohere-key', request, true)
+    const cohere = buildProviderRequest(config('cohere', {
+      temperature: 0.7,
+      frequencyPenalty: 0.25,
+      presencePenalty: 0,
+    }), 'cohere-key', request, true)
     expect(cohere.url).toBe('https://api.cohere.ai/v2/chat')
-    expect(JSON.parse(cohere.init.body as string)).toMatchObject({ messages: request.messages, stream: true })
+    const cohereBody = JSON.parse(cohere.init.body as string)
+    expect(cohereBody).toMatchObject({ messages: request.messages, stream: true, frequency_penalty: 0.25 })
+    expect(cohereBody).not.toHaveProperty('presence_penalty')
     expect(extractProviderContent('cohere-v2', { message: { content: [{ type: 'text', text: 'Cohere 正文' }] } })).toEqual({ content: 'Cohere 正文', reasoning: '' })
     expect(extractProviderSseContent('cohere-v2', { type: 'content-delta', delta: { message: { content: { text: '流片段' } } } })).toEqual({ content: '流片段', reasoning: '' })
 
@@ -137,4 +143,49 @@ describe('供应商协议适配', () => {
 
     expect(built.url).toBe('https://api.example.test/root/chat/completions')
   })
+
+  it('omits zero Cohere penalties and rejects incompatible sampling values before fetch', () => {
+    const zeroPenalty = buildProviderRequest(config('cohere', {
+      temperature: 0.6,
+      frequencyPenalty: 0,
+      presencePenalty: 0,
+    }), 'cohere-key', request, false)
+    const body = JSON.parse(zeroPenalty.init.body as string)
+    expect(body).not.toHaveProperty('frequency_penalty')
+    expect(body).not.toHaveProperty('presence_penalty')
+
+    expect(() => buildProviderRequest(config('cohere', {
+      frequencyPenalty: 0.2,
+      presencePenalty: 0.3,
+    }), 'cohere-key', request, false)).toThrow('不能同时设置')
+    expect(() => buildProviderRequest(config('cohere', {
+      frequencyPenalty: -0.1,
+      presencePenalty: 0,
+    }), 'cohere-key', request, false)).toThrow('0 到 1')
+    expect(() => buildProviderRequest(config('cohere', {
+      temperature: 1.1,
+      frequencyPenalty: 0,
+      presencePenalty: 0,
+    }), 'cohere-key', request, false)).toThrow('温度')
+  })
+
+  it.each(['claude', 'google-ai-studio', 'cohere'] as const)(
+    'rejects post-history system prompts for %s instead of silently reordering them',
+    (provider) => {
+      const ordered: TavernRequest = {
+        task: 'story',
+        messages: [
+          { role: 'system', content: '历史前规则' },
+          { role: 'user', content: '历史' },
+          { role: 'system', content: '历史后规则' },
+          { role: 'user', content: '本轮' },
+        ],
+      }
+      expect(() => buildProviderRequest(config(provider, {
+        temperature: provider === 'cohere' ? 0.7 : 0.8,
+        frequencyPenalty: 0,
+        presencePenalty: 0,
+      }), 'secret', ordered, true)).toThrow('无法保持当前预设的系统提示词顺序')
+    },
+  )
 })

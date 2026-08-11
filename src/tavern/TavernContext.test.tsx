@@ -21,8 +21,8 @@ afterEach(async () => {
   database = undefined
 })
 
-function response(text: string): Response {
-  return new Response(`data: ${JSON.stringify({ choices: [{ delta: { content: `<maintext>${text}</maintext><vars>{}</vars>` } }] })}\n\ndata: [DONE]\n\n`, {
+function response(text: string, variables = '{}'): Response {
+  return new Response(`data: ${JSON.stringify({ choices: [{ delta: { content: `<maintext>${text}</maintext><vars>${variables}</vars>` } }] })}\n\ndata: [DONE]\n\n`, {
     headers: { 'content-type': 'text/event-stream' },
   })
 }
@@ -103,6 +103,45 @@ describe('酒馆会话持久化边界', () => {
 
     await expect(tavern.sendTurn({ sessionId: session.id, npcId: 'loran', playerText: 'commit failure' })).rejects.toThrow('audit write failed')
     expect((await repository.getSession(session.id))?.messages).toHaveLength(session.messages.length)
+  })
+
+  it('原子提交已声明的全局与会话变量，并拒绝游戏镜像和未知字段', async () => {
+    database = createTavernDatabase(`mistvale-context-variable-transaction-${crypto.randomUUID()}`)
+    const repository = createTavernRepository(database)
+    await repository.initialize()
+    const settings = await repository.getSettings()
+    await repository.saveSettings({
+      ...settings,
+      globalVariables: [{ key: 'worldMood', label: '世界气氛', type: 'number', scope: 'global', value: 2, min: 0, max: 10 }],
+    })
+    const card = (await repository.listCharacters()).find((candidate) => candidate.npcId === 'loran')!
+    await repository.saveSession({
+      id: 'defined-variable-session', name: '变量会话', npcId: 'loran', characterId: card.id,
+      characterName: card.name, userName: '旅行者', presetId: null, presetBinding: { mode: 'follow-active' },
+      lorebookIds: card.lorebookIds, variables: { topic: '初见', legacyShadow: 'remove-me' },
+      variableDefinitions: [{ key: 'topic', label: '话题', type: 'string', scope: 'session', value: '初见' }],
+      messages: [{ id: 'opening-vars', role: 'assistant', content: card.firstMessage, timestamp: 1 }],
+      createdAt: 1, updatedAt: Date.now() + 100,
+    })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response(
+      '变量已核对。',
+      JSON.stringify({ worldMood: '99', topic: 42, money: 999999, invented: '污染' }),
+    )))
+
+    const { session, tavern } = await openProvider(repository)
+    const next = await tavern.sendTurn({ sessionId: session.id, npcId: 'loran', playerText: '更新变量', variables: { money: 500 } })
+
+    expect(next.variables).toEqual({ topic: '42' })
+    expect(next.variableDefinitions).toEqual([expect.objectContaining({ key: 'topic', value: '42' })])
+    expect((await repository.getSettings()).globalVariables).toEqual([
+      expect.objectContaining({ key: 'worldMood', value: 10 }),
+    ])
+    expect((await repository.getSession(session.id))?.variables).toEqual({ topic: '42' })
+    expect((await repository.listRequestAudits())[0].diagnostics).toEqual(expect.arrayContaining([
+      expect.stringContaining('worldMood'),
+      expect.stringContaining('money'),
+      expect.stringContaining('invented'),
+    ]))
   })
 
   it.each([

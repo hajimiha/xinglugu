@@ -105,4 +105,33 @@ describe('酒馆 API 配置', () => {
       location: expect.any(String),
     })
   })
+
+  it('按 Cohere 官方能力限制采样参数并阻止同时启用两种惩罚', () => {
+    const defaults = createMistvaleDefaults().settings.api
+    expect(validateTavernApiConfig({
+      ...defaults,
+      provider: 'cohere',
+      baseUrl: 'https://api.cohere.ai',
+      model: 'command-a-03-2025',
+      temperature: 1.1,
+      frequencyPenalty: -0.1,
+      presencePenalty: 0.2,
+    })).toMatchObject({
+      temperature: expect.any(String),
+      frequencyPenalty: expect.any(String),
+    })
+
+    expect(validateTavernApiConfig({
+      ...defaults,
+      provider: 'cohere',
+      baseUrl: 'https://api.cohere.ai',
+      model: 'command-a-03-2025',
+      temperature: 0.7,
+      frequencyPenalty: 0.2,
+      presencePenalty: 0.3,
+    })).toMatchObject({
+      frequencyPenalty: expect.stringContaining('不能同时设置'),
+      presencePenalty: expect.stringContaining('不能同时设置'),
+    })
+  })
 })

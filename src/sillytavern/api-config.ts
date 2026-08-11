@@ -16,6 +16,29 @@ export function normalizeApiBaseUrl(value: string): string {
   return value.trim().replace(/\/+$/, '')
 }
 
+export function validateProviderSamplingConfig(config: TavernApiConfig): TavernApiFieldErrors {
+  if (getTavernProvider(config.provider).protocol !== 'cohere-v2') return {}
+  const errors: TavernApiFieldErrors = {}
+  if (!Number.isFinite(config.temperature) || config.temperature < 0 || config.temperature > 1) {
+    errors.temperature = 'Cohere 温度必须在 0 到 1 之间。'
+  }
+  if (!Number.isFinite(config.frequencyPenalty) || config.frequencyPenalty < 0 || config.frequencyPenalty > 1) {
+    errors.frequencyPenalty = 'Cohere 频率惩罚必须在 0 到 1 之间。'
+  }
+  if (!Number.isFinite(config.presencePenalty) || config.presencePenalty < 0 || config.presencePenalty > 1) {
+    errors.presencePenalty = 'Cohere 存在惩罚必须在 0 到 1 之间。'
+  }
+  if (config.frequencyPenalty > 0 && config.presencePenalty > 0) {
+    const message = 'Cohere 不能同时设置频率惩罚和存在惩罚，请将其中一项设为 0。'
+    errors.frequencyPenalty = message
+    errors.presencePenalty = message
+  }
+  if (!Number.isFinite(config.topP) || config.topP < 0.01 || config.topP > 0.99) {
+    errors.topP = 'Cohere Top P 必须在 0.01 到 0.99 之间。'
+  }
+  return errors
+}
+
 export function validateTavernApiConfig(config: TavernApiConfig): TavernApiFieldErrors {
   const errors: TavernApiFieldErrors = {}
   const baseUrl = normalizeApiBaseUrl(config.baseUrl)
@@ -53,7 +76,7 @@ export function validateTavernApiConfig(config: TavernApiConfig): TavernApiField
   if (!Number.isFinite(config.topP) || config.topP < 0 || config.topP > 1) {
     errors.topP = 'Top P 必须在 0 到 1 之间。'
   }
-  return errors
+  return { ...errors, ...validateProviderSamplingConfig(config) }
 }
 
 export function normalizeTavernSettings(value: unknown): TavernSettings {

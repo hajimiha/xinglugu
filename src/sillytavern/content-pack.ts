@@ -128,10 +128,10 @@ export function parseContentPack(value: unknown): TavernContentPack {
 export async function loadRepositoryContentPack(fetcher: typeof fetch = fetch): Promise<TavernContentPack | null> {
   try {
     const response = await fetcher(TAVERN_CONTENT_PACK_PATH, { cache: 'no-cache' })
-    if (!response.ok) return null
+    if (!response.ok) throw new Error(`HTTP ${response.status}${response.statusText ? ` ${response.statusText}` : ''}`)
     return parseContentPack(await response.json())
-  } catch {
-    return null
+  } catch (caught) {
+    throw new Error(`仓库内容包加载失败：${caught instanceof Error ? caught.message : '未知错误'}`, { cause: caught })
   }
 }
 

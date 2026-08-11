@@ -13,7 +13,7 @@ import {
   type TavernPreparedRequest,
   type TavernProviderRequestInspection,
 } from '../sillytavern/types'
-import { aggregateEvents, applyParsedToChat } from '../sillytavern/variables'
+import { aggregateEvents } from '../sillytavern/variables'
 import { applyRegexScripts, getPresetRegexScripts } from '../sillytavern/regex-engine'
 import type { TavernRegexScript } from '../sillytavern/types'
 
@@ -43,7 +43,7 @@ export interface RemoteTurnInspection {
 export interface RemoteTurnResult {
   raw: string
   parsed: ParsedTags
-  variablesAfter: Record<string, unknown>
+  variablePatch: Record<string, unknown>
   matchedEntryIds: string[]
   regexErrors: string[]
   providerReasoning: string
@@ -141,11 +141,10 @@ export async function createRemoteTurn(input: RemoteTurnInput): Promise<RemoteTu
   })
   raw = outputRegex.text
   const parsed = parseResponse(raw)
-  const { nextVariables } = applyParsedToChat(input.variables, parsed)
   return {
     raw,
     parsed,
-    variablesAfter: nextVariables,
+    variablePatch: { ...parsed.varsCommands.merge },
     matchedEntryIds: assembled.matchedEntries.map((match) => match.entry.id),
     regexErrors: outputRegex.errors.map((error) => `正则“${error.scriptName}”：${error.message}`),
     providerReasoning: providerReasoning.trim(),

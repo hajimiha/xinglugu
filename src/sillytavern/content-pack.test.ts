@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createMistvaleDefaults } from './defaults'
-import { createContentPack, parseContentPack } from './content-pack'
+import { createContentPack, loadRepositoryContentPack, parseContentPack } from './content-pack'
 import repositoryContentPack from '../../public/content/mistvale-content-pack.json'
 
 describe('仓库酒馆内容包', () => {
@@ -114,5 +114,16 @@ describe('仓库酒馆内容包', () => {
     expect(pack.characters).toHaveLength(6)
     expect(pack.characters.every((card) => card.tags.includes('共生伙伴'))).toBe(true)
     expect(pack.characters.every((card) => JSON.stringify(card.lorebookIds) === JSON.stringify(['mistvale-world-rules']))).toBe(true)
+  })
+
+  it('仓库内容包加载失败时返回可见原因而不是静默降级', async () => {
+    await expect(loadRepositoryContentPack(async () => new Response('missing', { status: 404 }) as never))
+      .rejects.toThrow(/HTTP 404/)
+    await expect(loadRepositoryContentPack(async () => { throw new Error('network offline') }))
+      .rejects.toThrow(/network offline/)
+    await expect(loadRepositoryContentPack(async () => new Response(JSON.stringify({ schemaVersion: 99 }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }) as never)).rejects.toThrow(/架构版本/)
   })
 })

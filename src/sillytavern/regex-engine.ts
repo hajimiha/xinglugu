@@ -64,6 +64,7 @@ export function parseRegexScripts(
     const placement = Array.isArray(source.placement) ? source.placement.filter((entry): entry is number => typeof entry === 'number') : []
     const promptOnly = source.promptOnly === true
     const markdownOnly = source.markdownOnly === true
+    if (promptOnly && markdownOnly) throw new Error(`regexScripts[${index}] 的 promptOnly 与 markdownOnly 不能同时为 true。`)
     const stages = stageArray(source.stages)
       ?? (promptOnly ? ['prompt'] : markdownOnly ? ['display'] : ['prompt', 'output', 'display'])
     const targets = targetArray(source.targets)
@@ -72,6 +73,14 @@ export function parseRegexScripts(
         ...(placement.includes(2) ? ['assistant' as const] : []),
       ]))
     const scope = source.scope === 'preset' || source.scope === 'global' ? source.scope : defaultScope
+    const existingCompatibility = source.compatibility && typeof source.compatibility === 'object' && !Array.isArray(source.compatibility)
+      ? source.compatibility as Record<string, unknown>
+      : null
+    const existingRaw = existingCompatibility?.raw && typeof existingCompatibility.raw === 'object' && !Array.isArray(existingCompatibility.raw)
+      ? existingCompatibility.raw as Record<string, unknown>
+      : null
+    const isSillyTavernDialect = ['scriptName', 'findRegex', 'replaceString', 'placement', 'promptOnly', 'markdownOnly', 'runOnEdit', 'substituteRegex']
+      .some((key) => key in source)
     return {
       id,
       name: typeof source.name === 'string' && source.name.trim()
@@ -89,6 +98,12 @@ export function parseRegexScripts(
       maxDepth: typeof source.maxDepth === 'number' && Number.isFinite(source.maxDepth) ? Math.max(0, Math.round(source.maxDepth)) : undefined,
       scope,
       order: typeof source.order === 'number' && Number.isFinite(source.order) ? source.order : index,
+      ...((existingRaw || isSillyTavernDialect) ? {
+        compatibility: {
+          dialect: 'sillytavern' as const,
+          raw: structuredClone(existingRaw ?? source),
+        },
+      } : {}),
     }
   })
 }
@@ -99,11 +114,52 @@ export function getPresetRegexScripts(settings: Record<string, unknown>): Tavern
     : {}
   const raw = settings.regex_scripts ?? extensions.regex_scripts
   if (raw === undefined) return []
-  try {
-    return parseRegexScripts(raw, 'preset')
-  } catch {
-    return []
-  }
+  return parseRegexScripts(raw, 'preset')
+}
+
+function stagesFromRaw(raw: Record<string, unknown>): TavernRegexStage[] {
+  if (raw.promptOnly === true && raw.markdownOnly === true) return []
+  if (raw.promptOnly === true) return ['prompt']
+  if (raw.markdownOnly === true) return ['display']
+  return ['prompt', 'output', 'display']
+}
+
+export function exportRegexScripts(scripts: TavernRegexScript[]): Record<string, unknown>[] {
+  return scripts.map((script) => {
+    const raw = script.compatibility?.dialect === 'sillytavern'
+      ? structuredClone(script.compatibility.raw)
+      : {}
+    const exported: Record<string, unknown> = {
+      ...raw,
+      id: script.id,
+      scriptName: script.name,
+      findRegex: script.pattern,
+      replaceString: script.replacement,
+      trimStrings: [...script.trimStrings],
+      placement: [
+        ...(script.targets.includes('user') ? [1] : []),
+        ...(script.targets.includes('assistant') ? [2] : []),
+      ],
+      disabled: !script.enabled,
+      minDepth: script.minDepth,
+      maxDepth: script.maxDepth,
+    }
+    const originalStages = script.compatibility ? stagesFromRaw(raw) : null
+    if (!originalStages || JSON.stringify(originalStages) !== JSON.stringify(script.stages)) {
+      if (script.stages.length === 1 && script.stages[0] === 'prompt') {
+        exported.promptOnly = true
+        delete exported.markdownOnly
+      } else if (script.stages.length === 1 && script.stages[0] === 'display') {
+        exported.markdownOnly = true
+        delete exported.promptOnly
+      } else {
+        exported.promptOnly = false
+        exported.markdownOnly = false
+        exported.stages = [...script.stages]
+      }
+    }
+    return exported
+  })
 }
 
 export function putPresetRegexScripts(settings: Record<string, unknown>, scripts: TavernRegexScript[]): Record<string, unknown> {
@@ -112,7 +168,7 @@ export function putPresetRegexScripts(settings: Record<string, unknown>, scripts
     : {}
   return {
     ...settings,
-    extensions: { ...extensions, regex_scripts: scripts.map((script) => ({ ...script, scope: 'preset' })) },
+    extensions: { ...extensions, regex_scripts: exportRegexScripts(scripts.map((script) => ({ ...script, scope: 'preset' }))) },
   }
 }
 

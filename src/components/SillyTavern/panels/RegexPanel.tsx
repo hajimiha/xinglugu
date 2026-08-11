@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { exportToJson } from '../../../sillytavern/importer'
-import { applyRegexScripts, getPresetRegexScripts, parseRegexScripts, putPresetRegexScripts } from '../../../sillytavern/regex-engine'
+import { applyRegexScripts, exportRegexScripts, getPresetRegexScripts, parseRegexScripts, putPresetRegexScripts } from '../../../sillytavern/regex-engine'
 import type { TavernRegexScope, TavernRegexScript, TavernRegexStage, TavernRegexTarget } from '../../../sillytavern/types'
 import { useTavern } from '../../../tavern/TavernContext'
 import { GameIcon } from '../../icons/GameIcon'
@@ -113,7 +113,7 @@ export function RegexPanel() {
       <div className="panel-heading-actions">
         <input ref={importRef} id="regex-import-file" className="sr-only" type="file" accept="application/json,.json" aria-label="选择正则 JSON" onChange={(event) => void importScripts(event.target.files?.[0])} />
         <button id="regex-import" type="button" onClick={() => importRef.current?.click()}><GameIcon name="upload" size={16} />导入正则 JSON</button>
-        <button id="regex-export" type="button" onClick={() => exportToJson({ regex_scripts: scripts }, 'mistvale-regex-scripts.json')}><GameIcon name="download" size={16} />导出正则 JSON</button>
+        <button id="regex-export" type="button" onClick={() => exportToJson({ regex_scripts: exportRegexScripts(scripts) }, 'mistvale-regex-scripts.json')}><GameIcon name="download" size={16} />导出正则 JSON</button>
         <button id="regex-create" type="button" onClick={create}>新建正则脚本</button>
         <button id="regex-save" className="primary-button" type="button" onClick={() => void save()}><GameIcon name="save" size={16} />保存正则</button>
       </div>

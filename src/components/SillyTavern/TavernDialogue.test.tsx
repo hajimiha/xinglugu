@@ -111,6 +111,71 @@ describe('NPC 酒馆会话', () => {
     await waitFor(() => expect(screen.getByTestId('game-state-probe')).toHaveTextContent('精力 4 · 好感 6'))
   })
 
+  it('每一次成功的 NPC 模型互动都独立消耗精力', async () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: true }))
+    const responseText = '<maintext>洛岚继续回答。</maintext><option>继续追问\n暂时告辞</option><sum>继续交谈。</sum><vars>{}</vars>'
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(new Response(
+      `data: ${JSON.stringify({ choices: [{ delta: { content: responseText } }] })}\n\ndata: [DONE]\n\n`,
+      { headers: { 'content-type': 'text/event-stream' } },
+    )))
+    vi.stubGlobal('fetch', fetchMock)
+    setSessionApiKey('session-secret')
+    database = createTavernDatabase(`mistvale-multi-turn-energy-${crypto.randomUUID()}`)
+    const repository = createTavernRepository(database)
+    await repository.initialize()
+    const loran = npcs.find((npc) => npc.id === 'loran')!
+    const user = userEvent.setup()
+
+    render(
+      <GameProvider initialState={{ ...initialGameState, location: 'mayor-home' }}>
+        <TavernProvider repository={repository}>
+          <TavernDialogue npc={loran} />
+          <GameStateProbe />
+        </TavernProvider>
+      </GameProvider>,
+    )
+
+    const firstAction = await screen.findByRole('button', { name: /选择行动：询问今日委托/ })
+    await waitFor(() => expect(firstAction).toBeEnabled())
+    await user.click(firstAction)
+    await waitFor(() => expect(screen.getByTestId('game-state-probe')).toHaveTextContent('精力 4'))
+    const secondAction = await screen.findByRole('button', { name: /选择行动：继续追问/ })
+    await waitFor(() => expect(secondAction).toBeEnabled())
+    await user.click(secondAction)
+
+    await waitFor(() => expect(screen.getByTestId('game-state-probe')).toHaveTextContent('精力 3'))
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('精力为零时在发送前阻止远程请求并显示游戏内提示', async () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: true }))
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    setSessionApiKey('session-secret')
+    database = createTavernDatabase(`mistvale-zero-energy-${crypto.randomUUID()}`)
+    const repository = createTavernRepository(database)
+    await repository.initialize()
+    const loran = npcs.find((npc) => npc.id === 'loran')!
+    const user = userEvent.setup()
+
+    render(
+      <GameProvider initialState={{ ...initialGameState, energy: 0, location: 'mayor-home' }}>
+        <TavernProvider repository={repository}>
+          <TavernDialogue npc={loran} />
+          <GameStateProbe />
+        </TavernProvider>
+      </GameProvider>,
+    )
+
+    const action = await screen.findByRole('button', { name: /选择行动：询问今日委托/ })
+    await waitFor(() => expect(action).toBeEnabled())
+    await user.click(action)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/精力不足/)
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(screen.getByTestId('game-state-probe')).toHaveTextContent('精力 0')
+  })
+
   it('既有会话继续交谈时使用当前激活预设，而不是创建会话时遗留的旧 presetId', async () => {
     vi.stubGlobal('matchMedia', () => ({ matches: true }))
     const response = '<maintext>当前预设已生效。</maintext><option>继续</option><sum>验证预设。</sum><vars>{}</vars>'

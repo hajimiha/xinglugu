@@ -3,7 +3,7 @@ import { createRemoteTavernApi, redactRequestInspection } from '../sillytavern/a
 import { getTavernApiReadiness } from '../sillytavern/api-readiness'
 import { resolveApiKey } from '../sillytavern/api-credentials'
 import { getTavernProvider } from '../sillytavern/provider-registry'
-import { resolveSessionPreset } from '../sillytavern/prompt-compiler'
+import { resolveSessionResources } from '../sillytavern/prompt-compiler'
 import { applyPresetGenerationSettings } from '../sillytavern/preset-generation'
 import { tavernRepository, type TavernRepository } from '../sillytavern/repository'
 import type {
@@ -15,7 +15,7 @@ import type {
   TavernSettings,
   TavernRequestAudit,
 } from '../sillytavern/types'
-import { variableDefinitionsToRecord } from '../sillytavern/variable-definitions'
+import { applyDefinedVariablePatch, variableDefinitionsToRecord } from '../sillytavern/variable-definitions'
 import { branchChat, truncateChatAt } from '../sillytavern/variables'
 import { createRemoteTurn, type RemoteTurnInspection, type RemoteTurnResult } from './remote-story-engine'
 import { DEFAULT_PLAYER_NAME, normalizePlayerName } from '../game/player-profile'
@@ -195,10 +195,9 @@ export function TavernProvider({ children, repository = tavernRepository, player
       ?? (await repository.listCharacters()).find((candidate) => candidate.npcId === input.npcId)
     if (!character) throw new Error(`找不到 NPC 角色卡：${input.npcId}`)
     const availablePresets = presets.length ? presets : await repository.listPresets()
-    const preset = resolveSessionPreset(session, currentSettings, availablePresets)
-    if (!preset) throw new Error('尚未选择可用的酒馆提示词预设。')
-    const sessionLorebookIds = session.lorebookIds.length ? session.lorebookIds : currentSettings.activeLorebookIds
-    const activeLorebooks = lorebooks.filter((book) => sessionLorebookIds.includes(book.id))
+    const resources = resolveSessionResources(session, currentSettings, availablePresets, lorebooks)
+    const preset = resources.preset
+    const activeLorebooks = resources.lorebooks
     const effectiveApiConfig = applyPresetGenerationSettings(currentSettings.api, preset.settings)
     const api = createRemoteTavernApi(effectiveApiConfig, resolveApiKey(currentSettings))
     let requestInspection: RemoteTurnInspection | null = null
@@ -258,6 +257,20 @@ export function TavernProvider({ children, repository = tavernRepository, player
       providerReasoning: turn.providerReasoning || undefined,
       responsePreview: turn.parsed.maintext.slice(0, 500),
     }
+    const variableTransaction = applyDefinedVariablePatch({
+      patch: turn.variablePatch,
+      globalDefinitions: currentSettings.globalVariables ?? [],
+      sessionDefinitions: session.variableDefinitions ?? [],
+      readOnlyKeys: [...Object.keys(input.variables ?? {}), 'playerName', 'userName'],
+    })
+    const committedSettings = JSON.stringify(variableTransaction.globalDefinitions) === JSON.stringify(currentSettings.globalVariables ?? [])
+      ? undefined
+      : { ...currentSettings, globalVariables: variableTransaction.globalDefinitions, updatedAt: Date.now() }
+    succeeded.diagnostics = [
+      ...succeeded.diagnostics,
+      ...turn.regexErrors,
+      ...variableTransaction.diagnostics,
+    ]
     const now = Date.now()
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
@@ -272,7 +285,7 @@ export function TavernProvider({ children, repository = tavernRepository, player
       content: turn.parsed.maintext,
       timestamp: now + 1,
       parsed: turn.parsed,
-      variablesAfter: turn.variablesAfter,
+      variablesAfter: variableTransaction.sessionVariables,
       apiUsed: 'remote',
       metadata: {
         processingTime: Math.round(performance.now() - startedAt),
@@ -284,11 +297,13 @@ export function TavernProvider({ children, repository = tavernRepository, player
       ...session,
       userName: currentPlayerName,
       messages: [...session.messages, userMessage, assistantMessage],
-      variables: turn.variablesAfter,
+      variables: variableTransaction.sessionVariables,
+      variableDefinitions: variableTransaction.sessionDefinitions,
       updatedAt: now + 1,
     }
-    await repository.commitTurn(next, succeeded)
+    await repository.commitTurn(next, succeeded, committedSettings)
     setSessions((current) => replaceById(current, next).sort((a, b) => b.updatedAt - a.updatedAt))
+    if (committedSettings) setSettings(committedSettings)
     setRequestAudits(await repository.listRequestAudits())
     return next
       })
@@ -321,7 +336,14 @@ export function TavernProvider({ children, repository = tavernRepository, player
   }, [repository])
   const deletePreset = useCallback(async (id: string) => {
     await repository.deletePreset(id)
-    setPresets((current) => current.filter((item) => item.id !== id))
+    const [nextPresets, nextSessions, nextSettings] = await Promise.all([
+      repository.listPresets(),
+      repository.listSessions(),
+      repository.getSettings(),
+    ])
+    setPresets(nextPresets)
+    setSessions(nextSessions)
+    setSettings(nextSettings)
   }, [repository])
   const saveCharacter = useCallback(async (value: CharacterCard) => {
     await repository.saveCharacter(value)

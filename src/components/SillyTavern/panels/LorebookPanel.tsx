@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
 import { createDefaultEntry, createDefaultLorebook, removeEntry, updateEntry } from '../../../sillytavern/editor-utils'
-import { exportLorebook, exportToJson, importLorebook } from '../../../sillytavern/importer'
+import { exportLorebook, exportToJson, getLorebookCompatibilityWarnings, importLorebook } from '../../../sillytavern/importer'
 import type { Lorebook, LorebookEntry } from '../../../sillytavern/types'
 import { useTavern } from '../../../tavern/TavernContext'
 import { GameIcon } from '../../icons/GameIcon'
@@ -75,9 +75,10 @@ export function LorebookPanel() {
       setSelectedId(next.id)
       setDraft(next)
       setEntryId(next.entries[0]?.id ?? null)
-      setNotice(`已导入世界书“${next.name}”`)
-    } catch {
-      setNotice('导入失败：请选择有效的 SillyTavern 世界书 JSON。')
+      const warnings = getLorebookCompatibilityWarnings(next)
+      setNotice(`已导入世界书“${next.name}”${warnings.length ? `；以下字段会原样保留但当前运行时不会执行：${warnings.join('、')}` : ''}`)
+    } catch (caught) {
+      setNotice(`导入失败：${caught instanceof Error ? caught.message : '请选择有效的 SillyTavern 世界书 JSON。'}`)
     }
   }
   const exportBook = () => {

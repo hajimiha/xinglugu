@@ -50,6 +50,32 @@ describe('importer multi/rename', () => {
     expect(exported.entries['0']).toMatchObject({ disable: true, excluded: false, content: 'hidden lore' });
   });
 
+  it('无损保留世界书原始 UID、条目键、未知字段与整册设置', () => {
+    const imported = importLorebook({
+      name: '兼容档案',
+      custom_root: { author: 'player' },
+      entries: {
+        '42': {
+          uid: 77, key: ['雾'], keysecondary: [], content: '原始正文', disable: false,
+          vectorized: true, automation_id: 'custom-automation',
+        },
+      },
+      settings: { recursive_scanning: true, scan_depth: 12, custom_setting: 'keep' },
+    })
+    imported.entries[0].content = '编辑后的正文'
+
+    const exported = exportLorebook({ ...imported, id: 'book', createdAt: 1, updatedAt: 2 }) as Record<string, any>
+
+    expect(exported.custom_root).toEqual({ author: 'player' })
+    expect(exported.settings).toMatchObject({ recursive_scanning: true, scan_depth: 12, custom_setting: 'keep' })
+    expect(exported.entries['42']).toMatchObject({
+      uid: 77,
+      content: '编辑后的正文',
+      vectorized: true,
+      automation_id: 'custom-automation',
+    })
+  })
+
   it('imports official grouped SillyTavern prompt order and prefers character slot 100001', () => {
     const source = {
       temperature: 1,

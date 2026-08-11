@@ -154,6 +154,31 @@ describe('雾灯谷酒馆仓储', () => {
     expect(await repository.getSession('session-test')).toBeUndefined()
   })
 
+  it('删除预设时在同一事务中解除固定会话绑定并迁移当前预设', async () => {
+    database = createTavernDatabase(`mistvale-delete-preset-${crypto.randomUUID()}`)
+    const repository = createTavernRepository(database)
+    await repository.initialize()
+    const [fallback] = await repository.listPresets()
+    const pinned = { ...structuredClone(fallback), id: 'pinned-to-delete', name: '待删除固定预设', updatedAt: Date.now() + 1 }
+    await repository.savePreset(pinned)
+    const settings = await repository.getSettings()
+    await repository.saveSettings({ ...settings, activePresetId: pinned.id })
+    await repository.saveSession({
+      id: 'pinned-delete-session', name: '固定会话', messages: [], characterName: '洛岚', userName: '旅行者',
+      presetId: pinned.id, presetBinding: { mode: 'pinned', presetId: pinned.id }, lorebookIds: [], variables: {},
+      createdAt: 1, updatedAt: 1,
+    })
+
+    await repository.deletePreset(pinned.id)
+
+    expect(await repository.getPreset(pinned.id)).toBeUndefined()
+    expect(await repository.getSession('pinned-delete-session')).toMatchObject({
+      presetId: null,
+      presetBinding: { mode: 'follow-active' },
+    })
+    expect((await repository.getSettings()).activePresetId).toBe(fallback.id)
+  })
+
   it('仓库内容包仅在版本升级时更新同 ID 默认内容并保留本机新增内容', async () => {
     database = createTavernDatabase(`mistvale-content-pack-${crypto.randomUUID()}`)
     const defaults = createMistvaleDefaults()

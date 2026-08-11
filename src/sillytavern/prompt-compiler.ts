@@ -2,7 +2,6 @@ import { createLorebookEngine } from './lorebook-engine'
 import { evaluateMacros } from './macro-engine'
 import { applyRegexScripts, getPresetRegexScripts } from './regex-engine'
 import { getPresetPromptDefinitions, getPresetPromptOrder, normalizePresetPromptRole } from './preset-compat'
-import { projectCharacterPrompts } from './rolecard-projection'
 import type {
   CharacterCard,
   ChatPreset,
@@ -18,6 +17,7 @@ import type {
 } from './types'
 import { formatVariablesForPrompt } from './variables'
 import { applyPromptBudget } from './prompt-budget'
+import { getLorebookCompatibilityWarnings } from './importer'
 
 export interface PromptCompileInput {
   userInput: string
@@ -83,6 +83,35 @@ export function resolveSessionPreset(
   throw new Error('尚未选择可用的酒馆提示词预设。')
 }
 
+export interface ResolvedSessionResources {
+  preset: ChatPreset
+  lorebooks: Lorebook[]
+  lorebookIds: string[]
+}
+
+/**
+ * Resolve the exact prompt resources attached to a chat session.
+ * Request compilation and every UI preview must use this same result so a
+ * pinned session cannot silently display a different preset or lorebook set.
+ */
+export function resolveSessionResources(
+  session: Pick<ChatSession, 'presetId' | 'presetBinding' | 'lorebookIds'>,
+  settings: Pick<TavernSettings, 'activePresetId' | 'activeLorebookIds'>,
+  presets: ChatPreset[],
+  lorebooks: Lorebook[],
+): ResolvedSessionResources {
+  const preset = resolveSessionPreset(session, settings, presets)
+  const lorebookIds = session.lorebookIds.length
+    ? [...session.lorebookIds]
+    : [...settings.activeLorebookIds]
+  const enabledIds = new Set(lorebookIds)
+  return {
+    preset,
+    lorebookIds,
+    lorebooks: lorebooks.filter((book) => enabledIds.has(book.id)),
+  }
+}
+
 export function compileTavernTurn(input: PromptCompileInput): PromptCompilation {
   const { preset, variables = {}, extraVariables = {} } = input
   const allMatchedEntries: MatchedEntry[] = []
@@ -106,7 +135,13 @@ export function compileTavernTurn(input: PromptCompileInput): PromptCompilation 
   const unsupportedPositions = Array.from(new Set(matchedEntries
     .map((match) => match.position)
     .filter((position) => !['before_char', 'after_char', 'before_example', 'after_example'].includes(position))))
-  const diagnostics: string[] = unsupportedPositions.map((position) => `未支持的世界书注入位置：${position}`)
+  const diagnostics: string[] = [
+    ...unsupportedPositions.map((position) => `未支持的世界书注入位置：${position}`),
+    ...input.lorebooks.flatMap((book) => {
+      const warnings = getLorebookCompatibilityWarnings(book)
+      return warnings.length ? [`世界书“${book.name}”保留但当前运行时未执行：${warnings.join('、')}`] : []
+    }),
+  ]
   const macroOperations: MacroOperation[] = []
   let macroVariables: Record<string, unknown> = { ...extraVariables, ...variables }
   const macroContext = {
@@ -116,7 +151,6 @@ export function compileTavernTurn(input: PromptCompileInput): PromptCompilation 
     lastUserMessage: [...input.history].reverse().find((message) => message.role === 'user')?.content ?? '',
     lastCharacterMessage: [...input.history].reverse().find((message) => message.role === 'assistant')?.content ?? '',
   }
-  const characterPrompts = input.character ? projectCharacterPrompts(input.character) : undefined
   const regexScripts = [...(input.regexScripts ?? []), ...getPresetRegexScripts(preset.settings)]
   const compileMacros = (raw: string) => {
     const evaluation = evaluateMacros(raw, macroVariables, macroContext)
@@ -181,14 +215,9 @@ export function compileTavernTurn(input: PromptCompileInput): PromptCompilation 
     if (identifier === 'bias') return { content: null, source: 'preset' }
     if (settingKeys[identifier]) {
       const promptKey = settingKeys[identifier]
-      const characterPrompt = characterPrompts && promptKey in characterPrompts
-        ? characterPrompts[promptKey as keyof typeof characterPrompts]
-        : undefined
       return {
-        content: characterPrompt?.trim() ? characterPrompt : setting(promptKey),
-        source: identifier.startsWith('char') || identifier === 'scenario' || identifier === 'dialogueExamples'
-          ? 'character'
-          : 'preset',
+        content: setting(promptKey),
+        source: 'preset',
       }
     }
     const definition = definitions.find((prompt) => prompt.identifier === identifier)

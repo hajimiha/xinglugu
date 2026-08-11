@@ -4,6 +4,7 @@ import { formatClock, formatGameDate, getCalendarDate, getFestivalOnDay, getNpcP
 import { locations } from '../../game/data'
 import type { GameState, Npc } from '../../game/types'
 import type { ChatSession } from '../../sillytavern/types'
+import { resolveSessionResources } from '../../sillytavern/prompt-compiler'
 import { applyRegexScripts, getPresetRegexScripts } from '../../sillytavern/regex-engine'
 import { useTavern } from '../../tavern/TavernContext'
 import { GameIcon } from '../icons/GameIcon'
@@ -63,7 +64,6 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
   const [historyOpen, setHistoryOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const openingRef = useRef(false)
-  const settlementRef = useRef(false)
   const abortRef = useRef<AbortController | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const dialogueVariables = useMemo(
@@ -88,12 +88,14 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
   const lastAssistant = [...(session?.messages ?? [])].reverse().find((message) => message.role === 'assistant')
   const options = lastAssistant?.parsed?.options.length ? lastAssistant.parsed.options : (openingOptions[npc.id] ?? ['继续交谈', '询问她的近况', '暂时告辞'])
   const card = tavern.characters.find((candidate) => candidate.npcId === npc.id)
-  const activeLorebooks = useMemo(() => tavern.lorebooks.filter((book) => card?.lorebookIds.includes(book.id)), [tavern.lorebooks, card])
-  const activePreset = tavern.presets.find((preset) => preset.id === tavern.settings?.activePresetId) ?? tavern.presets[0]
+  const activeResources = useMemo(() => {
+    if (!session || !tavern.settings || tavern.presets.length === 0) return null
+    return resolveSessionResources(session, tavern.settings, tavern.presets, tavern.lorebooks)
+  }, [session, tavern.settings, tavern.presets, tavern.lorebooks])
   const displayScripts = useMemo(() => [
     ...(tavern.settings?.regexScripts ?? []),
-    ...(activePreset ? getPresetRegexScripts(activePreset.settings) : []),
-  ], [tavern.settings?.regexScripts, activePreset])
+    ...(activeResources ? getPresetRegexScripts(activeResources.preset.settings) : []),
+  ], [tavern.settings?.regexScripts, activeResources])
   const displayedMessages = useMemo(() => (session?.messages ?? []).map((message, index, messages) => ({
     ...message,
     displayContent: applyRegexScripts(message.content, displayScripts, {
@@ -114,6 +116,10 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
   const send = async (text: string) => {
     const message = text.trim()
     if (!message || working || !session) return
+    if (state.energy < 1) {
+      setError('精力不足，今天无法继续与 NPC 互动。可以休息到明天，或前往医院恢复精力。')
+      return
+    }
     if (!tavern.apiReady) {
       setError(tavern.apiReadinessError ?? '接口尚未就绪，请先完成模型连接配置。')
       return
@@ -138,10 +144,7 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
         onReasoningDelta: setStreamingReasoning,
       })
       setSessionSnapshot(next)
-      if (!settlementRef.current) {
-        settlementRef.current = true
-        dispatch({ type: 'CHAT_WITH_NPC', npcId: npc.id })
-      }
+      dispatch({ type: 'CHAT_WITH_NPC', npcId: npc.id })
     } catch (caught) {
       if (!(caught instanceof DOMException && caught.name === 'AbortError')) {
         setError(caught instanceof Error ? caught.message : '叙事生成失败，请检查接口设置。')
@@ -207,7 +210,7 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
       <div className="tavern-status-ribbon">
         <span className="tavern-status-dot" aria-hidden="true" />
         <strong>{tavern.apiLabel}</strong>
-        <small>{tavern.status === 'loading' ? '正在载入角色记忆' : `${activeLorebooks.length} 册世界书已挂载`}</small>
+        <small>{tavern.status === 'loading' ? '正在载入角色记忆' : `${activeResources?.lorebooks.length ?? 0} 册世界书已挂载`}</small>
       </div>
 
       <div ref={scrollRef} className="tavern-dialogue-scroll" data-testid="tavern-dialogue-scroll" role="region" aria-label="酒馆会话记录">

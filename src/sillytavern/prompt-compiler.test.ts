@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { CharacterCard, ChatPreset, ChatSession, TavernSettings } from './types'
-import { compileTavernTurn, resolveSessionPreset } from './prompt-compiler'
+import type { CharacterCard, ChatPreset, ChatSession, Lorebook, TavernSettings } from './types'
+import { compileTavernTurn, resolveSessionPreset, resolveSessionResources } from './prompt-compiler'
 import { createMistvaleDefaults } from './defaults'
 
 const now = 1
@@ -107,6 +107,27 @@ describe('严格酒馆提示词编译器', () => {
     expect(resolveSessionPreset(session, settings, [pinned, active])).toBe(pinned)
   })
 
+  it('为固定会话统一解析实际预设与会话世界书，供请求和界面共同使用', () => {
+    const pinned = preset('pinned', '固定预设')
+    const active = preset('active', '当前预设')
+    const session = {
+      id: 'resource-session', name: '资源会话', messages: [], characterName: '洛岚', userName: '旅行者',
+      presetId: null, presetBinding: { mode: 'pinned', presetId: pinned.id }, lorebookIds: ['session-book'],
+      variables: {}, createdAt: now, updatedAt: now,
+    } satisfies ChatSession
+    const settings = { activePresetId: active.id, activeLorebookIds: ['active-book'] } as TavernSettings
+    const books = [
+      { id: 'session-book', name: '会话世界书', entries: [], recursiveScanning: true, caseSensitive: false, matchWholeWords: false, createdAt: now, updatedAt: now },
+      { id: 'active-book', name: '全局世界书', entries: [], recursiveScanning: true, caseSensitive: false, matchWholeWords: false, createdAt: now, updatedAt: now },
+    ] satisfies Lorebook[]
+
+    const resources = resolveSessionResources(session, settings, [active, pinned], books)
+
+    expect(resources.preset).toBe(pinned)
+    expect(resources.lorebooks.map((book) => book.id)).toEqual(['session-book'])
+    expect(resources.lorebookIds).toEqual(['session-book'])
+  })
+
   it('按条目顺序执行 SillyTavern 宏并把最终结果真正放进出站消息', () => {
     const macroPreset = preset('macro', '宏预设', '{{setvar::tone::温柔}}{{//仅本地注释}}{{trim}}', '语气={{getvar::tone}}；玩家={{user}}；上一句={{lastCharMessage}}')
     const result = compileTavernTurn({
@@ -169,7 +190,7 @@ describe('严格酒馆提示词编译器', () => {
           { id: 'after', ...lorebookEntryDefaults, keys: ['触发'], position: 'after_char', content: 'AFTER' },
           { id: 'example-before', ...lorebookEntryDefaults, keys: ['触发'], position: 'before_example', content: 'EXAMPLE_BEFORE' },
           { id: 'example-after', ...lorebookEntryDefaults, keys: ['触发'], position: 'after_example', content: 'EXAMPLE_AFTER' },
-          { id: 'depth', ...lorebookEntryDefaults, keys: ['触发'], position: 'at_depth', depth: 3, content: 'DEPTH_UNSUPPORTED' },
+          { id: 'depth', ...lorebookEntryDefaults, keys: ['触发'], position: 'at_depth', depth: 3, sticky: 2, content: 'DEPTH_UNSUPPORTED' },
           { id: 'outlet', ...lorebookEntryDefaults, keys: ['触发'], position: 'outlet', content: 'UNSUPPORTED' },
         ],
       }],
@@ -183,6 +204,7 @@ describe('严格酒馆提示词编译器', () => {
     expect(result.systemPrompt).not.toContain('UNSUPPORTED')
     expect(result.diagnostics).toContain('未支持的世界书注入位置：at_depth')
     expect(result.diagnostics).toContain('未支持的世界书注入位置：outlet')
+    expect(result.diagnostics).toContain('世界书“placements”保留但当前运行时未执行：注入位置 at_depth、粘滞回合、注入位置 outlet')
   })
 
   it('orders equal-score matches by collision-safe identity across lorebooks', () => {
@@ -203,7 +225,7 @@ describe('严格酒馆提示词编译器', () => {
     expect(result.systemPrompt).toContain('A\n\nZ')
   })
 
-  it('按启用的角色卡提示词顺序编译角色内容和宏，并保持当前输入最后', () => {
+  it('角色卡仅承担立绘资料，不把旧文字字段重复注入提示词', () => {
     const character = {
       ...createMistvaleDefaults().characters[0],
       description: '描述 {{char}}',
@@ -232,12 +254,9 @@ describe('严格酒馆提示词编译器', () => {
       character,
     })
 
-    expect(result.messages).toEqual([
-      { role: 'system', content: `描述 ${character.name}\n\n场景 当前输入\n\n示例` },
-      { role: 'user', content: '当前输入' },
-    ])
+    expect(result.messages).toEqual([{ role: 'user', content: '当前输入' }])
     expect(result.segments.filter((segment) => segment.source === 'character' && segment.sent).map((segment) => segment.identifier))
-      .toEqual(['charDescription', 'scenario', 'dialogueExamples'])
+      .toEqual([])
   })
 
   it('先编译全部历史，再用运行时 API 预算省略旧历史并保持最终消息顺序', () => {

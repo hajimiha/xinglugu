@@ -3,7 +3,7 @@ import { createMistvaleDefaults } from './defaults'
 import { projectCharacterPrompts } from './rolecard-projection'
 
 describe('角色卡提示词投影', () => {
-  it('将角色卡的四个提示词字段映射到规范标识符并保留原始宏', () => {
+  it('角色文字只由世界书提供，不再从立绘角色卡投影到提示词', () => {
     const character = {
       ...createMistvaleDefaults().characters[0],
       description: '描述 {{char}} {{user}}',
@@ -12,12 +12,7 @@ describe('角色卡提示词投影', () => {
       exampleDialogue: '示例 {{lastUserMessage}}',
     }
 
-    expect(projectCharacterPrompts(character)).toEqual({
-      character_description: '描述 {{char}} {{user}}',
-      character_personality: '性格 {{original}}',
-      scenario: '场景 {{getvar::weather}}',
-      dialogue_examples: '示例 {{lastUserMessage}}',
-    })
+    expect(projectCharacterPrompts(character)).toEqual({})
   })
 
   it('空角色卡字段保持为空字符串', () => {
@@ -29,11 +24,6 @@ describe('角色卡提示词投影', () => {
       exampleDialogue: '',
     }
 
-    expect(projectCharacterPrompts(character)).toEqual({
-      character_description: '',
-      character_personality: '',
-      scenario: '',
-      dialogue_examples: '',
-    })
+    expect(projectCharacterPrompts(character)).toEqual({})
   })
 })

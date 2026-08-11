@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyRegexScripts, parseRegexScripts } from './regex-engine'
+import { applyRegexScripts, exportRegexScripts, parseRegexScripts } from './regex-engine'
 
 const context = {
   stage: 'prompt' as const,
@@ -49,5 +49,27 @@ describe('SillyTavern 正则运行时', () => {
       id: 'st-script', name: 'ST 脚本', pattern: '/foo/gi', replacement: 'bar',
       stages: ['prompt', 'output', 'display'], targets: ['user', 'assistant'], scope: 'preset', minDepth: 0, maxDepth: 5,
     })
+  })
+
+  it('导出时保留 SillyTavern 方言未知字段和布尔三态', () => {
+    const scripts = parseRegexScripts([{
+      id: 'lossless', scriptName: '无损脚本', findRegex: '/foo/g', replaceString: 'bar', placement: [2],
+      disabled: false, promptOnly: false, runOnEdit: true, substituteRegex: 2, customExtension: { keep: true },
+    }], 'preset')
+    scripts[0].replacement = 'edited'
+
+    const [exported] = exportRegexScripts(scripts)
+
+    expect(exported).toMatchObject({
+      id: 'lossless', scriptName: '无损脚本', replaceString: 'edited', promptOnly: false,
+      runOnEdit: true, substituteRegex: 2, customExtension: { keep: true },
+    })
+    expect(exported).not.toHaveProperty('markdownOnly')
+  })
+
+  it('拒绝同时声明 promptOnly 与 markdownOnly 的矛盾脚本', () => {
+    expect(() => parseRegexScripts([{
+      id: 'contradictory', findRegex: '/foo/g', replaceString: '', promptOnly: true, markdownOnly: true,
+    }])).toThrow(/promptOnly.*markdownOnly/)
   })
 })

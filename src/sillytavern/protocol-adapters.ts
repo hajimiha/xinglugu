@@ -1,4 +1,4 @@
-import { normalizeApiBaseUrl } from './api-config'
+import { normalizeApiBaseUrl, validateProviderSamplingConfig } from './api-config'
 import { getTavernProvider } from './provider-registry'
 import type { TavernApiConfig, TavernApiProtocol, TavernRequest } from './types'
 
@@ -31,6 +31,20 @@ function geminiContents(request: TavernRequest) {
       role: message.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: message.content }],
     })),
+  }
+}
+
+function assertProviderMessageOrder(protocol: TavernApiProtocol, request: TavernRequest): void {
+  if (!['anthropic-messages', 'gemini', 'vertex-gemini', 'cohere-v2'].includes(protocol)) return
+  let reachedConversation = false
+  for (const message of request.messages) {
+    if (message.role !== 'system') {
+      reachedConversation = true
+      continue
+    }
+    if (reachedConversation) {
+      throw new Error('当前模型接口无法保持当前预设的系统提示词顺序。请把所有系统提示词移到聊天历史之前，或改用 OpenAI 兼容接口。')
+    }
   }
 }
 
@@ -74,6 +88,10 @@ export function buildProviderRequest(
   stream: boolean,
 ): BuiltProviderRequest {
   const provider = getTavernProvider(config.provider)
+  assertProviderMessageOrder(provider.protocol, request)
+  const samplingErrors = validateProviderSamplingConfig(config)
+  const samplingError = Object.values(samplingErrors)[0]
+  if (samplingError) throw new Error(samplingError)
   const url = joinUrl(config.baseUrl, resolveChatPath(config, stream))
   const common = { model: config.model, temperature: config.temperature }
   const openAiSampling = {
@@ -102,8 +120,8 @@ export function buildProviderRequest(
       ...common,
       max_tokens: config.maxResponseLength,
       p: config.topP,
-      frequency_penalty: config.frequencyPenalty,
-      presence_penalty: config.presencePenalty,
+      ...(config.frequencyPenalty > 0 ? { frequency_penalty: config.frequencyPenalty } : {}),
+      ...(config.presencePenalty > 0 ? { presence_penalty: config.presencePenalty } : {}),
       stream,
       messages: request.messages,
     }

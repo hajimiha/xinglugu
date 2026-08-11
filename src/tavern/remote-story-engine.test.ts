@@ -48,7 +48,7 @@ describe('远程酒馆剧情引擎', () => {
       history: [],
       preset: defaults.presets[0],
       lorebooks: defaults.lorebooks,
-      character: card,
+      character: { ...card, description: 'ROLECARD-DESCRIPTION-SENTINEL' },
       userName: '云岚',
       variables: { affinity: 0, money: 500 },
       formatPrompt: defaults.settings.formatPromptTemplate,
@@ -58,14 +58,14 @@ describe('远程酒馆剧情引擎', () => {
 
     expect(result.parsed.maintext).toBe('洛岚把今日的委托簿推到你面前。')
     expect(result.parsed.options).toEqual(['查看委托详情', '询问村庄近况'])
-    expect(result.variablesAfter).toMatchObject({ affinity: 0, money: 500, lastTopic: '委托' })
+    expect(result.variablePatch).toEqual({ lastTopic: '委托' })
     expect(result.matchedEntryIds.length).toBeGreaterThan(0)
     expect(streamed).toHaveLength(2)
     expect(streamed.at(-1)).toBe(response)
     expect(reasoning).toEqual(['核对角色卡'])
     expect(result.providerReasoning).toBe('核对角色卡')
-    expect(result.inspection.compilation.segments.filter((segment) => segment.source === 'character' && segment.sent).length).toBeGreaterThan(0)
-    expect(result.inspection.compilation.systemPrompt).toContain(card.description)
+    expect(result.inspection.compilation.segments.filter((segment) => segment.source === 'character' && segment.sent)).toEqual([])
+    expect(result.inspection.compilation.systemPrompt).not.toContain('ROLECARD-DESCRIPTION-SENTINEL')
     expect(prepare).toHaveBeenCalledWith(expect.objectContaining({
       task: 'story',
       messages: expect.arrayContaining([
@@ -122,7 +122,7 @@ describe('远程酒馆剧情引擎', () => {
       formatPrompt: '',
     })
 
-    expect(result.variablesAfter).toEqual({})
+    expect(result.variablePatch).toEqual({})
     expect(prepare).toHaveBeenCalledWith(expect.objectContaining({
       messages: expect.arrayContaining([expect.objectContaining({ role: 'system', content: expect.stringContaining('本轮语气=温柔') })]),
     }))
