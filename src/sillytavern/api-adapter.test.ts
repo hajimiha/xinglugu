@@ -100,6 +100,21 @@ describe('本地优先酒馆 API 适配器', () => {
     }))
   })
 
+  it('对预算内的编译消息原样透传，保持系统、历史和当前输入顺序', () => {
+    const config = { ...createMistvaleDefaults().settings.api, contextLength: 100, maxResponseLength: 10 }
+    const api = createRemoteTavernApi(config, 'secret-key', vi.fn())
+    const request = {
+      task: 'story' as const,
+      messages: [
+        { role: 'system' as const, content: '规则' },
+        { role: 'assistant' as const, content: '历史' },
+        { role: 'user' as const, content: '当前' },
+      ],
+    }
+
+    expect(api.prepare(request).request).toEqual(request)
+  })
+
   it('按 Claude 协议解析命名 SSE 事件', async () => {
     const config = {
       ...createMistvaleDefaults().settings.api,

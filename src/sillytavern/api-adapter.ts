@@ -212,12 +212,15 @@ export function createRemoteTavernApi(
     mode: 'remote',
     label: `${provider.label} · ${config.model}`,
     getPromptBudget: () => ({ contextLength: config.contextLength, maxResponseLength: config.maxResponseLength }),
-    prepare: (request) => ({
-      id: crypto.randomUUID(),
-      request: (validateRequestBudget(request, config.contextLength, config.maxResponseLength), request),
-      status: 'preview',
-      createdAt: Date.now(),
-    }),
+    prepare: (request) => {
+      validateRequestBudget(request, config.contextLength, config.maxResponseLength)
+      return {
+        id: crypto.randomUUID(),
+        request,
+        status: 'preview',
+        createdAt: Date.now(),
+      }
+    },
     inspect: (prepared) => inspectProviderRequest(config, prepared),
     async *stream(prepared: TavernPreparedRequest, signal?: AbortSignal) {
       const key = requireApiKey(apiKey)

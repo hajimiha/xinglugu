@@ -41,6 +41,18 @@ function estimateTokens(content: string): number {
   )))
 }
 
+function resolvePromptBudget(input: PromptCompileInput): { contextLength: number; maxResponseLength: number } {
+  if (input.budget) return input.budget
+  const configuredContext = input.preset.settings.openai_max_context ?? input.preset.settings.max_length
+  const parsedContext = typeof configuredContext === 'number' ? configuredContext : Number(configuredContext)
+  const configuredResponse = input.preset.settings.maxResponseLength ?? input.preset.settings.max_tokens
+  const parsedResponse = typeof configuredResponse === 'number' ? configuredResponse : Number(configuredResponse)
+  return {
+    contextLength: Number.isFinite(parsedContext) && parsedContext > 0 ? parsedContext : 4096,
+    maxResponseLength: Number.isFinite(parsedResponse) && parsedResponse > 0 ? parsedResponse : 0,
+  }
+}
+
 function traceSegment(
   segment: Omit<PromptTraceSegment, 'id' | 'tokenEstimate' | 'diagnostics'> & Partial<Pick<PromptTraceSegment, 'diagnostics'>>,
 ): PromptTraceSegment {
@@ -84,19 +96,7 @@ export function compileTavernTurn(input: PromptCompileInput): PromptCompilation 
   const matchedEntries = Array.from(new Map(allMatchedEntries.map((match) => [match.identity, match])).values())
     .sort((left, right) => left.score - right.score || left.identity.localeCompare(right.identity))
 
-  const configuredContext = preset.settings.openai_max_context ?? preset.settings.max_length
-  const parsedContext = typeof configuredContext === 'number' ? configuredContext : Number(configuredContext)
-  const maxContextTokens = Number.isFinite(parsedContext) && parsedContext > 0 ? parsedContext : 4096
-  let usedHistoryTokens = 0
-  const recentHistory: Array<{ id: string; role: TavernMessageRole; content: string }> = []
-  for (let index = input.history.length - 1; index >= 0; index -= 1) {
-    const message = input.history[index]
-    if (message.role === 'system') continue
-    const tokens = estimateTokens(message.content)
-    if (usedHistoryTokens + tokens > maxContextTokens * 0.8) break
-    recentHistory.unshift({ id: message.id, role: message.role, content: message.content })
-    usedHistoryTokens += tokens
-  }
+  const recentHistory = input.history.filter((message) => message.role !== 'system')
 
   const definitions = getPresetPromptDefinitions(preset.settings)
   const order = getPresetPromptOrder(preset.settings).items
@@ -285,12 +285,10 @@ export function compileTavernTurn(input: PromptCompileInput): PromptCompilation 
     diagnostics,
     systemPrompt: messages.filter((message) => message.role === 'system').map((message) => message.content).join('\n\n'),
   }
-  if (!input.budget) return compilation
   const budgeted = applyPromptBudget({
     messages: compilation.messages,
     segments: compilation.segments,
-    contextLength: input.budget.contextLength,
-    maxResponseLength: input.budget.maxResponseLength,
+    ...resolvePromptBudget(input),
     tokenEstimator: estimateTokens,
   })
   return {

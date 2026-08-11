@@ -239,4 +239,34 @@ describe('严格酒馆提示词编译器', () => {
     expect(result.segments.filter((segment) => segment.source === 'character' && segment.sent).map((segment) => segment.identifier))
       .toEqual(['charDescription', 'scenario', 'dialogueExamples'])
   })
+
+  it('先编译全部历史，再用运行时 API 预算省略旧历史并保持最终消息顺序', () => {
+    const result = compileTavernTurn({
+      userInput: 'current',
+      history: [
+        { id: 'old', role: 'assistant', content: 'old'.repeat(20), timestamp: now },
+        { id: 'newer', role: 'assistant', content: 'newer', timestamp: now },
+      ],
+      preset: {
+        ...preset('runtime-budget', 'runtime-budget', 'system', ''),
+        settings: {
+          ...preset('runtime-budget', 'runtime-budget', 'system', '').settings,
+          max_length: 4,
+        },
+      },
+      lorebooks: [],
+      userName: '玩家',
+      characterName: '角色',
+      budget: { contextLength: 12, maxResponseLength: 2 },
+    })
+
+    expect(result.messages).toEqual([
+      { role: 'system', content: 'system' },
+      { role: 'assistant', content: 'newer' },
+      { role: 'user', content: 'current' },
+    ])
+    expect(result.segments.find((segment) => segment.identifier === 'old')).toMatchObject({ sent: false })
+    expect(result.segments.find((segment) => segment.identifier === 'newer')).toMatchObject({ sent: true })
+    expect(result.budgetDiagnostics?.omittedSegments).toContain('old')
+  })
 })

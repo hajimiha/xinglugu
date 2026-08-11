@@ -60,4 +60,32 @@ describe('最终酒馆提示词预算', () => {
     expect(result.diagnostics.overflow).toBe(true)
     expect(result.diagnostics.omittedSegments).toEqual([])
   })
+
+  it('省略较旧历史时保留能放入预算的更新历史，并把非历史段落标记为省略', () => {
+    const result = applyPromptBudget({
+      messages: [
+        { role: 'system', content: 'sys' },
+        { role: 'assistant', content: 'old'.repeat(20) },
+        { role: 'assistant', content: 'newer' },
+        { role: 'assistant', content: 'optional-preset' },
+        { role: 'user', content: 'current' },
+      ],
+      segments: [
+        segment('system', 'preset', 'system', 'sys'),
+        segment('old-history', 'history', 'assistant', 'old'.repeat(20)),
+        segment('newer-history', 'history', 'assistant', 'newer'),
+        segment('optional-preset', 'preset', 'assistant', 'optional-preset'),
+        segment('current-user-input', 'user', 'user', 'current'),
+      ],
+      contextLength: 17,
+      maxResponseLength: 2,
+      tokenEstimator: (content) => content.length,
+    })
+
+    expect(result.messages.map((message) => message.content)).toEqual(['sys', 'newer', 'current'])
+    expect(result.segments.filter((item) => item.sent).map((item) => item.identifier)).toEqual([
+      'system', 'newer-history', 'current-user-input',
+    ])
+    expect(result.diagnostics.omittedSegments).toEqual(['old-history', 'optional-preset'])
+  })
 })
