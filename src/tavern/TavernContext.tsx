@@ -1,6 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { createRemoteTavernApi } from '../sillytavern/api-adapter'
-import { redactRequestInspection } from '../sillytavern/api-adapter'
+import { createRemoteTavernApi, redactRequestInspection } from '../sillytavern/api-adapter'
 import { validateTavernApiConfig } from '../sillytavern/api-config'
 import { resolveApiKey } from '../sillytavern/api-credentials'
 import { getTavernProvider } from '../sillytavern/provider-registry'

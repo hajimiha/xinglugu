@@ -209,6 +209,29 @@ describe('本地优先酒馆 API 适配器', () => {
     expect(JSON.stringify(redacted)).not.toMatch(/password|url-secret|fragment-secret|header-secret|api-secret|cookie-secret|token-secret/)
   })
 
+  it.each([
+    'X-Auth',
+    'X-Client-Key',
+    'Ocp-Apim-Subscription-Key',
+    'Proxy-Authorization',
+    'Set-Cookie',
+    'Api-Token',
+    'Client-Secret',
+    'Credential',
+    'Password',
+  ])('masks explicit credential-shaped header %s', (headerName) => {
+    const value = `${headerName}-fixture-secret`
+    const redacted = redactRequestInspection({
+      url: 'https://example.test/v1/chat',
+      method: 'POST',
+      headers: { [headerName]: value },
+      body: {},
+    })
+
+    expect(redacted.headers[headerName]).toBe('[已隐藏]')
+    expect(JSON.stringify(redacted)).not.toContain(value)
+  })
+
   it('frames split provider JSON and accepts a complete EOF event without DONE', async () => {
     const config = createMistvaleDefaults().settings.api
     const fetchMock = vi.fn().mockResolvedValue(new Response([

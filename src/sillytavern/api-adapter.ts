@@ -76,13 +76,17 @@ export function createDisabledTavernApi(): TavernApiAdapter {
   }
 }
 
-function redactHeaders(headers: HeadersInit | undefined): Record<string, string> {
-  const values = headers instanceof Headers
+function normalizeHeaders(headers: HeadersInit | undefined): Record<string, string> {
+  return headers instanceof Headers
     ? Object.fromEntries(headers.entries())
     : Array.isArray(headers)
       ? Object.fromEntries(headers)
       : Object.fromEntries(Object.entries(headers ?? {}).map(([key, value]) => [key, String(value)]))
-  const sensitive = /(?:authorization|api[-_]?key|x[-_]?api[-_]?key|token|secret|credential|password|cookie)/i
+}
+
+function redactHeaders(headers: HeadersInit | undefined): Record<string, string> {
+  const values = normalizeHeaders(headers)
+  const sensitive = /(?:auth|key|token|secret|credential|password|cookie)/i
   return Object.fromEntries(Object.entries(values).map(([key, value]) => [key, sensitive.test(key) ? '[已隐藏]' : value]))
 }
 
@@ -114,7 +118,7 @@ function inspectProviderRequest(config: TavernApiConfig, prepared: TavernPrepare
   return redactRequestInspection({
     url: built.url,
     method: built.init.method ?? 'POST',
-    headers: redactHeaders(built.init.headers),
+    headers: normalizeHeaders(built.init.headers),
     body,
   })
 }

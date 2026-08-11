@@ -125,7 +125,7 @@ describe('供应商协议适配', () => {
   })
 
   it('rejects malformed provider response shapes without inventing content', () => {
-    for (const protocol of ['openai-chat', 'anthropic-messages', 'gemini', 'vertex-gemini', 'cohere-v2', 'cloudflare-workers-ai'] as const) {
+    for (const protocol of ['openai-chat', 'azure-openai', 'anthropic-messages', 'gemini', 'vertex-gemini', 'cohere-v2', 'cloudflare-workers-ai'] as const) {
       expect(extractProviderContent(protocol, { error: { message: 'provider failure' } })).toEqual({ content: '', reasoning: '' })
     }
   })
