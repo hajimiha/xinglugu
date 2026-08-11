@@ -187,6 +187,12 @@ export interface ToastMessage {
   message: string
 }
 
+export interface DialogueIntent {
+  id: string
+  kind: 'gift' | 'quest'
+  playerText: string
+}
+
 export interface BattleState {
   floor: number
   enemyName: string
@@ -270,6 +276,7 @@ export interface GameState {
   activeModal: ModalType
   selectedNpcId?: string
   selectedPlotId?: string
+  dialogueIntent?: DialogueIntent
   toasts: ToastMessage[]
 }
 
@@ -279,6 +286,8 @@ export type GameAction =
   | { type: 'ADD_TOAST'; toast: Omit<ToastMessage, 'id'> }
   | { type: 'DISMISS_TOAST'; id: string }
   | { type: 'OPEN_MODAL'; modal: Exclude<ModalType, null>; npcId?: string; plotId?: string }
+  | { type: 'OPEN_DIALOGUE'; npcId: string; intent?: DialogueIntent }
+  | { type: 'CONSUME_DIALOGUE_INTENT'; intentId: string }
   | { type: 'CLOSE_MODAL' }
   | { type: 'TRAVEL_TO_LOCATION'; location: LocationId; minutes: number }
   | { type: 'ADVANCE_TIME'; minutes: number; reason: string }

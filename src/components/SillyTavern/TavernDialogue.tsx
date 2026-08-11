@@ -1,19 +1,27 @@
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useGame } from '../../game/GameContext'
 import { formatClock, formatGameDate, getCalendarDate, getFestivalOnDay, getNpcPresence } from '../../game/calendar'
 import { locations } from '../../game/data'
 import type { GameState, Npc } from '../../game/types'
 import type { ChatSession } from '../../sillytavern/types'
 import { resolveSessionResources } from '../../sillytavern/prompt-compiler'
+import { resolvePortraitSlot } from '../../sillytavern/portrait-slots'
 import { applyRegexScripts, getPresetRegexScripts } from '../../sillytavern/regex-engine'
 import { useTavern } from '../../tavern/TavernContext'
+import { parseGalgameSegments, type GalgameSegment } from '../../tavern/galgame-dialogue'
 import { GameIcon } from '../icons/GameIcon'
+import { getLocationBackground } from '../stage/location-scenes'
 import { HistoryDrawer } from './HistoryDrawer'
 
 const openingOptions: Record<string, string[]> = {
   loran: ['询问今日委托', '聊聊村庄近况', '暂时告辞'],
   daifu: ['请教五行魔法', '询问药剂配方', '暂时告辞'],
   rin: ['请求战斗指导', '询问魔物踪迹', '暂时告辞'],
+}
+
+interface DialogueFrame extends GalgameSegment {
+  id: string
 }
 
 function extractStreamingMaintext(raw: string): string {
@@ -62,10 +70,15 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
   const [streamingText, setStreamingText] = useState('')
   const [streamingReasoning, setStreamingReasoning] = useState('')
   const [historyOpen, setHistoryOpen] = useState(false)
+  const [cinemaMode, setCinemaMode] = useState(false)
+  const [frameIndex, setFrameIndex] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const openingRef = useRef(false)
+  const autoIntentRef = useRef<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
+  const dialogueRef = useRef<HTMLElement | null>(null)
+  const focusBeforeCinemaRef = useRef<HTMLElement | null>(null)
   const dialogueVariables = useMemo(
     () => createDialogueVariables(state, npc, relationship.affinity),
     [state, npc, relationship.affinity],
@@ -83,6 +96,42 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
   }, [tavern.status, tavern.openNpcSession, npc.id, dialogueVariables])
 
   useEffect(() => () => abortRef.current?.abort(), [])
+
+  useEffect(() => {
+    if (!cinemaMode) return
+    const previousOverflow = document.body.style.overflow
+    const exitOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setCinemaMode(false)
+        return
+      }
+      if (event.key !== 'Tab' || !dialogueRef.current) return
+      const focusable = Array.from(dialogueRef.current.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])'))
+      if (!focusable.length) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (document.activeElement === dialogueRef.current || !dialogueRef.current.contains(document.activeElement)) {
+        event.preventDefault()
+        const wrapTarget = event.shiftKey ? last : first
+        wrapTarget.focus()
+        return
+      }
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+    }
+    document.body.style.overflow = 'hidden'
+    requestAnimationFrame(() => dialogueRef.current?.focus())
+    document.addEventListener('keydown', exitOnEscape)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      document.removeEventListener('keydown', exitOnEscape)
+      const previousId = focusBeforeCinemaRef.current?.id
+      requestAnimationFrame(() => {
+        if (previousId) document.getElementById(previousId)?.focus()
+      })
+    }
+  }, [cinemaMode])
 
   const session = tavern.sessions.find((candidate) => candidate.id === sessionId) ?? sessionSnapshot
   const lastAssistant = [...(session?.messages ?? [])].reverse().find((message) => message.role === 'assistant')
@@ -112,11 +161,32 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
       variables: { ...(session?.variables ?? {}), ...dialogueVariables },
     }).text,
   })), [session?.messages, session?.userName, session?.variables, displayScripts, card?.name, npc.name, dialogueVariables])
+  const dialogueFrames = useMemo<DialogueFrame[]>(() => displayedMessages.flatMap((message) => {
+    const segments = message.role === 'user'
+      ? [{ speaker: 'player' as const, name: state.playerProfile.name, text: message.displayContent.trim() }]
+      : parseGalgameSegments(message.displayContent, { npcName: npc.name, playerName: state.playerProfile.name })
+    return segments.filter((segment) => segment.text).map((segment, index) => ({ ...segment, id: `${message.id}-${index}` }))
+  }), [displayedMessages, npc.name, state.playerProfile.name])
+  const streamingFrames = useMemo<DialogueFrame[]>(() => {
+    if (!working || !streamingText.trim()) return []
+    return parseGalgameSegments(streamingText, { npcName: npc.name, playerName: state.playerProfile.name })
+      .map((segment, index) => ({ ...segment, id: `streaming-${index}` }))
+  }, [working, streamingText, npc.name, state.playerProfile.name])
+  const frames = streamingFrames.length ? [...dialogueFrames, ...streamingFrames] : dialogueFrames
+  const activeFrame = frames[Math.min(frameIndex, Math.max(0, frames.length - 1))]
+  const portraitSource = card ? resolvePortraitSlot(card.portraitSlots, relationship.affinity)?.source : undefined
+  const sceneBackground = getLocationBackground(state.location)
 
-  const send = async (text: string) => {
+  useEffect(() => {
+    if (frames.length) setFrameIndex(frames.length - 1)
+  }, [frames.length])
+
+  const send = async (text: string, behavior: { requireEnergy?: boolean; settleChat?: boolean } = {}) => {
     const message = text.trim()
     if (!message || working || !session) return
-    if (state.energy < 1) {
+    const requireEnergy = behavior.requireEnergy ?? true
+    const settleChat = behavior.settleChat ?? true
+    if (requireEnergy && state.energy < 1) {
       setError('精力不足，今天无法继续与 NPC 互动。可以休息到明天，或前往医院恢复精力。')
       return
     }
@@ -144,7 +214,7 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
         onReasoningDelta: setStreamingReasoning,
       })
       setSessionSnapshot(next)
-      dispatch({ type: 'CHAT_WITH_NPC', npcId: npc.id })
+      if (settleChat) dispatch({ type: 'CHAT_WITH_NPC', npcId: npc.id })
     } catch (caught) {
       if (!(caught instanceof DOMException && caught.name === 'AbortError')) {
         setError(caught instanceof Error ? caught.message : '叙事生成失败，请检查接口设置。')
@@ -157,6 +227,14 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
       abortRef.current = null
     }
   }
+
+  useEffect(() => {
+    const intent = state.dialogueIntent
+    if (!session || !intent || intent.id === autoIntentRef.current || !tavern.apiReady) return
+    autoIntentRef.current = intent.id
+    dispatch({ type: 'CONSUME_DIALOGUE_INTENT', intentId: intent.id })
+    void send(intent.playerText, { requireEnergy: false, settleChat: false })
+  }, [session, state.dialogueIntent, tavern.apiReady])
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
@@ -194,14 +272,15 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
       : <details className={`tavern-reasoning is-${source}`}><summary>{label}</summary>{body}</details>
   }
 
-  return (
-    <section className="dialogue-view tavern-dialogue" role="dialog" aria-modal="false" aria-labelledby={`tavern-dialogue-title-${npc.id}`}>
+  const dialogue = (
+    <section ref={dialogueRef} className={`dialogue-view tavern-dialogue galgame-dialogue ${cinemaMode ? 'is-cinema' : ''}`} role="dialog" aria-modal={cinemaMode} aria-labelledby={`tavern-dialogue-title-${npc.id}`} tabIndex={cinemaMode ? -1 : undefined}>
       <header>
         <div>
           <span>REMOTE TAVERN · 好感 {relationship.affinity}</span>
           <h2 id={`tavern-dialogue-title-${npc.id}`}>与{npc.name}的酒馆会话</h2>
         </div>
         <div className="tavern-dialogue-header-actions">
+          <button id={`dialogue-cinema-${npc.id}`} className="icon-button" type="button" aria-label={cinemaMode ? '退出对话全屏' : '对话全屏显示'} aria-pressed={cinemaMode} onClick={() => { if (!cinemaMode) focusBeforeCinemaRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; setCinemaMode((current) => !current) }}><GameIcon name={cinemaMode ? 'fullscreenExit' : 'fullscreen'} size={18} /></button>
           <button id={`tavern-history-open-${npc.id}`} className="icon-button" type="button" aria-label="查看会话历史" disabled={!session} onClick={() => setHistoryOpen(true)}><GameIcon name="history" size={18} /></button>
           <button id={`dialogue-close-${npc.id}`} className="icon-button" type="button" aria-label={`关闭与${npc.name}的对话`} onClick={() => dispatch({ type: 'CLOSE_MODAL' })}><GameIcon name="close" size={17} /></button>
         </div>
@@ -211,6 +290,25 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
         <span className="tavern-status-dot" aria-hidden="true" />
         <strong>{tavern.apiLabel}</strong>
         <small>{tavern.status === 'loading' ? '正在载入角色记忆' : `${activeResources?.lorebooks.length ?? 0} 册世界书已挂载`}</small>
+      </div>
+
+      <div className={`galgame-scene ${activeFrame?.speaker === 'npc' ? 'is-npc-speaking' : 'is-npc-dimmed'}`} style={{ backgroundImage: `url(${sceneBackground})` }} data-testid="galgame-scene">
+        <div className="galgame-scene-shade" aria-hidden="true" />
+        {portraitSource
+          ? <img className="galgame-character" src={portraitSource} alt={`${npc.name}立绘`} />
+          : <div className="galgame-character-fallback" aria-hidden="true"><span>{npc.name.slice(0, 1)}</span></div>}
+        <div className="galgame-textbox" aria-live="polite">
+          <div className="galgame-speaker-row">
+            {portraitSource && <img className="galgame-avatar" src={portraitSource} alt="" aria-hidden="true" />}
+            <div><small>{activeFrame?.speaker === 'narrator' ? 'SCENE NARRATION' : activeFrame?.speaker === 'player' ? 'PLAYER VOICE' : npc.role}</small><strong>{activeFrame?.name ?? npc.name}</strong></div>
+            <span>{frames.length ? `${Math.min(frameIndex + 1, frames.length)} / ${frames.length}` : '—'}</span>
+          </div>
+          <p>{activeFrame?.text ?? (working ? '模型正在组织下一幕……' : '正在读取角色记忆与当前场景。')}</p>
+          <div className="galgame-frame-controls" aria-label="对话分镜控制">
+            <button id={`dialogue-frame-prev-${npc.id}`} type="button" aria-label="上一段对话" disabled={frameIndex <= 0} onClick={() => setFrameIndex((current) => Math.max(0, current - 1))}><GameIcon name="panLeft" size={16} /></button>
+            <button id={`dialogue-frame-next-${npc.id}`} type="button" aria-label="下一段对话" disabled={!frames.length || frameIndex >= frames.length - 1} onClick={() => setFrameIndex((current) => Math.min(frames.length - 1, current + 1))}><GameIcon name="panRight" size={16} /></button>
+          </div>
+        </div>
       </div>
 
       <div ref={scrollRef} className="tavern-dialogue-scroll" data-testid="tavern-dialogue-scroll" role="region" aria-label="酒馆会话记录">
@@ -227,7 +325,9 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
               <span>{message.role === 'assistant' ? npc.name : state.playerProfile.name}</span>
               {message.role === 'assistant' && renderReasoning('供应商返回的推理内容', message.metadata?.providerReasoning, 'provider')}
               {message.role === 'assistant' && renderReasoning('模型自行输出的思考标签', message.parsed?.thinking, 'authored')}
-              <p>{message.displayContent}</p>
+              {message.role === 'user'
+                ? <p>{message.displayContent}</p>
+                : parseGalgameSegments(message.displayContent, { npcName: npc.name, playerName: state.playerProfile.name }).map((segment, index) => <p key={`${message.id}-display-${index}`} className={`dialogue-segment is-${segment.speaker}`}><b>{segment.name}</b>{segment.text}</p>)}
               {message.parsed?.sum && <small className="dialogue-summary">楼层摘要 · {message.parsed.sum}</small>}
             </article>
           ))}
@@ -261,4 +361,6 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
       {historyOpen && session && <HistoryDrawer session={session} onClose={() => setHistoryOpen(false)} onBranch={branch} onTruncate={truncate} />}
     </section>
   )
+
+  return cinemaMode ? createPortal(dialogue, document.body) : dialogue
 }

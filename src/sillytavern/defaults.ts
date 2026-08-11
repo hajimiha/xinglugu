@@ -28,7 +28,13 @@ export {
   VILLAGE_ARCHIVE_ID,
   WORLD_RULES_ID,
 } from './lorebook-consolidation'
-export const DEFAULT_CONTENT_VERSION = 8
+export const DEFAULT_CONTENT_VERSION = 9
+
+export const DEFAULT_PORTRAIT_SOURCES: Record<string, string> = Object.fromEntries([
+  'loran', 'freya', 'mina', 'liuan', 'taomi', 'yanque', 'sera', 'mira', 'qiluo', 'daifu',
+  'rin', 'chaoyin', 'xiye', 'weina', 'sujin', 'cow-girl', 'bee-girl', 'spider-girl',
+  'fire-slime-girl', 'water-slime-girl', 'dragon-girl',
+].map((npcId) => [npcId, `./assets/portraits/generated/${npcId}.png`]))
 export const DEFAULT_PRESET_ID = 'mistvale-preset-narrative'
 export const MONSTER_GIRL_CARD_IDS = (Object.keys(MONSTER_PARTNERS) as MonsterPartnerId[]).map((id) => `mistvale-character-${id}`)
 
@@ -189,7 +195,7 @@ function createCharacterCard(npc: Npc, now: number): CharacterCard {
     firstMessage: voice.firstMessage,
     exampleDialogue: voice.example,
     lorebookIds: [WORLD_RULES_ID],
-    portraitSlots: createDefaultPortraitSlots(),
+    portraitSlots: createDefaultPortraitSlots(DEFAULT_PORTRAIT_SOURCES[npc.id]),
     tags: [npc.role, location?.name ?? WORLD_NAME, '女性角色'],
     createdAt: now,
     updatedAt: now,
@@ -211,7 +217,7 @@ function createMonsterGirlCard(id: MonsterPartnerId, now: number): CharacterCard
     firstMessage: voice.firstMessage,
     exampleDialogue: voice.example,
     lorebookIds: [WORLD_RULES_ID],
-    portraitSlots: createDefaultPortraitSlots(),
+    portraitSlots: createDefaultPortraitSlots(DEFAULT_PORTRAIT_SOURCES[id]),
     tags: [partner.role, '苔灯农场·共生牧场', '共生伙伴', '女性角色'],
     createdAt: now,
     updatedAt: now,

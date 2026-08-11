@@ -29,7 +29,8 @@ describe('性撸谷酒馆默认内容', () => {
     expect(defaults.presets[0].settings).not.toHaveProperty('apiKey')
     expect(defaults.presets[0].description).toContain('模型')
     expect(defaults.presets[0].description).not.toContain('本地剧情引擎')
-    expect(DEFAULT_CONTENT_VERSION).toBe(8)
+    expect(DEFAULT_CONTENT_VERSION).toBe(9)
+    expect(defaults.characters.every((card) => card.portraitSlots[0]?.source === `./assets/portraits/generated/${card.npcId}.png`)).toBe(true)
   })
 
   it('把完整鱼类图鉴、通用礼物与每位角色的偏爱写入世界书', () => {
@@ -93,7 +94,7 @@ describe('性撸谷酒馆默认内容', () => {
     expect(loran?.firstMessage).toContain('性撸谷')
     expect(loran?.lorebookIds).toEqual(expect.arrayContaining(['mistvale-world-rules']))
     expect(loran?.portraitSlots).toEqual([
-      { id: 'portrait-0-100', minAffinity: 0, maxAffinity: 100, source: '' },
+      { id: 'portrait-0-100', minAffinity: 0, maxAffinity: 100, source: './assets/portraits/generated/loran.png' },
     ])
     expect(loran).not.toHaveProperty('portraitByAffinity')
   })

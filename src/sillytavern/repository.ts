@@ -2,7 +2,7 @@ import { createMistvaleDefaults, createMistvaleLorebookSections, DEFAULT_CONTENT
 import { normalizeTavernSettings } from './api-config'
 import type { MistvaleTavernDatabase } from './database'
 import { tavernDatabase } from './database'
-import type { CharacterCard, ChatPreset, ChatSession, Lorebook, PromptTraceSegment, TavernRequestAudit, TavernSettings } from './types'
+import type { CharacterCard, ChatMessage, ChatPreset, ChatSession, Lorebook, ParsedTags, PromptTraceSegment, TavernRequestAudit, TavernSettings } from './types'
 import { loadRepositoryContentPack, mergeById, type TavernContentPack } from './content-pack'
 import { createDefaultPortraitSlots, legacyPortraitsToSlots, parsePortraitSlots } from './portrait-slots'
 import { parseVariableDefinitions } from './variable-definitions'
@@ -40,17 +40,101 @@ function normalizeStoredCharacter(value: CharacterCard): CharacterCard {
   return { ...character, portraitSlots }
 }
 
-function normalizeStoredSession(value: ChatSession): ChatSession {
-  if (value.variableDefinitions === undefined) return value
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function finiteTimestamp(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : fallback
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string').slice(0, 500) : []
+}
+
+function normalizeParsedTags(value: unknown): ParsedTags | undefined {
+  if (!isRecord(value)) return undefined
+  const rawCommands = isRecord(value.varsCommands) && isRecord(value.varsCommands.merge)
+    ? value.varsCommands.merge
+    : {}
+  const rawUnknown = isRecord(value.unknown) ? value.unknown : {}
+  return {
+    thinking: typeof value.thinking === 'string' ? value.thinking : '',
+    maintext: typeof value.maintext === 'string' ? value.maintext : '',
+    options: stringArray(value.options),
+    sum: typeof value.sum === 'string' ? value.sum : '',
+    varsRaw: typeof value.varsRaw === 'string' ? value.varsRaw : '',
+    varsCommands: { merge: { ...rawCommands } },
+    unknown: Object.fromEntries(Object.entries(rawUnknown).filter((entry): entry is [string, string] => typeof entry[1] === 'string')),
+  }
+}
+
+function normalizeStoredMessage(value: unknown, index: number, fallbackTimestamp: number): ChatMessage | null {
+  if (!isRecord(value) || typeof value.content !== 'string') return null
+  if (value.role !== 'system' && value.role !== 'user' && value.role !== 'assistant') return null
+  const timestamp = finiteTimestamp(value.timestamp, fallbackTimestamp + index)
+  const metadata = isRecord(value.metadata)
+    ? {
+        ...(typeof value.metadata.tokenCount === 'number' && Number.isFinite(value.metadata.tokenCount) ? { tokenCount: value.metadata.tokenCount } : {}),
+        ...(Array.isArray(value.metadata.lorebookEntries) ? { lorebookEntries: stringArray(value.metadata.lorebookEntries) } : {}),
+        ...(typeof value.metadata.processingTime === 'number' && Number.isFinite(value.metadata.processingTime) ? { processingTime: value.metadata.processingTime } : {}),
+        ...(typeof value.metadata.providerReasoning === 'string' ? { providerReasoning: value.metadata.providerReasoning } : {}),
+      }
+    : undefined
+  const parsed = normalizeParsedTags(value.parsed)
+  const messageVariables = isRecord(value.variables)
+    ? Object.fromEntries(Object.entries(value.variables).filter((entry): entry is [string, string | number] => typeof entry[1] === 'string' || typeof entry[1] === 'number'))
+    : undefined
+  return {
+    id: typeof value.id === 'string' && value.id.trim() ? value.id : `legacy-message-${timestamp}-${index}`,
+    role: value.role,
+    content: value.content,
+    timestamp,
+    ...(messageVariables ? { variables: messageVariables } : {}),
+    ...(metadata ? { metadata } : {}),
+    ...(parsed ? { parsed } : {}),
+    ...(isRecord(value.variablesAfter) ? { variablesAfter: { ...value.variablesAfter } } : {}),
+    ...(value.apiUsed === 'local' || value.apiUsed === 'remote' ? { apiUsed: value.apiUsed } : {}),
+  }
+}
+
+export function normalizeStoredSession(value: ChatSession): ChatSession {
+  const raw = value as ChatSession & Record<string, unknown>
+  const now = Date.now()
+  const createdAt = finiteTimestamp(raw.createdAt, now)
+  const messages = Array.isArray(raw.messages)
+    ? raw.messages.map((message, index) => normalizeStoredMessage(message, index, createdAt)).filter((message): message is ChatMessage => Boolean(message))
+    : []
+  let variableDefinitions
   try {
-    return {
-      ...value,
-      variableDefinitions: parseVariableDefinitions(value.variableDefinitions)
-        .filter((definition) => definition.scope === 'session'),
-    }
+    variableDefinitions = raw.variableDefinitions === undefined
+      ? undefined
+      : parseVariableDefinitions(raw.variableDefinitions)
+        .filter((definition) => definition.scope === 'session')
   } catch {
-    const { variableDefinitions: _invalidDefinitions, ...session } = value
-    return session
+    variableDefinitions = undefined
+  }
+  return {
+    ...value,
+    id: typeof raw.id === 'string' && raw.id.trim() ? raw.id : `legacy-session-${createdAt}`,
+    name: typeof raw.name === 'string' ? raw.name : '恢复的旧会话',
+    messages,
+    ...(typeof raw.characterId === 'string' ? { characterId: raw.characterId } : { characterId: undefined }),
+    ...(typeof raw.npcId === 'string' ? { npcId: raw.npcId } : { npcId: undefined }),
+    ...(typeof raw.branchFromSessionId === 'string' ? { branchFromSessionId: raw.branchFromSessionId } : { branchFromSessionId: undefined }),
+    characterName: typeof raw.characterName === 'string' ? raw.characterName : '未知角色',
+    userName: typeof raw.userName === 'string' ? raw.userName : '旅行者',
+    presetId: typeof raw.presetId === 'string' ? raw.presetId : null,
+    ...(isRecord(raw.presetBinding) && raw.presetBinding.mode === 'pinned' && typeof raw.presetBinding.presetId === 'string'
+      ? { presetBinding: { mode: 'pinned' as const, presetId: raw.presetBinding.presetId } }
+      : isRecord(raw.presetBinding) && raw.presetBinding.mode === 'follow-active'
+        ? { presetBinding: { mode: 'follow-active' as const } }
+        : { presetBinding: undefined }),
+    lorebookIds: stringArray(raw.lorebookIds),
+    variables: isRecord(raw.variables) ? { ...raw.variables } : {},
+    createdAt,
+    updatedAt: finiteTimestamp(raw.updatedAt, createdAt),
+    ...(variableDefinitions ? { variableDefinitions } : { variableDefinitions: undefined }),
   }
 }
 
@@ -124,6 +208,7 @@ class DexieTavernRepository implements TavernRepository {
         const shouldMigrateFishingAndGifts = storedContentVersion < 6
         const shouldConsolidateLorebooks = storedContentVersion < 7
         const shouldMigrateBranding = storedContentVersion < 8
+        const shouldMigrateGeneratedPortraits = storedContentVersion < 9
         const shouldMigrateDefaults = storedContentVersion < DEFAULT_CONTENT_VERSION
         const migrationLorebookIds = [
           ...(shouldMigrateCalendar ? [CALENDAR_FESTIVALS_ID] : []),
@@ -183,7 +268,18 @@ class DexieTavernRepository implements TavernRepository {
         if ((await this.database.characters.count()) === 0) {
           await this.database.characters.bulkAdd(mergeById(defaults.characters, contentPack?.characters ?? []))
         } else {
-          if (shouldPublishPack && contentPack?.characters.length) await this.database.characters.bulkPut(contentPack.characters)
+          if (shouldPublishPack && contentPack?.characters.length) {
+            const existingById = new Map((await this.database.characters.toArray())
+              .map(normalizeStoredCharacter)
+              .map((card) => [card.id, card]))
+            const publishedCharacters = contentPack.characters.map((card) => {
+              const existing = existingById.get(card.id)
+              return existing?.portraitSlots.some((slot) => Boolean(slot.source))
+                ? { ...card, portraitSlots: existing.portraitSlots.map((slot) => ({ ...slot })) }
+                : card
+            })
+            await this.database.characters.bulkPut(publishedCharacters)
+          }
           if (shouldMigrateDefaults) {
             const defaultCharacterIds = new Set(defaults.characters.map((card) => card.id))
             const migratedCharacters = (await this.database.characters.toArray())
@@ -198,6 +294,17 @@ class DexieTavernRepository implements TavernRepository {
             if (shouldMigratePortraitSlots) {
               const migratedPortraits = (await this.database.characters.toArray()).map(normalizeStoredCharacter)
               if (migratedPortraits.length) await this.database.characters.bulkPut(migratedPortraits)
+            }
+            if (shouldMigrateGeneratedPortraits) {
+              const defaultById = new Map(defaults.characters.map((card) => [card.id, card]))
+              const generatedPortraits = (await this.database.characters.toArray())
+                .filter((card) => defaultById.has(card.id) && card.portraitSlots.every((slot) => !slot.source))
+                .map((card) => ({
+                  ...card,
+                  portraitSlots: defaultById.get(card.id)!.portraitSlots.map((slot) => ({ ...slot })),
+                  updatedAt: Date.now(),
+                }))
+              if (generatedPortraits.length) await this.database.characters.bulkPut(generatedPortraits)
             }
             if (shouldConsolidateLorebooks) {
               const consolidatedCharacters = (await this.database.characters.toArray())
@@ -217,9 +324,10 @@ class DexieTavernRepository implements TavernRepository {
           await this.database.sessions.bulkAdd(defaults.sessions)
         } else if (shouldMigrateDefaults) {
           const defaultNpcIds = new Set(defaults.characters.map((card) => card.npcId))
-          const storedSessions = await this.database.sessions.toArray()
-          const migratedSessions = storedSessions
-            .map((session) => {
+          const rawSessions = await this.database.sessions.toArray()
+          const migratedSessions = rawSessions
+            .map((rawSession) => {
+              const session = normalizeStoredSession(rawSession)
               const shouldAddLorebooks = Boolean(
                 session.npcId
                 && defaultNpcIds.has(session.npcId)
@@ -239,7 +347,7 @@ class DexieTavernRepository implements TavernRepository {
                   ? { presetId: null, presetBinding: { mode: 'follow-active' as const } }
                   : {}),
               }
-              return JSON.stringify(next) === JSON.stringify(session) ? null : next
+              return JSON.stringify(next) === JSON.stringify(rawSession) ? null : next
             })
             .filter((session): session is ChatSession => Boolean(session))
           if (migratedSessions.length) await this.database.sessions.bulkPut(migratedSessions)
@@ -309,17 +417,12 @@ class DexieTavernRepository implements TavernRepository {
   async listSessions() { return (await this.database.sessions.orderBy('updatedAt').reverse().toArray()).map(normalizeStoredSession) }
   async getSession(id: string) { const value = await this.database.sessions.get(id); return value ? normalizeStoredSession(value) : undefined }
   async saveSession(value: ChatSession) {
-    const variableDefinitions = value.variableDefinitions === undefined
-      ? undefined
-      : parseVariableDefinitions(value.variableDefinitions).filter((definition) => definition.scope === 'session')
-    await this.database.sessions.put({ ...value, variableDefinitions })
+    await this.database.sessions.put(normalizeStoredSession(value))
   }
   async commitTurn(session: ChatSession, audit: TavernRequestAudit, settings?: TavernSettings): Promise<void> {
-    const variableDefinitions = session.variableDefinitions === undefined
-      ? undefined
-      : parseVariableDefinitions(session.variableDefinitions).filter((definition) => definition.scope === 'session')
+    const normalizedSession = normalizeStoredSession(session)
     await this.database.transaction('rw', this.database.sessions, this.database.requestAudits, this.database.settings, async () => {
-      await this.database.sessions.put({ ...session, variableDefinitions })
+      await this.database.sessions.put(normalizedSession)
       if (settings) await this.database.settings.put(normalizeTavernSettings(settings))
       await this.database.requestAudits.put(audit)
       const expired = await this.database.requestAudits.orderBy('createdAt').reverse().offset(20).primaryKeys()

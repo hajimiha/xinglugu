@@ -1,19 +1,15 @@
-import locationAtlas from '../../assets/pixel/location-atlas.webp'
-import hospitalBackground from '../../assets/pixel/location-hospital.webp'
-import hunterCampBackground from '../../assets/pixel/location-hunter-camp.webp'
-import libraryBackground from '../../assets/pixel/location-library.webp'
-import mayorHomeBackground from '../../assets/pixel/location-mayor-home.webp'
-import monsterMarketBackground from '../../assets/pixel/location-monster-market.webp'
-import smithyBackground from '../../assets/pixel/location-smithy.webp'
+import { useState } from 'react'
 import { getNpcsAtLocation } from '../../game/calendar'
 import { locations, npcs } from '../../game/data'
 import { useGame } from '../../game/GameContext'
 import type { LocationId, ModalType } from '../../game/types'
 import { resolvePortraitSlot } from '../../sillytavern/portrait-slots'
 import { useTavern } from '../../tavern/TavernContext'
+import { DialogueErrorBoundary } from '../SillyTavern/DialogueErrorBoundary'
 import { DialogueView } from '../npc/DialogueView'
 import { NpcPanel } from '../npc/NpcPanel'
 import { NpcPortrait } from '../npc/NpcPortrait'
+import { getLocationBackground, hasCustomLocationBackground } from './location-scenes'
 
 const sceneClass: Record<LocationId, string> = {
   farm: 'scene-shop',
@@ -27,15 +23,6 @@ const sceneClass: Record<LocationId, string> = {
   'fisher-home': 'scene-coast',
   library: 'scene-shop',
   hospital: 'scene-shop',
-}
-
-const locationBackgrounds: Partial<Record<LocationId, string>> = {
-  'mayor-home': mayorHomeBackground,
-  smithy: smithyBackground,
-  'monster-market': monsterMarketBackground,
-  'hunter-camp': hunterCampBackground,
-  library: libraryBackground,
-  hospital: hospitalBackground,
 }
 
 const primaryModal: Partial<Record<LocationId, { modal: Exclude<ModalType, null>; label: string }>> = {
@@ -59,7 +46,20 @@ export function LocationStage() {
   const selectedNpc = npcs.find((npc) => npc.id === state.selectedNpcId)
   const feature = primaryModal[state.location]
   const featureNpcId = location.npcIds.find((npcId) => presentNpcs.some((npc) => npc.id === npcId))
-  const customBackground = locationBackgrounds[state.location]
+  const locationBackground = getLocationBackground(state.location)
+  const customBackground = hasCustomLocationBackground(state.location)
+  const [dialogueRecoveryKey, setDialogueRecoveryKey] = useState(0)
+
+  const resetNpcDialogue = async (npcId: string) => {
+    try {
+      const matchingSessions = tavern.sessions.filter((session) => session.npcId === npcId)
+      await Promise.all(matchingSessions.map((session) => tavern.deleteSession(session.id)))
+      setDialogueRecoveryKey((current) => current + 1)
+      dispatch({ type: 'ADD_TOAST', toast: { tone: 'success', title: '旧会话已清理', message: '角色卡、世界书与游戏存档均已保留，现在可以重新交谈。' } })
+    } catch {
+      dispatch({ type: 'ADD_TOAST', toast: { tone: 'danger', title: '会话清理失败', message: '本地会话库暂时无法写入，请返回场景后刷新页面再试。' } })
+    }
+  }
 
   const upload = async (npcId: string, slotId: string, file: File) => {
     if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
@@ -91,7 +91,7 @@ export function LocationStage() {
 
   return (
     <section className={`world-stage location-stage panel-frame ${sceneClass[state.location]} ${customBackground ? 'has-custom-background' : ''}`} aria-labelledby="stage-title">
-      <div className="location-scene" style={{ backgroundImage: `url(${customBackground ?? locationAtlas})` }} aria-hidden="true" />
+      <div className="location-scene" style={{ backgroundImage: `url(${locationBackground})` }} aria-hidden="true" />
       <div className="location-shade" aria-hidden="true" />
       <header className="stage-titlebar"><div><p className="eyebrow">{location.name} · {location.hours}</p><h1 id="stage-title">{location.subtitle}</h1></div><span className="weather-pill">{location.hours === '全天' ? '随时开放' : `开放 ${location.hours}`}</span></header>
       <div className="location-story"><span>{location.name}</span><p>{location.description}</p>{feature && <button id={`location-feature-${state.location}`} className="primary-button" type="button" onClick={() => dispatch({ type: 'OPEN_MODAL', modal: feature.modal, npcId: featureNpcId })}>{feature.label}</button>}</div>
@@ -106,7 +106,16 @@ export function LocationStage() {
         {!presentNpcs.length && <div className="empty-location-state"><strong>此刻无人停留</strong><p>村民会依照每日行程与节日安排在不同地点活动。</p></div>}
       </div>
       {state.activeModal === 'npc' && selectedNpc && <NpcPanel npcId={selectedNpc.id} />}
-      {state.activeModal === 'dialogue' && selectedNpc && <DialogueView npc={selectedNpc} />}
+      {state.activeModal === 'dialogue' && selectedNpc && (
+        <DialogueErrorBoundary
+          key={`${selectedNpc.id}-${dialogueRecoveryKey}`}
+          npcName={selectedNpc.name}
+          onClose={() => dispatch({ type: 'CLOSE_MODAL' })}
+          onReset={() => resetNpcDialogue(selectedNpc.id)}
+        >
+          <DialogueView npc={selectedNpc} />
+        </DialogueErrorBoundary>
+      )}
     </section>
   )
 }

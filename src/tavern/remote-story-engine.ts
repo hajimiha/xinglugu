@@ -52,11 +52,11 @@ export interface RemoteTurnResult {
 
 const REMOTE_RESPONSE_CONTRACT = `请只输出以下酒馆标签结构，不要使用 Markdown 代码块：
 <thinking>简短的内部状态，可省略</thinking>
-<maintext>NPC 本回合对玩家说的话与必要的场景描写</maintext>
+<maintext>使用一个或多个分镜标签：<scene speaker="narrator">必要的场景描写</scene><scene speaker="npc" name="{{char}}">NPC 台词</scene>。只有复述玩家已经明确说过的话时才能使用 <scene speaker="player" name="{{user}}">玩家台词</scene></maintext>
 <option>给玩家的下一步行动，每行一项，提供 2 到 4 项</option>
 <sum>一句话记录本回合发生的事</sum>
 <vars>{"需要更新的变量":"新值"}</vars>
-正文必须使用简体中文；不要替玩家做出未选择的决定；变量没有变化时输出空对象。`
+正文必须使用简体中文；每个分镜必须准确标明 npc、player 或 narrator；不要替玩家做出未选择的决定；变量没有变化时输出空对象。`
 
 const PLAYER_IDENTITY_CONTRACT = `玩家姓名为“{{user}}”。{{char}}可以在符合人物性格与当前关系的时机自然称呼这个名字，但不要在每句话中机械重复。不得把玩家重新称作“旅行者”，也不得替玩家修改姓名。`
 

@@ -24,7 +24,7 @@
           "id": "portrait-0-100",
           "minAffinity": 0,
           "maxAffinity": 100,
-          "source": ""
+          "source": "./assets/portraits/generated/cow-girl.png"
         }
       ],
       "tags": [
@@ -55,7 +55,7 @@
           "id": "portrait-0-100",
           "minAffinity": 0,
           "maxAffinity": 100,
-          "source": ""
+          "source": "./assets/portraits/generated/bee-girl.png"
         }
       ],
       "tags": [
@@ -86,7 +86,7 @@
           "id": "portrait-0-100",
           "minAffinity": 0,
           "maxAffinity": 100,
-          "source": ""
+          "source": "./assets/portraits/generated/spider-girl.png"
         }
       ],
       "tags": [
@@ -117,7 +117,7 @@
           "id": "portrait-0-100",
           "minAffinity": 0,
           "maxAffinity": 100,
-          "source": ""
+          "source": "./assets/portraits/generated/fire-slime-girl.png"
         }
       ],
       "tags": [
@@ -148,7 +148,7 @@
           "id": "portrait-0-100",
           "minAffinity": 0,
           "maxAffinity": 100,
-          "source": ""
+          "source": "./assets/portraits/generated/water-slime-girl.png"
         }
       ],
       "tags": [
@@ -179,7 +179,7 @@
           "id": "portrait-0-100",
           "minAffinity": 0,
           "maxAffinity": 100,
-          "source": ""
+          "source": "./assets/portraits/generated/dragon-girl.png"
         }
       ],
       "tags": [

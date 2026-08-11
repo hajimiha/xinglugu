@@ -251,9 +251,19 @@ function reduceGameState(state: GameState, action: GameAction): GameState {
     case 'DISMISS_TOAST':
       return { ...state, toasts: state.toasts.filter((toast) => toast.id !== action.id) }
     case 'OPEN_MODAL':
-      return { ...state, activeModal: action.modal, selectedNpcId: action.npcId, selectedPlotId: action.plotId }
+      if (action.modal === 'tavern' && state.activeModal === 'dialogue' && state.dialogueIntent && state.selectedNpcId) {
+        return { ...state, activeModal: 'tavern', selectedPlotId: undefined }
+      }
+      return { ...state, activeModal: action.modal, selectedNpcId: action.npcId, selectedPlotId: action.plotId, dialogueIntent: undefined }
+    case 'OPEN_DIALOGUE':
+      return { ...state, activeModal: 'dialogue', selectedNpcId: action.npcId, selectedPlotId: undefined, dialogueIntent: action.intent }
+    case 'CONSUME_DIALOGUE_INTENT':
+      return state.dialogueIntent?.id === action.intentId ? { ...state, dialogueIntent: undefined } : state
     case 'CLOSE_MODAL':
-      return { ...state, activeModal: null, selectedNpcId: undefined, selectedPlotId: undefined }
+      if (state.activeModal === 'tavern' && state.dialogueIntent && state.selectedNpcId) {
+        return { ...state, activeModal: 'dialogue', selectedPlotId: undefined }
+      }
+      return { ...state, activeModal: null, selectedNpcId: undefined, selectedPlotId: undefined, dialogueIntent: undefined }
     case 'TRAVEL_TO_LOCATION': {
       const advanced = advanceGameClock(state, action.minutes)
       return { ...advanced, location: action.location }

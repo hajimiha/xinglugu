@@ -190,7 +190,12 @@ describe('雾灯谷酒馆仓储', () => {
     await repositoryV1.initialize()
     expect((await repositoryV1.getCharacter(card.id))?.personality).toBe('仓库版本一')
 
-    await repositoryV1.saveCharacter({ ...card, personality: '本机修改', updatedAt: Date.now() + 10 })
+    await repositoryV1.saveCharacter({
+      ...card,
+      personality: '本机修改',
+      portraitSlots: [{ ...card.portraitSlots[0], source: './portraits/player-upload.png' }],
+      updatedAt: Date.now() + 10,
+    })
     await repositoryV1.saveCharacter({ ...card, id: 'local-custom-character', personality: '本机新增', updatedAt: Date.now() + 11 })
     await repositoryV1.initialize()
     expect((await repositoryV1.getCharacter(card.id))?.personality).toBe('本机修改')
@@ -201,6 +206,7 @@ describe('雾灯谷酒馆仓储', () => {
     const repositoryV2 = createTavernRepository(database, async () => packV2)
     await repositoryV2.initialize()
     expect((await repositoryV2.getCharacter(card.id))?.personality).toBe('仓库版本二')
+    expect((await repositoryV2.getCharacter(card.id))?.portraitSlots[0].source).toBe('./portraits/player-upload.png')
     expect((await repositoryV2.getCharacter('local-custom-character'))?.personality).toBe('本机新增')
   })
 
@@ -300,6 +306,27 @@ describe('雾灯谷酒馆仓储', () => {
       { id: 'portrait-0-100', minAffinity: 0, maxAffinity: 100, source: '/portraits/legacy-loran.webp' },
     ])
     expect(migrated).not.toHaveProperty('portraitByAffinity')
+    expect((await repository.getSettings()).defaultContentVersion).toBe(DEFAULT_CONTENT_VERSION)
+  })
+
+  it('为版本八的空白官方角色补入透明立绘，但绝不覆盖玩家已上传图片', async () => {
+    database = createTavernDatabase(`xinglugu-generated-portrait-migration-${crypto.randomUUID()}`)
+    const repository = createTavernRepository(database)
+    await repository.initialize()
+    const settings = await repository.getSettings()
+    const loran = (await repository.listCharacters()).find((card) => card.npcId === 'loran')!
+    const freya = (await repository.listCharacters()).find((card) => card.npcId === 'freya')!
+
+    await database.characters.bulkPut([
+      { ...loran, portraitSlots: [{ ...loran.portraitSlots[0], source: '/portraits/player-loran.png' }] },
+      { ...freya, portraitSlots: [{ ...freya.portraitSlots[0], source: '' }] },
+    ])
+    await database.settings.put({ ...settings, defaultContentVersion: 8 })
+
+    await repository.initialize()
+
+    expect((await repository.getCharacter(loran.id))?.portraitSlots[0].source).toBe('/portraits/player-loran.png')
+    expect((await repository.getCharacter(freya.id))?.portraitSlots[0].source).toBe('./assets/portraits/generated/freya.png')
     expect((await repository.getSettings()).defaultContentVersion).toBe(DEFAULT_CONTENT_VERSION)
   })
 
@@ -503,6 +530,72 @@ describe('雾灯谷酒馆仓储', () => {
     expect((await repository.getLorebook('player-custom-brand-book'))?.name).toBe('雾灯谷是我的自定义词')
     expect(await repository.getPreset('mistvale-preset-narrative')).toMatchObject({ name: '性撸谷叙事预设', description: '性撸谷专用' })
     expect((await repository.getCharacter('mistvale-character-loran'))?.scenario).toBe('当前位于性撸谷。')
-    expect((await repository.getSettings()).defaultContentVersion).toBe(8)
+    expect((await repository.getSettings()).defaultContentVersion).toBe(DEFAULT_CONTENT_VERSION)
+  })
+
+  it('读取旧设备损坏会话时净化消息结构，避免交谈入口让整页崩溃', async () => {
+    database = createTavernDatabase(`mistvale-broken-session-${crypto.randomUUID()}`)
+    const repository = createTavernRepository(database)
+    await repository.initialize()
+    await database.sessions.put({
+      id: 'broken-loran-session',
+      name: '损坏的洛岚会话',
+      npcId: 'loran',
+      characterName: '洛岚',
+      userName: '旅人',
+      presetId: null,
+      lorebookIds: null,
+      variables: null,
+      messages: [
+        { id: 'safe', role: 'assistant', content: '可以保留的正文', timestamp: 1, parsed: { maintext: '正文' } },
+        { id: 'bad-content', role: 'assistant', content: { nested: true }, timestamp: 2 },
+        null,
+      ],
+      createdAt: Number.NaN,
+      updatedAt: Number.POSITIVE_INFINITY,
+    } as never)
+
+    const session = await repository.getSession('broken-loran-session')
+
+    expect(session).toMatchObject({
+      id: 'broken-loran-session',
+      lorebookIds: [],
+      variables: {},
+      messages: [{
+        id: 'safe',
+        role: 'assistant',
+        content: '可以保留的正文',
+        parsed: { maintext: '正文', options: [], thinking: '', sum: '', varsRaw: '', varsCommands: { merge: {} }, unknown: {} },
+      }],
+    })
+    expect(Number.isFinite(session?.createdAt)).toBe(true)
+    expect(Number.isFinite(session?.updatedAt)).toBe(true)
+  })
+
+  it('升级事务先净化损坏会话，再迁移世界书与预设绑定', async () => {
+    database = createTavernDatabase(`mistvale-broken-session-upgrade-${crypto.randomUUID()}`)
+    const repository = createTavernRepository(database)
+    await repository.initialize()
+    const settings = await repository.getSettings()
+    await database.sessions.put({
+      id: 'broken-before-upgrade',
+      npcId: 'loran',
+      characterName: '洛岚',
+      lorebookIds: null,
+      variables: null,
+      messages: null,
+      createdAt: Number.NaN,
+      updatedAt: Number.POSITIVE_INFINITY,
+    } as never)
+    await database.settings.put({ ...settings, defaultContentVersion: 1 })
+
+    await expect(repository.initialize()).resolves.toBeUndefined()
+
+    expect(await repository.getSession('broken-before-upgrade')).toMatchObject({
+      lorebookIds: [WORLD_RULES_ID],
+      variables: {},
+      messages: [],
+      presetBinding: { mode: 'follow-active' },
+    })
   })
 })

@@ -6,6 +6,17 @@ import { DEFAULT_GAME_RULES } from './rules'
 import type { GameState } from './types'
 
 describe('游戏状态变更', () => {
+  it('从待发送动作进入接口设置后，关闭设置会返回原 NPC 对话并保留动作', () => {
+    const intent = { id: 'pending-gift', kind: 'gift' as const, playerText: '（云岚）赠礼月铃花给洛岚' }
+    const dialogue = gameReducer(initialGameState, { type: 'OPEN_DIALOGUE', npcId: 'loran', intent })
+    const settings = gameReducer(dialogue, { type: 'OPEN_MODAL', modal: 'tavern' })
+    const resumed = gameReducer(settings, { type: 'CLOSE_MODAL' })
+
+    expect(settings).toMatchObject({ activeModal: 'tavern', selectedNpcId: 'loran', dialogueIntent: intent })
+    expect(resumed).toMatchObject({ activeModal: 'dialogue', selectedNpcId: 'loran', dialogueIntent: intent })
+    expect(gameReducer(resumed, { type: 'CONSUME_DIALOGUE_INTENT', intentId: intent.id }).dialogueIntent).toBeUndefined()
+  })
+
   it('以单一动作保存已经净化的玩家姓名', () => {
     const named = gameReducer(initialGameState, { type: 'SET_PLAYER_NAME', name: '  云岚  ' })
     expect(named.playerProfile).toEqual({ name: '云岚', hasConfirmedName: true })

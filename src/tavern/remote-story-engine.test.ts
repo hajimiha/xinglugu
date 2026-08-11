@@ -74,6 +74,10 @@ describe('远程酒馆剧情引擎', () => {
       ]),
     }))
     expect(JSON.stringify(prepare.mock.calls[0]?.[0])).toContain('玩家姓名为“云岚”')
+    const preparedText = prepare.mock.calls[0]?.[0].messages.map((message: { content: string }) => message.content).join('\n') ?? ''
+    expect(preparedText).toContain('<scene speaker="narrator">')
+    expect(preparedText).toContain('<scene speaker="npc" name="洛岚">')
+    expect(preparedText).toContain('<scene speaker="player" name="云岚">')
   })
 
   it('模型未输出标签时仍将原始文字作为正文', async () => {

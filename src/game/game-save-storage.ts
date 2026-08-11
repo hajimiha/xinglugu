@@ -247,6 +247,7 @@ export function sanitizeGameState(value: Partial<GameState>): GameState {
     activeModal: null,
     selectedNpcId: undefined,
     selectedPlotId: undefined,
+    dialogueIntent: undefined,
     toasts: [],
   }
 }

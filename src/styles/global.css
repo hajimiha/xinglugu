@@ -949,16 +949,51 @@ h1, h2, h3, p { margin-top: 0; }
 .toast p { margin: 3px 0 0; color: var(--text-secondary); font-size: 11px; }
 .toast-close { width: 34px; height: 34px; }
 
-.tavern-dialogue { width: min(680px, 62%); padding: 0; grid-template-rows: auto auto minmax(0, 1fr) auto; overflow: hidden; background: linear-gradient(155deg, rgba(14, 34, 28, .99), rgba(5, 14, 13, .995)); }
+.tavern-dialogue { width: min(760px, 68%); padding: 0; grid-template-rows: auto auto minmax(230px, 40%) minmax(0, 1fr) auto; overflow: hidden; background: linear-gradient(155deg, rgba(14, 34, 28, .99), rgba(5, 14, 13, .995)); }
 .tavern-dialogue::before { position: absolute; inset: 0; z-index: -1; content: ''; pointer-events: none; background-image: linear-gradient(rgba(213, 166, 74, .025) 1px, transparent 1px), linear-gradient(90deg, rgba(213, 166, 74, .025) 1px, transparent 1px); background-size: 16px 16px; mask-image: linear-gradient(to bottom, black, transparent 76%); }
 .tavern-dialogue > header { padding: 16px 18px 13px; background: rgba(4, 13, 11, .46); }
 .tavern-dialogue-header-actions { display: flex; gap: 8px; }
 .tavern-dialogue-header-actions .icon-button { width: 44px !important; height: 44px !important; }
+.tavern-dialogue.is-cinema { position: fixed; inset: 0; z-index: 1200; width: 100vw; height: 100dvh; max-height: none; border: 0; border-radius: 0; grid-template-rows: auto auto minmax(360px, 1fr) minmax(110px, 22vh) auto; animation: galgame-cinema-in 260ms var(--ease-out) both; }
+@keyframes galgame-cinema-in { from { opacity: .4; transform: scale(.985); } to { opacity: 1; transform: none; } }
 .tavern-status-ribbon { display: grid; min-height: 38px; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; padding: 7px 18px; color: #d5e7d3; border-bottom: 1px solid rgba(126, 190, 124, .16); background: linear-gradient(90deg, rgba(60, 118, 74, .18), rgba(18, 52, 41, .06)); }
 .tavern-status-ribbon strong { font-size: 9px; letter-spacing: .03em; }
 .tavern-status-ribbon small { color: var(--text-muted); font-size: 8px; }
 .tavern-status-dot { width: 7px; height: 7px; border-radius: 2px; background: #8bcf73; box-shadow: 0 0 0 3px rgba(139, 207, 115, .08), 0 0 12px rgba(139, 207, 115, .38); animation: tavern-status-pulse 2.4s ease-in-out infinite; }
 @keyframes tavern-status-pulse { 50% { opacity: .58; transform: scale(.82); } }
+.galgame-scene { position: relative; min-height: 230px; isolation: isolate; overflow: hidden; border-bottom: 1px solid rgba(213, 166, 74, .22); background-color: #07130f; background-position: center; background-size: cover; }
+.galgame-scene::after { position: absolute; inset: 0; z-index: 0; content: ''; pointer-events: none; background: linear-gradient(90deg, rgba(1, 8, 7, .68) 0%, rgba(1, 8, 7, .08) 42%, rgba(1, 8, 7, .2) 100%), linear-gradient(0deg, rgba(1, 8, 7, .82), transparent 68%); }
+.galgame-scene-shade { position: absolute; inset: 0; z-index: 2; pointer-events: none; background: radial-gradient(circle at 70% 18%, rgba(244, 208, 122, .14), transparent 34%), linear-gradient(120deg, transparent 45%, rgba(4, 12, 10, .22)); mix-blend-mode: screen; }
+.galgame-character { position: absolute; z-index: 1; right: clamp(2%, 5vw, 12%); bottom: -5%; width: min(52%, 420px); height: 112%; object-fit: contain; object-position: center bottom; filter: drop-shadow(0 24px 28px rgba(0, 0, 0, .58)); transform-origin: center bottom; transition: filter 320ms var(--ease-out), opacity 320ms var(--ease-out), transform 320ms var(--ease-out); }
+.galgame-scene.is-npc-speaking .galgame-character { animation: galgame-character-enter 420ms var(--ease-out) both; }
+.galgame-scene.is-npc-dimmed .galgame-character { opacity: .48; filter: brightness(.46) saturate(.55) drop-shadow(0 24px 28px rgba(0, 0, 0, .65)); transform: translateY(2%) scale(.985); }
+@keyframes galgame-character-enter { from { opacity: .45; transform: translate3d(3%, 2%, 0) scale(.975); } }
+.galgame-character-fallback { position: absolute; right: 8%; bottom: -8%; z-index: 1; display: grid; width: min(45%, 330px); aspect-ratio: .66; place-items: start center; padding-top: 22%; color: rgba(242, 229, 198, .58); border: 1px solid rgba(213, 166, 74, .24); border-radius: 48% 48% 20% 20% / 25% 25% 8% 8%; background: linear-gradient(150deg, rgba(74, 113, 87, .74), rgba(15, 43, 34, .95)); box-shadow: 0 28px 42px rgba(0, 0, 0, .48); font-family: var(--font-display); font-size: clamp(36px, 6vw, 82px); }
+.galgame-textbox { position: absolute; right: 18px; bottom: 14px; left: 18px; z-index: 3; min-height: 108px; padding: 15px 100px 16px 92px; border: 1px solid rgba(226, 187, 98, .52); border-radius: 4px 14px 14px 14px; background: linear-gradient(105deg, rgba(4, 14, 12, .95), rgba(9, 26, 21, .88)); box-shadow: 0 18px 42px rgba(0, 0, 0, .48), inset 0 1px rgba(255, 244, 206, .06); backdrop-filter: blur(12px); }
+.galgame-textbox::before { position: absolute; top: -1px; bottom: -1px; left: -1px; width: 5px; content: ''; background: linear-gradient(var(--copper-300), var(--moss-500)); }
+.galgame-speaker-row { display: flex; align-items: center; gap: 9px; }
+.galgame-speaker-row > div { display: grid; gap: 1px; }
+.galgame-speaker-row small { color: var(--copper-300); font-family: var(--font-numeric); font-size: 7px; letter-spacing: .12em; }
+.galgame-speaker-row strong { color: var(--parchment-100); font-family: var(--font-display); font-size: 15px; letter-spacing: .05em; }
+.galgame-speaker-row > span { margin-left: auto; color: var(--text-muted); font-family: var(--font-numeric); font-size: 7px; }
+.galgame-textbox > p { display: -webkit-box; overflow: hidden; margin: 8px 0 0; color: #f4ead1; font-size: 11px; line-height: 1.75; text-shadow: 0 2px 2px rgba(0, 0, 0, .7); -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.galgame-avatar { position: absolute; bottom: 0; left: 10px; width: 70px; height: 100px; object-fit: cover; object-position: top center; border: 1px solid rgba(226, 187, 98, .28); border-bottom: 0; border-radius: 36px 36px 0 0; filter: drop-shadow(4px 0 8px rgba(0, 0, 0, .45)); }
+.galgame-frame-controls { position: absolute; right: 12px; bottom: 12px; display: flex; gap: 5px; }
+.galgame-frame-controls button { display: grid; width: 36px; height: 36px; place-items: center; color: var(--copper-300); border: 1px solid rgba(213, 166, 74, .24); border-radius: 8px; background: rgba(3, 12, 10, .68); transition: color 160ms, border-color 160ms, transform 160ms var(--ease-out); }
+.galgame-frame-controls button:not(:disabled):hover { color: var(--parchment-100); border-color: var(--copper-300); transform: translateY(-2px); }
+.galgame-frame-controls button:disabled { opacity: .3; }
+.dialogue-segment { display: grid; grid-template-columns: auto 1fr; gap: 7px; }
+.dialogue-segment b { color: var(--copper-300); font-size: 8px; }
+.dialogue-segment.is-narrator { color: var(--text-muted); font-style: italic; }
+.dialogue-segment.is-player b { color: #a9c7df; }
+.is-cinema .galgame-character { right: clamp(10%, 16vw, 24%); width: min(48vw, 640px); }
+.is-cinema .galgame-textbox { right: clamp(24px, 7vw, 130px); bottom: clamp(20px, 4vh, 54px); left: clamp(24px, 7vw, 130px); min-height: 148px; padding: 22px 132px 24px 128px; }
+.is-cinema .galgame-avatar { left: 18px; width: 92px; height: 132px; }
+.is-cinema .galgame-speaker-row strong { font-size: clamp(17px, 1.5vw, 24px); }
+.is-cinema .galgame-textbox > p { font-size: clamp(13px, 1.15vw, 18px); line-height: 1.8; }
+.is-cinema .tavern-dialogue-scroll { background: rgba(3, 11, 9, .98); }
+.is-cinema .tavern-context-strip, .is-cinema .tavern-reasoning-notice { display: none; }
+.is-cinema .dialogue-log { min-height: 0; }
 .tavern-dialogue-scroll { min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-color: rgba(213, 166, 74, .3) transparent; scrollbar-width: thin; }
 .tavern-context-strip { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 1px; margin: 10px 14px 4px; overflow: hidden; border: 1px solid rgba(154, 122, 199, .18); border-radius: 10px; background: rgba(154, 122, 199, .15); }
 .tavern-context-strip > div { position: relative; display: grid; min-width: 0; grid-template-columns: 20px 1fr; grid-template-rows: auto auto; gap: 2px 4px; padding: 9px 10px; background: rgba(11, 27, 23, .94); }
@@ -987,6 +1022,13 @@ h1, h2, h3, p { margin-top: 0; }
 .tavern-options button:not(:disabled):hover { color: var(--text-primary); border-color: var(--border-copper); background: rgba(213, 166, 74, .075); transform: translateY(-2px); }
 .tavern-options button:not(:disabled):hover svg { opacity: 1; transform: translateX(2px); }
 .tavern-dialogue-error { display: flex; align-items: center; gap: 7px; margin: 0 14px 8px; padding: 8px 10px; color: #efb6a5; border: 1px solid rgba(201, 93, 93, .32); border-radius: 8px; background: rgba(201, 93, 93, .09); font-size: 8px; }
+.dialogue-recovery { position: absolute; inset: 78px 18px 18px auto; z-index: 50; display: grid; width: min(520px, 56%); align-content: center; justify-items: start; padding: clamp(28px, 5vw, 68px); overflow: hidden; color: var(--text-primary); border: 1px solid rgba(213, 166, 74, .44); border-radius: 15px; background: radial-gradient(circle at 80% 12%, rgba(155, 86, 72, .2), transparent 36%), linear-gradient(145deg, rgba(12, 31, 26, .99), rgba(4, 13, 12, .995)); box-shadow: 0 30px 80px rgba(0, 0, 0, .64); }
+.dialogue-recovery::before { position: absolute; inset: 0; content: ''; pointer-events: none; background-image: linear-gradient(rgba(213, 166, 74, .03) 1px, transparent 1px), linear-gradient(90deg, rgba(213, 166, 74, .03) 1px, transparent 1px); background-size: 18px 18px; mask-image: linear-gradient(135deg, black, transparent 62%); }
+.dialogue-recovery-mark { display: grid; width: 56px; height: 56px; place-items: center; margin-bottom: 20px; color: #efb6a5; border: 1px solid rgba(201, 93, 93, .36); border-radius: 14px; background: rgba(201, 93, 93, .1); }
+.dialogue-recovery h2 { margin: 5px 0 12px; font-size: clamp(22px, 2.6vw, 38px); }
+.dialogue-recovery > p:not(.eyebrow) { max-width: 48ch; margin: 0; color: var(--text-secondary); font-size: 11px; line-height: 1.8; }
+.dialogue-recovery > div:last-child { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 26px; }
+.dialogue-recovery button { display: inline-flex; min-height: 46px; align-items: center; gap: 8px; padding: 0 16px; }
 .tavern-composer { position: relative; z-index: 2; flex: none; padding: 10px 14px 14px; border-top: 1px solid rgba(213, 166, 74, .18); background: rgba(3, 10, 9, .94); box-shadow: 0 -12px 30px rgba(0, 0, 0, .24); }
 .tavern-composer textarea { min-height: 58px; }
 .tavern-composer button { min-height: 44px; }
@@ -1097,7 +1139,17 @@ h1, h2, h3, p { margin-top: 0; }
   .portrait-upload { display: none; }
   .portrait-glass strong { font-size: 14px; }
   .npc-panel, .dialogue-view { top: 72px; right: 8px; bottom: 8px; left: 8px; width: auto; }
-  .tavern-dialogue { grid-template-rows: auto auto minmax(0, 1fr) auto; }
+  .dialogue-recovery { inset: 72px 8px 8px; width: auto; padding: 28px; }
+  .tavern-dialogue { grid-template-rows: auto auto minmax(220px, 38%) minmax(0, 1fr) auto; }
+  .tavern-dialogue.is-cinema { grid-template-rows: auto auto minmax(300px, 1fr) minmax(96px, 20vh) auto; }
+  .galgame-character { right: -2%; width: min(64%, 390px); }
+  .galgame-textbox { right: 8px; bottom: 8px; left: 8px; padding: 12px 78px 13px 72px; }
+  .galgame-avatar { left: 7px; width: 56px; height: 82px; }
+  .galgame-frame-controls { right: 7px; bottom: 7px; }
+  .galgame-frame-controls button { width: 32px; height: 32px; }
+  .is-cinema .galgame-character { right: -4%; width: min(76%, 480px); }
+  .is-cinema .galgame-textbox { right: 10px; bottom: 10px; left: 10px; min-height: 126px; padding: 15px 88px 16px 80px; }
+  .is-cinema .galgame-avatar { left: 8px; width: 60px; height: 92px; }
   .tavern-dialogue-scroll { min-height: 0; }
   .tavern-context-strip { grid-template-columns: 1fr; }
   .tavern-context-strip > div { min-height: 42px; }
