@@ -208,7 +208,7 @@ describe('酒馆中枢', () => {
       id: 'audit-ui', createdAt: Date.now(), status: 'succeeded', sessionId: 'session', characterName: '洛岚',
       presetId: 'preset', presetName: '当前测试预设', presetBinding: 'follow-active', provider: 'deepseek', model: 'deepseek-v4-flash',
       preparedRequest: { task: 'story', messages: [{ role: 'system', content: 'CURRENT-PRESET-SENTINEL' }, { role: 'user', content: '继续' }] },
-      providerRequest: { url: 'https://api.deepseek.com/chat/completions', method: 'POST', headers: { Authorization: '[已隐藏]' }, body: { model: 'deepseek-v4-flash', messages: [{ role: 'system', content: 'CURRENT-PRESET-SENTINEL' }] } },
+      providerRequest: { url: 'https://user:secret@api.deepseek.com/chat/completions?api_key=secret', method: 'POST', headers: { Authorization: '[已隐藏]' }, body: { model: 'deepseek-v4-flash', messages: [{ role: 'system', content: 'CURRENT-PRESET-SENTINEL' }] } },
       segments: [{ id: 'segment', source: 'preset', identifier: 'main', role: 'system', raw: 'CURRENT-PRESET-SENTINEL', compiled: 'CURRENT-PRESET-SENTINEL', sent: true, messageIndex: 0, tokenEstimate: 6, diagnostics: [] }],
       macroOperations: [], matchedLorebookEntries: [], diagnostics: [],
     })
@@ -217,11 +217,15 @@ describe('酒馆中枢', () => {
     await screen.findByText('浏览器直连提醒')
     await user.click(screen.getByRole('tab', { name: '检查器' }))
     expect(await screen.findByText('当前测试预设')).toBeVisible()
+    expect(screen.getByText(/本机保留最近 20 次请求/)).toBeVisible()
+    expect(screen.getByText('导出本次')).toBeVisible()
     await user.click(screen.getByText('查看编译后正文'))
     expect(screen.getByText('CURRENT-PRESET-SENTINEL')).toBeVisible()
     await user.click(screen.getByRole('tab', { name: '供应商 JSON' }))
     expect(screen.getAllByText(/CURRENT-PRESET-SENTINEL/).length).toBeGreaterThan(0)
     expect(screen.getAllByText(/已隐藏/).some((element) => element.tagName === 'PRE')).toBe(true)
+    expect(screen.getByText('https://api.deepseek.com/chat/completions')).toBeVisible()
+    expect(screen.queryByText(/api_key=secret|user:secret/)).not.toBeInTheDocument()
     expect(screen.queryByText(/session-secret/)).not.toBeInTheDocument()
   })
 

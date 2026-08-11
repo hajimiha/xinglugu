@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { exportToJson } from '../../../sillytavern/importer'
+import { redactRequestInspection } from '../../../sillytavern/api-adapter'
 import type { TavernRequestAudit } from '../../../sillytavern/types'
 import { useTavern } from '../../../tavern/TavernContext'
 import { GameIcon } from '../../icons/GameIcon'
@@ -23,6 +24,7 @@ export function RequestInspectorPanel() {
     if (!selectedId || !audits.some((audit) => audit.id === selectedId)) setSelectedId(audits[0]?.id ?? null)
   }, [audits, selectedId])
   const selected = audits.find((audit) => audit.id === selectedId) ?? null
+  const redactedProviderRequest = selected ? redactRequestInspection(selected.providerRequest) : null
   const totals = useMemo(() => selected ? {
     tokens: selected.segments.filter((segment) => segment.sent).reduce((total, segment) => total + segment.tokenEstimate, 0),
     sent: selected.segments.filter((segment) => segment.sent).length,
@@ -35,7 +37,7 @@ export function RequestInspectorPanel() {
 
   return <section className="tavern-panel request-inspector-panel" aria-labelledby="request-inspector-title">
     <header className="tavern-panel-heading"><div><span>OUTBOUND REQUEST AUDIT</span><h3 id="request-inspector-title">请求检查器</h3><p>逐段核对预设、角色卡、世界书、宏和正则最终如何进入模型请求。密钥不会写入档案。</p></div><div className="panel-heading-actions"><button id="request-audit-export" type="button" disabled={!selected} onClick={exportAudit}><GameIcon name="download" size={17} />导出本次</button><button id="request-audit-clear" className="danger-ghost" type="button" disabled={!audits.length} onClick={() => void tavern.clearRequestAudits()}><GameIcon name="trash" size={16} />清空档案</button></div></header>
-    <div className="request-privacy-note"><GameIcon name="shield" size={18} /><div><strong>安全审计副本</strong><p>最多保留最近 20 次请求；鉴权请求头固定显示为“已隐藏”，不会保存 API 密钥。</p></div></div>
+    <div className="request-privacy-note"><GameIcon name="shield" size={18} /><div><strong>安全审计副本</strong><p>本机保留最近 20 次请求；可单独导出或清空。鉴权请求头固定显示为“已隐藏”，不会保存 API 密钥。</p></div></div>
     <div className="request-inspector-workspace">
       <aside className="request-audit-list" aria-label="请求档案列表">{audits.length ? audits.map((audit) => <button id={`request-audit-select-${audit.id}`} key={audit.id} type="button" className={audit.id === selectedId ? 'is-active' : ''} onClick={() => setSelectedId(audit.id)}><span data-status={audit.status}>{statusLabel(audit)}</span><strong>{audit.characterName} · {audit.presetName}</strong><small>{new Date(audit.createdAt).toLocaleString('zh-CN')} · {audit.model}</small></button>) : <div className="tavern-empty-state"><GameIcon name="shield" size={28} /><strong>还没有出站请求档案</strong><p>与任意角色完成一次模型对话后，这里会显示实际发送的提示词和供应商 JSON。</p></div>}</aside>
       <main className="request-audit-detail">{selected ? <>
@@ -45,7 +47,7 @@ export function RequestInspectorPanel() {
         ] as Array<[InspectorView, string]>).map(([id, label]) => <button id={`request-inspector-view-${id}`} key={id} role="tab" type="button" aria-selected={view === id} onClick={() => setView(id)}>{label}</button>)}</div>
         {view === 'segments' && <ol className="request-segment-list">{selected.segments.map((segment, index) => <li key={segment.id} data-sent={segment.sent}><header><span>{String(index + 1).padStart(2, '0')}</span><strong>{sourceLabels[segment.source] ?? segment.source}{segment.identifier ? ` · ${segment.identifier}` : ''}</strong><small>{segment.role} · 约 {segment.tokenEstimate} 词符 · {segment.sent ? '已发送' : '未发送'}</small></header><details><summary>查看编译后正文</summary><pre>{segment.compiled}</pre></details>{segment.diagnostics.length > 0 && <p>{segment.diagnostics.join('；')}</p>}</li>)}</ol>}
         {view === 'messages' && <ol className="request-message-inspection">{selected.preparedRequest.messages.map((message, index) => <li key={`${message.role}-${index}`}><span>{String(index + 1).padStart(2, '0')} · {message.role}</span><pre>{message.content}</pre></li>)}</ol>}
-        {view === 'provider' && <div className="provider-request-inspection"><dl><div><dt>请求地址</dt><dd>{selected.providerRequest.url}</dd></div><div><dt>请求方法</dt><dd>{selected.providerRequest.method}</dd></div></dl><h5>请求头</h5><pre>{JSON.stringify(selected.providerRequest.headers, null, 2)}</pre><h5>最终请求体</h5><pre>{JSON.stringify(selected.providerRequest.body, null, 2)}</pre></div>}
+        {view === 'provider' && redactedProviderRequest && <div className="provider-request-inspection"><dl><div><dt>请求地址</dt><dd>{redactedProviderRequest.url}</dd></div><div><dt>请求方法</dt><dd>{redactedProviderRequest.method}</dd></div></dl><h5>请求头</h5><pre>{JSON.stringify(redactedProviderRequest.headers, null, 2)}</pre><h5>最终请求体</h5><pre>{JSON.stringify(redactedProviderRequest.body, null, 2)}</pre></div>}
         {view === 'diagnostics' && <div className="request-diagnostics"><section><h5>宏操作</h5>{selected.macroOperations.length ? <ol>{selected.macroOperations.map((operation, index) => <li key={`${operation.type}-${index}`}><strong>{operation.type}</strong><code>{operation.macro}</code>{operation.key && <span>{operation.key}</span>}</li>)}</ol> : <p>本次请求没有执行变量宏。</p>}</section><section><h5>编译诊断</h5>{selected.diagnostics.length ? <ul>{selected.diagnostics.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}</ul> : <p>未发现未知宏或正则错误。</p>}</section>{selected.error && <section className="is-error"><h5>请求错误</h5><p>{selected.error}</p></section>}</div>}
       </> : <div className="tavern-empty-state"><strong>选择一条请求档案</strong></div>}</main>
     </div>

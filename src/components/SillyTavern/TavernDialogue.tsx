@@ -174,7 +174,7 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
   }
 
   const readinessError = tavern.status === 'ready' && !tavern.apiReady ? tavern.apiReadinessError : null
-  const displayedError = error ?? readinessError
+  const displayedError = readinessError ?? error
 
   useEffect(() => {
     const scrollRegion = scrollRef.current

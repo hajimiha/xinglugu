@@ -113,6 +113,24 @@ describe('酒馆 API 控制台', () => {
     expect(screen.queryByRole('button', { name: '恢复官方地址' })).not.toBeInTheDocument()
   })
 
+  it('根据当前编辑中的完整配置即时更新就绪状态', async () => {
+    const user = userEvent.setup()
+    database = createTavernDatabase(`mistvale-api-readiness-${crypto.randomUUID()}`)
+    render(<TavernProvider repository={createTavernRepository(database)}><ApiPanel /></TavernProvider>)
+
+    expect(await screen.findByText('API REQUIRED')).toBeVisible()
+    await user.type(screen.getByLabelText('API 密钥'), 'session-secret')
+    await user.clear(screen.getByLabelText('接口根地址'))
+    await user.type(screen.getByLabelText('接口根地址'), 'not-a-url')
+    expect(screen.getByText('API REQUIRED')).toBeVisible()
+
+    await user.clear(screen.getByLabelText('接口根地址'))
+    await user.type(screen.getByLabelText('接口根地址'), 'https://api.example.test')
+    expect(await screen.findByText('REMOTE READY')).toBeVisible()
+    await user.clear(screen.getByLabelText('模型'))
+    expect(screen.getByText('API REQUIRED')).toBeVisible()
+  })
+
   it('允许用键盘逐字输入负数惩罚参数', async () => {
     const user = userEvent.setup()
     database = createTavernDatabase(`mistvale-api-negative-${crypto.randomUUID()}`)

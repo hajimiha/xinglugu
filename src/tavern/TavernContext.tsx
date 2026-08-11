@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createRemoteTavernApi, redactRequestInspection } from '../sillytavern/api-adapter'
-import { validateTavernApiConfig } from '../sillytavern/api-config'
+import { getTavernApiReadiness } from '../sillytavern/api-readiness'
 import { resolveApiKey } from '../sillytavern/api-credentials'
 import { getTavernProvider } from '../sillytavern/provider-registry'
 import { resolveSessionPreset } from '../sillytavern/prompt-compiler'
@@ -370,8 +370,7 @@ export function TavernProvider({ children, repository = tavernRepository, player
     : '模型配置载入中'
   const apiReadinessError = useMemo(() => {
     if (status !== 'ready' || !settings) return null
-    if (!resolveApiKey(settings)) return '尚未填写 API 密钥。请先完成接口设置，NPC 才能通过模型回应。'
-    return Object.values(validateTavernApiConfig(settings.api)).find(Boolean) ?? null
+    return getTavernApiReadiness({ ...settings, api: { ...settings.api, persistedApiKey: resolveApiKey(settings) } }).error
   }, [settings, status])
   const apiReady = status === 'ready' && Boolean(settings) && !apiReadinessError
   const value = useMemo<TavernContextValue>(() => ({

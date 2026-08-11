@@ -4,6 +4,7 @@ import { getSessionApiKey, setSessionApiKey } from '../../../sillytavern/api-cre
 import { getTavernApiPreset, validateTavernApiConfig, type TavernApiFieldErrors } from '../../../sillytavern/api-config'
 import { createMistvaleDefaults } from '../../../sillytavern/defaults'
 import { getTavernProvider, TAVERN_PROVIDERS, type TavernProviderGroup } from '../../../sillytavern/provider-registry'
+import { getTavernApiReadiness } from '../../../sillytavern/api-readiness'
 import type { TavernApiConfig, TavernApiProvider, TavernProviderOptionKey } from '../../../sillytavern/types'
 import { useTavern } from '../../../tavern/TavernContext'
 import { GameIcon } from '../../icons/GameIcon'
@@ -48,7 +49,10 @@ export function ApiPanel() {
 
   const provider = getTavernProvider(config.provider)
   const providerLabel = provider.label
-  const remoteReady = Boolean(apiKey.trim())
+  const draftReadiness = tavern.settings
+    ? getTavernApiReadiness({ ...tavern.settings, api: { ...config, persistedApiKey: apiKey } })
+    : { ready: false, error: null }
+  const remoteReady = draftReadiness.ready
 
   const validate = (requireKey: boolean): FormErrors => {
     const next: FormErrors = validateTavernApiConfig(config)
