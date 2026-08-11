@@ -61,7 +61,7 @@ function createMultiplierDrafts(rules: GameRuleSettings): MultiplierDrafts {
   return Object.fromEntries(multiplierKeys.map((key) => [key, String(rules[key])])) as MultiplierDrafts
 }
 
-export function SettingsModal() {
+export function SettingsModal({ onReturnToTitle }: { onReturnToTitle?: () => void } = {}) {
   const { state, dispatch, saveMeta, exportGameSave, importGameSave, resetGameSave } = useGame()
   const audio = useAudio()
   const [draft, setDraft] = useState<GameRuleSettings>(() => ({ ...state.rules }))
@@ -232,6 +232,7 @@ export function SettingsModal() {
 
     <footer className="settings-actions">
       <div><span className={dirty ? 'settings-dirty-dot is-dirty' : 'settings-dirty-dot'} aria-hidden="true" /><p>{status || (dirty ? '有尚未应用的规则修改' : '当前规则已同步')}</p></div>
+      {onReturnToTitle && <button id="settings-return-title" type="button" aria-label="保存进度并返回标题" onClick={onReturnToTitle}><GameIcon name="panLeft" size={17} />返回标题</button>}
       <button id="settings-reset" type="button" aria-label="恢复标准规则" onClick={() => setPendingReset(true)}><GameIcon name="reset" size={17} />恢复标准</button>
       <button id="settings-apply" className="primary-button" type="button" aria-label="应用玩法规则" disabled={!dirty} onClick={applyRules}><GameIcon name="save" size={17} />应用规则</button>
     </footer>

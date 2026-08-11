@@ -33,10 +33,10 @@ function FutureFeature({ type }: { type: Exclude<ModalType, null> }) {
   return <div className="future-feature"><span className="feature-orbit" aria-hidden="true"><i /><i /><i /></span><h3>{content.title}</h3><p>{content.text}</p><div className="feature-detail-grid"><div><span>界面状态</span><strong>已设计</strong></div><div><span>数据来源</span><strong>本地模拟</strong></div><div><span>服务端</span><strong>未连接</strong></div></div></div>
 }
 
-function contentFor(type: Exclude<ModalType, null>, close: () => void): ReactNode {
+function contentFor(type: Exclude<ModalType, null>, close: () => void, onReturnToTitle?: () => void): ReactNode {
   if (type === 'tavern') return <TavernHubModal onClose={close} />
   if (type === 'inventory') return <InventoryModal />
-  if (type === 'settings') return <SettingsModal />
+  if (type === 'settings') return <SettingsModal onReturnToTitle={onReturnToTitle ? () => { close(); onReturnToTitle() } : undefined} />
   if (type === 'calendar') return <CalendarModal />
   if (type === 'journal') return <QuestModal journal />
   if (type === 'quest-board') return <QuestModal />
@@ -51,7 +51,7 @@ function contentFor(type: Exclude<ModalType, null>, close: () => void): ReactNod
   return <FutureFeature type={type} />
 }
 
-export function ModalHost() {
+export function ModalHost({ onReturnToTitle }: { onReturnToTitle?: () => void }) {
   const { state, dispatch } = useGame()
   const panelRef = useRef<HTMLElement>(null)
   const previousFocus = useRef<HTMLElement | null>(null)
@@ -95,5 +95,5 @@ export function ModalHost() {
   if (!managed) return null
   const title = titles[managed] ?? '游戏界面'
   const close = () => dispatch({ type: 'CLOSE_MODAL' })
-  return <div id={`modal-${managed}-overlay`} className={`modal-overlay ${managed === 'tavern' ? 'is-tavern' : ''}`} onMouseDown={(event) => { if (event.target === event.currentTarget) close() }}><section id={`modal-${managed}`} ref={panelRef} className={`modal-panel modal-${managed}`} role="dialog" aria-modal="true" aria-labelledby={managed === 'tavern' ? 'tavern-hub-title' : `modal-title-${managed}`} tabIndex={-1}>{managed !== 'tavern' && <header className="modal-header"><div><p className="eyebrow">MISTVALE INTERFACE</p><h2 id={`modal-title-${managed}`}>{title}</h2></div><button id={`modal-close-${managed}`} className="icon-button" type="button" aria-label={`关闭${title}`} onClick={close}><GameIcon name="close" size={18} /></button></header>}<div className="modal-body">{contentFor(managed, close)}</div></section></div>
+  return <div id={`modal-${managed}-overlay`} className={`modal-overlay ${managed === 'tavern' ? 'is-tavern' : ''}`} onMouseDown={(event) => { if (event.target === event.currentTarget) close() }}><section id={`modal-${managed}`} ref={panelRef} className={`modal-panel modal-${managed}`} role="dialog" aria-modal="true" aria-labelledby={managed === 'tavern' ? 'tavern-hub-title' : `modal-title-${managed}`} tabIndex={-1}>{managed !== 'tavern' && <header className="modal-header"><div><p className="eyebrow">MISTVALE INTERFACE</p><h2 id={`modal-title-${managed}`}>{title}</h2></div><button id={`modal-close-${managed}`} className="icon-button" type="button" aria-label={`关闭${title}`} onClick={close}><GameIcon name="close" size={18} /></button></header>}<div className="modal-body">{contentFor(managed, close, onReturnToTitle)}</div></section></div>
 }

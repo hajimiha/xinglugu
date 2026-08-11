@@ -22,15 +22,15 @@ const tabs = [
   { id: 'inspector', label: '检查器', note: '最终出站请求', icon: 'shield' },
 ] as const satisfies ReadonlyArray<{ id: string; label: string; note: string; icon: GameIconName }>
 
-type TabId = typeof tabs[number]['id']
+export type TabId = typeof tabs[number]['id']
 
 function PanelFallback() {
   return <div className="tavern-panel-loading" role="status"><i /><i /><i /><span>正在从本地存储装配面板</span></div>
 }
 
-export function TavernHubModal({ onClose }: { onClose(): void }) {
+export function TavernHubModal({ onClose, initialTab = 'api' }: { onClose(): void; initialTab?: TabId }) {
   const tavern = useTavern()
-  const [activeTab, setActiveTab] = useState<TabId>('api')
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab)
   const currentIndex = tabs.findIndex((tab) => tab.id === activeTab)
 
   const selectByKeyboard = (event: KeyboardEvent<HTMLDivElement>) => {

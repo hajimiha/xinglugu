@@ -9,8 +9,9 @@ import { ModalHost } from './components/modals/ModalHost'
 import { TavernProvider } from './tavern/TavernContext'
 import { PlayerNameGate } from './components/onboarding/PlayerNameGate'
 import { AudioProvider } from './audio/AudioContext'
+import { StartLayer } from './start/StartLayer'
 
-function AppContent() {
+function AppContent({ onReturnToTitle }: { onReturnToTitle(): void }) {
   return (
     <div className="game-shell">
       <a className="skip-link" href="#main-game-content">跳到游戏场景</a>
@@ -23,7 +24,7 @@ function AppContent() {
         </main>
         <ContextRail />
       </div>
-      <ModalHost />
+      <ModalHost onReturnToTitle={onReturnToTitle} />
       <ToastRegion />
       <PlayerNameGate />
     </div>
@@ -36,5 +37,5 @@ function GameBoundTavern({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  return <AudioProvider><GameProvider><GameBoundTavern><AppContent /></GameBoundTavern></GameProvider></AudioProvider>
+  return <AudioProvider><GameProvider><GameBoundTavern><StartLayer renderGame={(onReturnToTitle) => <AppContent onReturnToTitle={onReturnToTitle} />} /></GameBoundTavern></GameProvider></AudioProvider>
 }
