@@ -8,6 +8,7 @@
 - 先行回归测试按预期失败：新增 6 个独立背景断言均因 `LocationStage` 尚未接入映射而失败（6 failed, 2 existing passed）；已记录为红灯，不重复同一失败命令，下一步实现映射。
 - 已将六张 PNG 转为 WebP，新增资源总计约 2.2MB；`LocationStage` 使用 `LocationId` 显式映射并对新图启用 `background-size: cover`。
 - 定向测试 8/8、全量测试 65 文件/343 测试、生产构建和 `git diff --check` 均通过；本地浏览器逐一切换六个地点，确认实际 CSS URL 指向对应新 WebP，控制台错误为 0。
+- 已推送提交 `8293da8` 到 `origin/main`；Vercel 线上逐一加载六张新 WebP，资源请求均返回 200，1440px 与 375px 均无横向溢出，移动端医院背景实际显示，线上控制台错误为 0。
 
 ## 2026-08-09 · Phase 16 开始
 - 完整读取已安装的 `ariespo/tavernlike` skill，确认其要求活动预设提示词经装配后直接进入 API `messages`，并提供世界书、变量、六标签和思维内容折叠的完整 React 路径。

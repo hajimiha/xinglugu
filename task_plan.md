@@ -26,8 +26,8 @@ Phase 18（默认世界书合册与预设槽位精简）已完成并推送。
 - [x] 通过 ChatGPT image generation 生成剩余地点背景并逐张人工筛选
 - [x] 将生成资产以显式地点映射接入代码，移除默认背景复用
 - [x] 完成资源格式/尺寸/构建/本地桌面手机验收
-- [ ] 提交并推送 GitHub `main`
-- **Status:** in_progress
+- [x] 提交并推送 GitHub `main`
+- **Status:** complete
 
 ## Phase 19 Errors Encountered
 | Error | Attempt | Resolution |
