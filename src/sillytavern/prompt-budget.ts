@@ -38,30 +38,9 @@ export function applyPromptBudget(input: PromptBudgetInput): PromptBudgetResult 
   }
 
   const messages = input.messages.filter((_, index) => retained.has(index))
-  const historyIndexes = conversationIndexes.slice(0, -1)
-  const retainedHistory = new Set(historyIndexes.filter((index) => retained.has(index)))
-  let historyCursor = 0
   const omittedSegments: string[] = []
   const segments = input.segments.map((segment) => {
-    let sent = segment.sent
-    const exactMessageIndex = input.messages.findIndex((message, index) => (
-      message.role === segment.role
-      && message.content === segment.compiled
-      && index !== latestIndex
-    ))
-    if (segment.source === 'history') {
-      const messageIndex = historyIndexes[historyCursor]
-      sent = messageIndex !== undefined && retainedHistory.has(messageIndex)
-      historyCursor += 1
-    } else if (segment.source === 'user' && segment.identifier === 'current-user-input') {
-      sent = latestIndex !== undefined && retained.has(latestIndex)
-    } else if (segment.role === 'system') {
-      sent = systemIndexes.some((index) => retained.has(index))
-    } else if (exactMessageIndex >= 0) {
-      sent = retained.has(exactMessageIndex)
-    } else {
-      sent = false
-    }
+    const sent = segment.messageIndex !== null && retained.has(segment.messageIndex)
     if (!sent && segment.identifier) omittedSegments.push(segment.identifier)
     return { ...segment, sent }
   })

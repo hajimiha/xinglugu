@@ -209,7 +209,7 @@ describe('酒馆中枢', () => {
       presetId: 'preset', presetName: '当前测试预设', presetBinding: 'follow-active', provider: 'deepseek', model: 'deepseek-v4-flash',
       preparedRequest: { task: 'story', messages: [{ role: 'system', content: 'CURRENT-PRESET-SENTINEL' }, { role: 'user', content: '继续' }] },
       providerRequest: { url: 'https://api.deepseek.com/chat/completions', method: 'POST', headers: { Authorization: '[已隐藏]' }, body: { model: 'deepseek-v4-flash', messages: [{ role: 'system', content: 'CURRENT-PRESET-SENTINEL' }] } },
-      segments: [{ id: 'segment', source: 'preset', identifier: 'main', role: 'system', raw: 'CURRENT-PRESET-SENTINEL', compiled: 'CURRENT-PRESET-SENTINEL', sent: true, tokenEstimate: 6, diagnostics: [] }],
+      segments: [{ id: 'segment', source: 'preset', identifier: 'main', role: 'system', raw: 'CURRENT-PRESET-SENTINEL', compiled: 'CURRENT-PRESET-SENTINEL', sent: true, messageIndex: 0, tokenEstimate: 6, diagnostics: [] }],
       macroOperations: [], matchedLorebookEntries: [], diagnostics: [],
     })
     render(<GameProvider><TavernProvider repository={repository}><TavernHubModal onClose={() => undefined} /></TavernProvider></GameProvider>)

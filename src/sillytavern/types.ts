@@ -267,6 +267,7 @@ export interface PromptTraceSegment {
   raw: string
   compiled: string
   sent: boolean
+  messageIndex: number | null
   tokenEstimate: number
   diagnostics: string[]
 }

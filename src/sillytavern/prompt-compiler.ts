@@ -54,11 +54,12 @@ function resolvePromptBudget(input: PromptCompileInput): { contextLength: number
 }
 
 function traceSegment(
-  segment: Omit<PromptTraceSegment, 'id' | 'tokenEstimate' | 'diagnostics'> & Partial<Pick<PromptTraceSegment, 'diagnostics'>>,
+  segment: Omit<PromptTraceSegment, 'id' | 'tokenEstimate' | 'diagnostics' | 'messageIndex'> & Partial<Pick<PromptTraceSegment, 'diagnostics' | 'messageIndex'>>,
 ): PromptTraceSegment {
   return {
     ...segment,
     id: crypto.randomUUID(),
+    messageIndex: segment.messageIndex ?? null,
     tokenEstimate: estimateTokens(segment.compiled),
     diagnostics: segment.diagnostics ?? [],
   }
@@ -136,10 +137,16 @@ export function compileTavernTurn(input: PromptCompileInput): PromptCompilation 
   }
   let systemAccumulator = ''
   let hasHistoryMarker = false
+  const pendingSystemSegmentIndexes: number[] = []
 
   const flushSystem = () => {
     if (!systemAccumulator) return
+    const messageIndex = messages.length
     messages.push({ role: 'system', content: systemAccumulator })
+    for (const segmentIndex of pendingSystemSegmentIndexes) {
+      segments[segmentIndex] = { ...segments[segmentIndex], messageIndex }
+    }
+    pendingSystemSegmentIndexes.length = 0
     systemAccumulator = ''
   }
 
@@ -192,8 +199,9 @@ export function compileTavernTurn(input: PromptCompileInput): PromptCompilation 
       flushSystem()
       for (const [historyIndex, historyMessage] of recentHistory.entries()) {
         const regexResult = applyPromptRegex(historyMessage.content, historyMessage.role === 'user' ? 'user' : 'assistant', recentHistory.length - historyIndex)
+        const messageIndex = messages.length
         messages.push({ role: historyMessage.role, content: regexResult.text })
-        segments.push(traceSegment({
+        segments.push({ ...traceSegment({
           source: 'history',
           identifier: historyMessage.id,
           role: historyMessage.role,
@@ -201,7 +209,7 @@ export function compileTavernTurn(input: PromptCompileInput): PromptCompilation 
           compiled: regexResult.text,
           sent: true,
           diagnostics: regexResult.errors.map((error) => error.message),
-        }))
+        }), messageIndex })
       }
       continue
     }
@@ -212,7 +220,7 @@ export function compileTavernTurn(input: PromptCompileInput): PromptCompilation 
     const role = normalizePresetPromptRole(item.role)
       || definitions.find((prompt) => prompt.identifier === item.identifier)?.role
       || 'system'
-    segments.push(traceSegment({
+    const segment = traceSegment({
       source: resolved.source,
       identifier: item.identifier,
       role,
@@ -223,19 +231,24 @@ export function compileTavernTurn(input: PromptCompileInput): PromptCompilation 
         ...evaluation.diagnostics,
         ...evaluation.unknownMacros.map((macro) => `未识别宏已原样保留：${macro}`),
       ],
-    }))
+    })
+    segments.push(segment)
     if (!compiled.trim()) continue
     if (role === 'system') {
+      pendingSystemSegmentIndexes.push(segments.length - 1)
       systemAccumulator += `${systemAccumulator ? '\n\n' : ''}${compiled}`
     } else {
       flushSystem()
+      const messageIndex = messages.length
       messages.push({ role, content: compiled })
+      segments[segments.length - 1] = { ...segment, messageIndex }
     }
   }
 
   const variablesBlock = formatVariablesForPrompt(variables)
   if (variablesBlock) {
     segments.push(traceSegment({ source: 'variables', identifier: 'session-variables', role: 'system', raw: variablesBlock, compiled: variablesBlock, sent: true }))
+    pendingSystemSegmentIndexes.push(segments.length - 1)
     systemAccumulator += `${systemAccumulator ? '\n\n' : ''}${variablesBlock}`
   }
   const primitiveExtraVariables = Object.fromEntries(
@@ -246,11 +259,12 @@ export function compileTavernTurn(input: PromptCompileInput): PromptCompilation 
   const extraBlock = formatVariablesForPrompt(primitiveExtraVariables)
   if (extraBlock) {
     segments.push(traceSegment({ source: 'variables', identifier: 'runtime-variables', role: 'system', raw: extraBlock, compiled: extraBlock, sent: true }))
+    pendingSystemSegmentIndexes.push(segments.length - 1)
     systemAccumulator += `${systemAccumulator ? '\n\n' : ''}${extraBlock}`
   }
   if (input.formatPrompt?.trim()) {
     const evaluation = compileMacros(input.formatPrompt)
-    segments.push(traceSegment({
+    const segment = traceSegment({
       source: 'format',
       identifier: 'response-contract',
       role: 'system',
@@ -258,23 +272,29 @@ export function compileTavernTurn(input: PromptCompileInput): PromptCompilation 
       compiled: evaluation.text,
       sent: Boolean(evaluation.text.trim()),
       diagnostics: evaluation.diagnostics,
-    }))
-    if (evaluation.text.trim()) systemAccumulator += `${systemAccumulator ? '\n\n' : ''}${evaluation.text}`
+    })
+    segments.push(segment)
+    if (evaluation.text.trim()) {
+      pendingSystemSegmentIndexes.push(segments.length - 1)
+      systemAccumulator += `${systemAccumulator ? '\n\n' : ''}${evaluation.text}`
+    }
   }
   flushSystem()
 
   if (!hasHistoryMarker) {
     for (const [historyIndex, historyMessage] of recentHistory.entries()) {
       const regexResult = applyPromptRegex(historyMessage.content, historyMessage.role === 'user' ? 'user' : 'assistant', recentHistory.length - historyIndex)
+      const messageIndex = messages.length
       messages.push({ role: historyMessage.role, content: regexResult.text })
-      segments.push(traceSegment({ source: 'history', identifier: historyMessage.id, role: historyMessage.role, raw: historyMessage.content, compiled: regexResult.text, sent: true, diagnostics: regexResult.errors.map((error) => error.message) }))
+      segments.push({ ...traceSegment({ source: 'history', identifier: historyMessage.id, role: historyMessage.role, raw: historyMessage.content, compiled: regexResult.text, sent: true, diagnostics: regexResult.errors.map((error) => error.message) }), messageIndex })
     }
   }
   const userEvaluation = compileMacros(input.userInput)
   const userRegexResult = applyPromptRegex(userEvaluation.text, 'user', 0)
   const userInput = userRegexResult.text
+  const userMessageIndex = messages.length
   messages.push({ role: 'user', content: userInput })
-  segments.push(traceSegment({ source: 'user', identifier: 'current-user-input', role: 'user', raw: input.userInput, compiled: userInput, sent: true, diagnostics: userRegexResult.errors.map((error) => error.message) }))
+  segments.push({ ...traceSegment({ source: 'user', identifier: 'current-user-input', role: 'user', raw: input.userInput, compiled: userInput, sent: true, diagnostics: userRegexResult.errors.map((error) => error.message) }), messageIndex: userMessageIndex })
 
   const compilation: PromptCompilation = {
     messages,
