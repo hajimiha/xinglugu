@@ -82,7 +82,7 @@ describe('雾灯谷酒馆仓储', () => {
     await repository.initialize()
 
     const merged = (await repository.getLorebook(WORLD_RULES_ID))!
-    expect(merged.name).toBe('雾灯谷·全域设定集')
+    expect(merged.name).toBe('性撸谷·全域设定集')
     expect(merged.entries).toEqual(expectedEntries)
     expect(await repository.getLorebook('mistvale-village-archive')).toBeUndefined()
     expect(await repository.getLorebook('mistvale-calendar-festivals')).toBeUndefined()
@@ -464,5 +464,45 @@ describe('雾灯谷酒馆仓储', () => {
     expect((await database.settings.get('mistvale-settings'))?.defaultContentVersion).toBe(1)
     await repository.initialize()
     expect((await database.settings.get('mistvale-settings'))?.defaultContentVersion).toBe(DEFAULT_CONTENT_VERSION)
+  })
+
+  it('只迁移第七版官方酒馆内容的品牌，不改用户资源和原始兼容载荷', async () => {
+    database = createTavernDatabase(`mistvale-brand-migration-${crypto.randomUUID()}`)
+    const repository = createTavernRepository(database)
+    await repository.initialize()
+
+    const settings = await repository.getSettings()
+    const systemBook = await repository.getLorebook(WORLD_RULES_ID)
+    const systemPreset = await repository.getPreset('mistvale-preset-narrative')
+    const loran = await repository.getCharacter('mistvale-character-loran')
+    expect(systemBook && systemPreset && loran).toBeTruthy()
+    if (!systemBook || !systemPreset || !loran) return
+
+    await database.lorebooks.put({
+      ...systemBook,
+      name: '雾灯谷·全域设定集',
+      compatibility: { source: 'sillytavern', raw: { name: '雾灯谷原始导出' } },
+      entries: systemBook.entries.map((item, index) => index === 0 ? { ...item, content: '雾灯谷规则' } : item),
+    })
+    await database.lorebooks.put({
+      ...systemBook,
+      id: 'player-custom-brand-book',
+      name: '雾灯谷是我的自定义词',
+    })
+    await database.presets.put({ ...systemPreset, name: '雾灯叙事预设', description: '雾灯谷专用' })
+    await database.characters.put({ ...loran, scenario: '当前位于雾灯谷。' })
+    await database.settings.put({ ...settings, defaultContentVersion: 7 })
+
+    await repository.initialize()
+
+    expect(await repository.getLorebook(WORLD_RULES_ID)).toMatchObject({
+      name: '性撸谷·全域设定集',
+      compatibility: { source: 'sillytavern', raw: { name: '雾灯谷原始导出' } },
+    })
+    expect((await repository.getLorebook(WORLD_RULES_ID))?.entries[0].content).toBe('性撸谷规则')
+    expect((await repository.getLorebook('player-custom-brand-book'))?.name).toBe('雾灯谷是我的自定义词')
+    expect(await repository.getPreset('mistvale-preset-narrative')).toMatchObject({ name: '性撸谷叙事预设', description: '性撸谷专用' })
+    expect((await repository.getCharacter('mistvale-character-loran'))?.scenario).toBe('当前位于性撸谷。')
+    expect((await repository.getSettings()).defaultContentVersion).toBe(8)
   })
 })

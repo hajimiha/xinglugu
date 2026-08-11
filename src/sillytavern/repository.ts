@@ -1,4 +1,4 @@
-import { createMistvaleDefaults, createMistvaleLorebookSections, DEFAULT_CONTENT_VERSION, MONSTER_GIRL_CARD_IDS } from './defaults'
+import { createMistvaleDefaults, createMistvaleLorebookSections, DEFAULT_CONTENT_VERSION, DEFAULT_PRESET_ID, MONSTER_GIRL_CARD_IDS } from './defaults'
 import { normalizeTavernSettings } from './api-config'
 import type { MistvaleTavernDatabase } from './database'
 import { tavernDatabase } from './database'
@@ -6,6 +6,7 @@ import type { CharacterCard, ChatPreset, ChatSession, Lorebook, PromptTraceSegme
 import { loadRepositoryContentPack, mergeById, type TavernContentPack } from './content-pack'
 import { createDefaultPortraitSlots, legacyPortraitsToSlots, parsePortraitSlots } from './portrait-slots'
 import { parseVariableDefinitions } from './variable-definitions'
+import { migrateSystemBranding } from './branding-migration'
 import {
   CALENDAR_FESTIVALS_ID,
   consolidateMistvaleLorebooks,
@@ -122,6 +123,7 @@ class DexieTavernRepository implements TavernRepository {
         const shouldMigratePresetBinding = storedContentVersion < 5
         const shouldMigrateFishingAndGifts = storedContentVersion < 6
         const shouldConsolidateLorebooks = storedContentVersion < 7
+        const shouldMigrateBranding = storedContentVersion < 8
         const shouldMigrateDefaults = storedContentVersion < DEFAULT_CONTENT_VERSION
         const migrationLorebookIds = [
           ...(shouldMigrateCalendar ? [CALENDAR_FESTIVALS_ID] : []),
@@ -165,10 +167,18 @@ class DexieTavernRepository implements TavernRepository {
             }
           }
         }
+        if (shouldMigrateBranding) {
+          const systemBook = await this.database.lorebooks.get(WORLD_RULES_ID)
+          if (systemBook) await this.database.lorebooks.put(migrateSystemBranding(systemBook))
+        }
         if ((await this.database.presets.count()) === 0) {
           await this.database.presets.bulkAdd(mergeById(defaults.presets, contentPack?.presets ?? []))
         } else if (shouldPublishPack && contentPack?.presets.length) {
           await this.database.presets.bulkPut(contentPack.presets)
+        }
+        if (shouldMigrateBranding) {
+          const systemPreset = await this.database.presets.get(DEFAULT_PRESET_ID)
+          if (systemPreset) await this.database.presets.put(migrateSystemBranding(systemPreset))
         }
         if ((await this.database.characters.count()) === 0) {
           await this.database.characters.bulkAdd(mergeById(defaults.characters, contentPack?.characters ?? []))
@@ -195,6 +205,13 @@ class DexieTavernRepository implements TavernRepository {
               if (consolidatedCharacters.length) await this.database.characters.bulkPut(consolidatedCharacters)
             }
           }
+        }
+        if (shouldMigrateBranding) {
+          const defaultCharacterIds = new Set(defaults.characters.map((card) => card.id))
+          const systemCharacters = (await this.database.characters.toArray())
+            .filter((card) => defaultCharacterIds.has(card.id))
+            .map((card) => migrateSystemBranding(card))
+          if (systemCharacters.length) await this.database.characters.bulkPut(systemCharacters)
         }
         if ((await this.database.sessions.count()) === 0 && defaults.sessions.length > 0) {
           await this.database.sessions.bulkAdd(defaults.sessions)

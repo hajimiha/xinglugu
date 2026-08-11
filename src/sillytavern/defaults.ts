@@ -1,6 +1,7 @@
 import { FISH_CATALOG, getItemName, locations, MONSTER_PARTNERS, npcs, UNIVERSAL_GIFT_IDS } from '../game/data'
 import { festivals, formatClock, npcSchedules, WEEKDAYS } from '../game/calendar'
 import type { MonsterPartnerId, Npc } from '../game/types'
+import { WORLD_NAME } from '../branding'
 import { createDefaultPortraitSlots } from './portrait-slots'
 import {
   CALENDAR_FESTIVALS_ID,
@@ -27,7 +28,8 @@ export {
   VILLAGE_ARCHIVE_ID,
   WORLD_RULES_ID,
 } from './lorebook-consolidation'
-export const DEFAULT_CONTENT_VERSION = 7
+export const DEFAULT_CONTENT_VERSION = 8
+export const DEFAULT_PRESET_ID = 'mistvale-preset-narrative'
 export const MONSTER_GIRL_CARD_IDS = (Object.keys(MONSTER_PARTNERS) as MonsterPartnerId[]).map((id) => `mistvale-character-${id}`)
 
 function entry(
@@ -58,7 +60,7 @@ function entry(
 const characterVoice: Record<string, { personality: string; firstMessage: string; example: string }> = {
   loran: {
     personality: '沉稳、善于倾听，习惯先观察再给出明确建议；谈及村民时带着不动声色的维护。',
-    firstMessage: '欢迎来到雾灯谷。壁炉边的位置给你留着，若农场或村里的事让你拿不准，我们可以慢慢谈。',
+    firstMessage: `欢迎来到${WORLD_NAME}。壁炉边的位置给你留着，若农场或村里的事让你拿不准，我们可以慢慢谈。`,
     example: '洛岚：路会被雾遮住，但不会凭空消失。先告诉我，你今天看见了什么？',
   },
   freya: {
@@ -183,12 +185,12 @@ function createCharacterCard(npc: Npc, now: number): CharacterCard {
     locationId: npc.locationId,
     description: npc.description,
     personality: voice.personality,
-    scenario: `当前位于${location?.name ?? '雾灯谷'}。玩家可与${npc.name}聊天、送礼，并按其身份进行交易或委托互动。`,
+    scenario: `当前位于${location?.name ?? WORLD_NAME}。玩家可与${npc.name}聊天、送礼，并按其身份进行交易或委托互动。`,
     firstMessage: voice.firstMessage,
     exampleDialogue: voice.example,
     lorebookIds: [WORLD_RULES_ID],
     portraitSlots: createDefaultPortraitSlots(),
-    tags: [npc.role, location?.name ?? '雾灯谷', '女性角色'],
+    tags: [npc.role, location?.name ?? WORLD_NAME, '女性角色'],
     createdAt: now,
     updatedAt: now,
   }
@@ -219,7 +221,7 @@ function createMonsterGirlCard(id: MonsterPartnerId, now: number): CharacterCard
 function createWorldRules(now: number): Lorebook {
   return {
     id: WORLD_RULES_ID,
-    name: '雾灯谷·世界规则',
+    name: `${WORLD_NAME}·世界规则`,
     description: '经营、精力、战斗、魔法与关系系统的稳定规则。',
     recursiveScanning: true,
     caseSensitive: false,
@@ -233,8 +235,8 @@ function createWorldRules(now: number): Lorebook {
       entry('mistvale-rule-skills', '技能成长', ['钓鱼', '农耕', '挖矿', '战斗', '魔法'], '钓鱼、农耕、挖矿等级提升对应收益；战斗等级提升生命与物理攻击；魔法等级提升魔力上限与魔法伤害，并限制图书馆可学法术等级。', { order: 40 }),
       entry('mistvale-rule-mine', '矿洞规则', ['矿洞', '电梯', '怪物', '挖矿'], '矿洞每层可挖矿，层数越深矿物越丰富。普通层存在怪物并进入回合制战斗；每逢五层为无怪电梯层，可返回或之后直达。战败会在次日复活。', { order: 50 }),
       entry('mistvale-rule-affinity', '关系记忆', ['好感', '礼物', '关系', '记忆'], 'NPC好感分初识、相识、信赖、亲密、羁绊五阶段。对话需尊重当前阶段与历史记忆，不提前泄露高好感内容；喜爱礼物与完成委托可提升关系。', { order: 60 }),
-      entry('mistvale-rule-gifts', '雾灯谷礼物偏好', ['礼物', '偏爱', '莓果挞', '月铃花', ...npcs.map((npc) => npc.name), ...Object.values(FISH_CATALOG).map((fish) => fish.name)], `${UNIVERSAL_GIFT_IDS.map(getItemName).join('、')}是所有角色都认可的通用礼物；月铃花只属于洛岚与芙蕾雅的个人偏爱。居民个人偏好：${npcs.map((npc) => `${npc.name}：${npc.preferredGifts.map(getItemName).join('、')}`).join('；')}。`, { order: 62 }),
-      entry('mistvale-rule-fishing', '雾灯谷鱼类图鉴', ['钓鱼', ...Object.values(FISH_CATALOG).map((fish) => fish.name)], `雾灯谷共有五种常见鱼类：${Object.values(FISH_CATALOG).map((fish) => `${fish.name}为${fish.size === 'small' ? '小型' : fish.size === 'medium' ? '中型' : '大型'}鱼，可从${fish.sources.join('、')}获得，主要用途是${fish.uses.join('、')}`).join('；')}。大型鱼更稀有且售价更高。`, { order: 65 }),
+      entry('mistvale-rule-gifts', `${WORLD_NAME}礼物偏好`, ['礼物', '偏爱', '莓果挞', '月铃花', ...npcs.map((npc) => npc.name), ...Object.values(FISH_CATALOG).map((fish) => fish.name)], `${UNIVERSAL_GIFT_IDS.map(getItemName).join('、')}是所有角色都认可的通用礼物；月铃花只属于洛岚与芙蕾雅的个人偏爱。居民个人偏好：${npcs.map((npc) => `${npc.name}：${npc.preferredGifts.map(getItemName).join('、')}`).join('；')}。`, { order: 62 }),
+      entry('mistvale-rule-fishing', `${WORLD_NAME}鱼类图鉴`, ['钓鱼', ...Object.values(FISH_CATALOG).map((fish) => fish.name)], `${WORLD_NAME}共有五种常见鱼类：${Object.values(FISH_CATALOG).map((fish) => `${fish.name}为${fish.size === 'small' ? '小型' : fish.size === 'medium' ? '中型' : '大型'}鱼，可从${fish.sources.join('、')}获得，主要用途是${fish.uses.join('、')}`).join('；')}。大型鱼更稀有且售价更高。`, { order: 65 }),
     ],
   }
 }
@@ -242,7 +244,7 @@ function createWorldRules(now: number): Lorebook {
 function createVillageArchive(now: number): Lorebook {
   return {
     id: VILLAGE_ARCHIVE_ID,
-    name: '雾灯谷·人物与地点档案',
+    name: `${WORLD_NAME}·人物与地点档案`,
     description: '村庄地点与十五位居民的可检索背景。',
     recursiveScanning: false,
     caseSensitive: false,
@@ -250,7 +252,7 @@ function createVillageArchive(now: number): Lorebook {
     createdAt: now,
     updatedAt: now,
     entries: [
-      entry('mistvale-village-overview', '村庄概览', ['雾灯谷', '村庄', '农场'], '雾灯谷坐落在森林、山地与海湾之间。苔灯农场位于南坡；村内以村长家、杂货店、铁匠铺、医院和图书馆为核心，外围分布共生所、魔女之家、猎人帐篷、矿洞与潮汐码头。', { constant: true, order: 10, position: 'before_char' }),
+      entry('mistvale-village-overview', '村庄概览', [WORLD_NAME, '村庄', '农场'], `${WORLD_NAME}坐落在森林、山地与海湾之间。苔灯农场位于南坡；村内以村长家、杂货店、铁匠铺、医院和图书馆为核心，外围分布共生所、魔女之家、猎人帐篷、矿洞与潮汐码头。`, { constant: true, order: 10, position: 'before_char' }),
       ...npcs.map((npc, index) => {
         const voice = characterVoice[npc.id]
         const location = locations.find((candidate) => candidate.id === npc.locationId)
@@ -258,7 +260,7 @@ function createVillageArchive(now: number): Lorebook {
           `mistvale-person-${npc.id}`,
           `${npc.name}档案`,
           [npc.name, npc.role, location?.name ?? npc.locationId],
-          `${npc.name}是${npc.role}，生日为${npc.birthday.month}月${npc.birthday.day}日，常驻地是${location?.name ?? '雾灯谷'}。${npc.description}性格与话语基调：${voice.personality}偏爱礼物：${npc.preferredGifts.map(getItemName).join('、')}；此外，莓果挞是所有角色都认可的通用礼物。常规行程：${npcSchedules[npc.id].defaultSegments.map((segment) => `${formatClock(segment.startMinute)}至${segment.endMinute === 1440 ? '24:00' : formatClock(segment.endMinute)}在${locations.find((item) => item.id === segment.locationId)?.name ?? segment.locationId}${segment.activity}`).join('；')}。每周变更：${Object.entries(npcSchedules[npc.id].weeklyOverrides ?? {}).map(([weekday, segments]) => `${WEEKDAYS[Number(weekday)]}${segments?.map((segment) => `${formatClock(segment.startMinute)}在${locations.find((item) => item.id === segment.locationId)?.name ?? segment.locationId}${segment.activity}`).join('、')}`).join('；') || '无'}。`,
+          `${npc.name}是${npc.role}，生日为${npc.birthday.month}月${npc.birthday.day}日，常驻地是${location?.name ?? WORLD_NAME}。${npc.description}性格与话语基调：${voice.personality}偏爱礼物：${npc.preferredGifts.map(getItemName).join('、')}；此外，莓果挞是所有角色都认可的通用礼物。常规行程：${npcSchedules[npc.id].defaultSegments.map((segment) => `${formatClock(segment.startMinute)}至${segment.endMinute === 1440 ? '24:00' : formatClock(segment.endMinute)}在${locations.find((item) => item.id === segment.locationId)?.name ?? segment.locationId}${segment.activity}`).join('；')}。每周变更：${Object.entries(npcSchedules[npc.id].weeklyOverrides ?? {}).map(([weekday, segments]) => `${WEEKDAYS[Number(weekday)]}${segments?.map((segment) => `${formatClock(segment.startMinute)}在${locations.find((item) => item.id === segment.locationId)?.name ?? segment.locationId}${segment.activity}`).join('、')}`).join('；') || '无'}。`,
           { order: 100 + index * 5, position: 'after_char' },
         )
       }),
@@ -270,7 +272,7 @@ function createCalendarFestivals(now: number): Lorebook {
   const birthdayIndex = npcs.map((npc) => `${npc.birthday.month}月${npc.birthday.day}日是${npc.name}的生日`).join('；')
   return {
     id: CALENDAR_FESTIVALS_ID,
-    name: '雾灯谷·岁时与庆典',
+    name: `${WORLD_NAME}·岁时与庆典`,
     description: '365日历、居民生日、动态日程与十二个月度节日活动。',
     recursiveScanning: false,
     caseSensitive: false,
@@ -278,7 +280,7 @@ function createCalendarFestivals(now: number): Lorebook {
     createdAt: now,
     updatedAt: now,
     entries: [
-      entry('mistvale-calendar-rules', '岁时规则', ['日期', '日历', '行程', '节日', '生日'], '雾灯谷一年固定365天，分为十二个月。人物会按照当前日期与时刻在工作地点、休闲地点和住处之间移动；叙事必须服从游戏变量给出的当前时间、地点和活动，不得让同一人物同时出现在两个地点。', { constant: true, order: 5, position: 'before_char' }),
+      entry('mistvale-calendar-rules', '岁时规则', ['日期', '日历', '行程', '节日', '生日'], `${WORLD_NAME}一年固定365天，分为十二个月。人物会按照当前日期与时刻在工作地点、休闲地点和住处之间移动；叙事必须服从游戏变量给出的当前时间、地点和活动，不得让同一人物同时出现在两个地点。`, { constant: true, order: 5, position: 'before_char' }),
       entry('mistvale-birthday-index', '居民生日表', ['生日', ...npcs.map((npc) => npc.name)], `${birthdayIndex}。角色生日当天，赠送其偏爱礼物获得双倍好感；人物应对生日祝福与礼物作出符合当前关系阶段的回应。`, { constant: true, order: 8, position: 'before_char' }),
       ...festivals.map((festival, index) => {
         const location = locations.find((item) => item.id === festival.locationId)
@@ -299,7 +301,7 @@ function createCalendarFestivals(now: number): Lorebook {
 function createProductionPartners(now: number): Lorebook {
   return {
     id: PRODUCTION_PARTNERS_ID,
-    name: '雾灯谷·农场生产与共生伙伴',
+    name: `${WORLD_NAME}·农场生产与共生伙伴`,
     description: '农场开拓、机器加工、金属锻造、节庆作物与六位魔物娘伙伴的稳定规则。',
     recursiveScanning: true,
     caseSensitive: false,
@@ -329,7 +331,7 @@ export function createMistvaleLorebookSections(now = Date.now()): Lorebook[] {
 export function createMistvaleDefaults(): MistvaleTavernDefaults {
   const now = Date.now()
   const presetSeed = createDefaultPreset()
-  const presetId = 'mistvale-preset-narrative'
+  const presetId = DEFAULT_PRESET_ID
   const mergedLorebook = consolidateMistvaleLorebooks(createMistvaleLorebookSections(now), now)
   if (!mergedLorebook) throw new Error('默认世界书合并失败')
   const lorebooks = [mergedLorebook]

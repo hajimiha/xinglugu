@@ -3,7 +3,7 @@ import { npcs } from '../game/data'
 import { DEFAULT_TAGS } from './types'
 import { createMistvaleDefaults, createMistvaleLorebookSections, DEFAULT_CONTENT_VERSION, WORLD_RULES_ID } from './defaults'
 
-describe('雾灯谷酒馆默认内容', () => {
+describe('性撸谷酒馆默认内容', () => {
   it('创建完整且默认等待模型密钥的酒馆种子', () => {
     const defaults = createMistvaleDefaults()
     const sourceBooks = createMistvaleLorebookSections(123)
@@ -11,7 +11,7 @@ describe('雾灯谷酒馆默认内容', () => {
 
     expect(defaults.characters).toHaveLength(21)
     expect(defaults.lorebooks).toHaveLength(1)
-    expect(defaults.lorebooks[0]).toMatchObject({ id: WORLD_RULES_ID, name: '雾灯谷·全域设定集' })
+    expect(defaults.lorebooks[0]).toMatchObject({ id: WORLD_RULES_ID, name: '性撸谷·全域设定集' })
     expect(defaults.lorebooks[0].entries).toEqual(sourceBooks.flatMap((book) => book.entries))
     expect(defaults.characters.every((card) => JSON.stringify(card.lorebookIds) === JSON.stringify([WORLD_RULES_ID]))).toBe(true)
     expect(defaults.settings.activeLorebookIds).toEqual([WORLD_RULES_ID])
@@ -29,7 +29,7 @@ describe('雾灯谷酒馆默认内容', () => {
     expect(defaults.presets[0].settings).not.toHaveProperty('apiKey')
     expect(defaults.presets[0].description).toContain('模型')
     expect(defaults.presets[0].description).not.toContain('本地剧情引擎')
-    expect(DEFAULT_CONTENT_VERSION).toBe(7)
+    expect(DEFAULT_CONTENT_VERSION).toBe(8)
   })
 
   it('把完整鱼类图鉴、通用礼物与每位角色的偏爱写入世界书', () => {
@@ -90,7 +90,7 @@ describe('雾灯谷酒馆默认内容', () => {
       name: '洛岚',
       locationId: 'mayor-home',
     })
-    expect(loran?.firstMessage).toContain('雾灯谷')
+    expect(loran?.firstMessage).toContain('性撸谷')
     expect(loran?.lorebookIds).toEqual(expect.arrayContaining(['mistvale-world-rules']))
     expect(loran?.portraitSlots).toEqual([
       { id: 'portrait-0-100', minAffinity: 0, maxAffinity: 100, source: '' },

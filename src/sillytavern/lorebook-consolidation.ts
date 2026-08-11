@@ -1,4 +1,5 @@
 import type { Lorebook } from './types'
+import { WORLD_NAME } from '../branding'
 
 export const WORLD_RULES_ID = 'mistvale-world-rules'
 export const VILLAGE_ARCHIVE_ID = 'mistvale-village-archive'
@@ -25,7 +26,7 @@ export function consolidateMistvaleLorebooks(books: readonly Lorebook[], updated
   return {
     ...primary,
     id: WORLD_RULES_ID,
-    name: '雾灯谷·全域设定集',
+    name: `${WORLD_NAME}·全域设定集`,
     description: '整合世界规则、人物地点、岁时庆典、农场生产与共生伙伴的完整设定。',
     recursiveScanning: ordered.some((book) => book.recursiveScanning),
     caseSensitive: ordered.every((book) => book.caseSensitive),
