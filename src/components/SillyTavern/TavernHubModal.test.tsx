@@ -209,7 +209,7 @@ describe('酒馆中枢', () => {
       id: 'audit-ui', createdAt: Date.now(), status: 'succeeded', sessionId: 'session', characterName: '洛岚',
       presetId: 'preset', presetName: '当前测试预设', presetBinding: 'follow-active', provider: 'deepseek', model: 'deepseek-v4-flash',
       preparedRequest: { task: 'story', messages: [{ role: 'system', content: 'CURRENT-PRESET-SENTINEL' }, { role: 'user', content: '继续' }] },
-       providerRequest: { url: 'https://user:secret@api.deepseek.com/chat/completions?api_key=secret', method: 'POST', headers: { Authorization: '[已隐藏]' }, body: { model: 'deepseek-v4-flash', messages: [{ role: 'system', content: 'CURRENT-PRESET-SENTINEL' }] } },
+        providerRequest: { url: 'https://user:secret@api.deepseek.com/chat/completions?api_key=secret', method: 'POST', headers: { Authorization: '[已隐藏]' }, body: { model: 'deepseek-v4-flash', messages: [{ role: 'system', content: 'CURRENT-PRESET-SENTINEL' }], credentials: { access_token: 'nested-ui-secret', metadata: { client_secret: 'nested-client-secret' } } } },
       segments: [{ id: 'segment', source: 'preset', identifier: 'main', role: 'system', raw: 'CURRENT-PRESET-SENTINEL', compiled: 'CURRENT-PRESET-SENTINEL', sent: true, messageIndex: 0, tokenEstimate: 6, diagnostics: [] }],
       macroOperations: [], matchedLorebookEntries: [], diagnostics: [],
     })
@@ -227,6 +227,7 @@ describe('酒馆中枢', () => {
     expect(screen.getAllByText(/已隐藏/).some((element) => element.tagName === 'PRE')).toBe(true)
     expect(screen.getByText('https://api.deepseek.com/chat/completions')).toBeVisible()
     expect(screen.queryByText(/api_key=secret|user:secret/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/nested-ui-secret|nested-client-secret/)).not.toBeInTheDocument()
     expect(screen.queryByText(/session-secret/)).not.toBeInTheDocument()
   })
 

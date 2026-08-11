@@ -195,7 +195,7 @@ describe('本地优先酒馆 API 适配器', () => {
         'X-Auth-Token': 'token-secret',
         'Content-Type': 'application/json',
       },
-      body: { messages: [{ role: 'user', content: 'safe prompt' }] },
+       body: { messages: [{ role: 'user', content: 'safe prompt' }], credentials: { access_token: 'body-token-secret', nested: { client_secret: 'body-client-secret' } } },
     })
 
     expect(redacted.url).toBe('https://example.test/v1/chat')
@@ -206,7 +206,7 @@ describe('本地优先酒馆 API 适配器', () => {
       'X-Auth-Token': '[已隐藏]',
       'Content-Type': 'application/json',
     })
-    expect(JSON.stringify(redacted)).not.toMatch(/password|url-secret|fragment-secret|header-secret|api-secret|cookie-secret|token-secret/)
+    expect(JSON.stringify(redacted)).not.toMatch(/password|url-secret|fragment-secret|header-secret|api-secret|cookie-secret|token-secret|body-client-secret/)
   })
 
   it.each([

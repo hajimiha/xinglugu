@@ -103,11 +103,23 @@ function redactInspectionUrl(value: string): string {
   }
 }
 
+const sensitiveKey = /api[-_]?key|authorization|access[-_]?token|refresh[-_]?token|client[-_]?secret|password|credential|secret|^token$/i
+
+export function redactSensitiveValue(value: unknown, key?: string): unknown {
+  if (key && sensitiveKey.test(key)) return '[已隐藏]'
+  if (Array.isArray(value)) return value.map((item) => redactSensitiveValue(item))
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([entryKey, entryValue]) => [entryKey, redactSensitiveValue(entryValue, entryKey)]))
+  }
+  return value
+}
+
 export function redactRequestInspection(inspection: TavernProviderRequestInspection): TavernProviderRequestInspection {
   return {
     ...inspection,
     url: redactInspectionUrl(inspection.url),
     headers: redactHeaders(inspection.headers),
+    body: redactSensitiveValue(inspection.body) as Record<string, unknown>,
   }
 }
 

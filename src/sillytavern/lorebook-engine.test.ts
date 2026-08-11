@@ -35,6 +35,13 @@ describe('deterministic lorebook matching', () => {
     expect(match('not_all', 'alpha', 'other')).toBe(1)
   })
 
+  it.each(['alpha', 'beta'])('applies selective logic consistently for partial primary key %s matches', (primaryText) => {
+    expect(match('and_all', primaryText, 'gate')).toBe(0)
+    expect(match('and_all', primaryText, 'gate lock')).toBe(1)
+    expect(match('not_all', primaryText, 'gate')).toBe(1)
+    expect(match('not_all', primaryText, 'gate lock')).toBe(0)
+  })
+
   it('uses entry matching overrides without changing unrelated imported fields', () => {
     const entry = { ...entryDefaults, keys: ['Alpha'], selective: false, caseSensitive: true, matchWholeWords: true, probability: 0, useProbability: false, comment: 'keep me' }
     const result = createLorebookEngine(book('book', [entry], { caseSensitive: false, matchWholeWords: false })).scan('Alpha')
@@ -49,6 +56,10 @@ describe('deterministic lorebook matching', () => {
     expect(createLorebookEngine(book('book', [{ ...entryDefaults, keys: ['cat'], secondaryKeys: [], selective: false, caseSensitive: true }], { caseSensitive: false })).scan('CAT')).toHaveLength(0)
     expect(createLorebookEngine(book('book', [{ ...entryDefaults, keys: ['cat'], secondaryKeys: [], selective: false, matchWholeWords: true }], { matchWholeWords: false })).scan('scatter')).toHaveLength(0)
     expect(createLorebookEngine(book('book', [{ ...entryDefaults, keys: ['cat'], secondaryKeys: [], selective: false, matchWholeWords: false }], { matchWholeWords: true })).scan('scatter')).toHaveLength(1)
+    expect(createLorebookEngine(book('book', [{ ...entryDefaults, keys: ['猫'], secondaryKeys: [], selective: false }], { matchWholeWords: true })).scan('小猫。')).toHaveLength(0)
+    expect(createLorebookEngine(book('book', [{ ...entryDefaults, keys: ['猫'], secondaryKeys: [], selective: false }], { matchWholeWords: true })).scan('猫。')).toHaveLength(1)
+    expect(createLorebookEngine(book('book', [{ ...entryDefaults, keys: ['cat'], secondaryKeys: [], selective: false }], { matchWholeWords: true })).scan('a cat!')).toHaveLength(1)
+    expect(createLorebookEngine(book('book', [{ ...entryDefaults, keys: ['cat'], secondaryKeys: [], selective: false }], { matchWholeWords: true })).scan('cater')).toHaveLength(0)
   })
 
   it('only invokes injected probability when useProbability is enabled', () => {
@@ -95,6 +106,17 @@ describe('deterministic lorebook matching', () => {
     const child = { ...entryDefaults, id: 'child', keys: ['child'], content: 'should-not-match', selective: false }
     const result = createLorebookEngine(book('book', [seed, child], { recursiveScanning: true })).recursiveScan('seed', 3)
     expect(result.map((item) => item.entry.id)).toEqual(['seed'])
+  })
+
+  it('limits recursive matches using each entry scanDepth', () => {
+    const seed = { ...entryDefaults, id: 'seed', keys: ['seed'], content: 'child', selective: false, scanDepth: 1 }
+    const child = { ...entryDefaults, id: 'child', keys: ['child'], content: 'grandchild', selective: false, scanDepth: 0 }
+    const grandchild = { ...entryDefaults, id: 'grandchild', keys: ['grandchild'], content: 'end', selective: false }
+
+    const result = createLorebookEngine(book('book', [seed, child, grandchild], { recursiveScanning: true }))
+      .recursiveScan('seed', 5)
+
+    expect(result.map((item) => item.entry.id).sort()).toEqual(['child', 'seed'])
   })
 
   it('does not return entries already present in the recursion context', () => {

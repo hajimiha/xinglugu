@@ -2,7 +2,7 @@ import { createMistvaleDefaults, createMistvaleLorebookSections, DEFAULT_CONTENT
 import { normalizeTavernSettings } from './api-config'
 import type { MistvaleTavernDatabase } from './database'
 import { tavernDatabase } from './database'
-import type { CharacterCard, ChatPreset, ChatSession, Lorebook, TavernRequestAudit, TavernSettings } from './types'
+import type { CharacterCard, ChatPreset, ChatSession, Lorebook, PromptTraceSegment, TavernRequestAudit, TavernSettings } from './types'
 import { loadRepositoryContentPack, mergeById, type TavernContentPack } from './content-pack'
 import { createDefaultPortraitSlots, legacyPortraitsToSlots, parsePortraitSlots } from './portrait-slots'
 import { parseVariableDefinitions } from './variable-definitions'
@@ -50,6 +50,22 @@ function normalizeStoredSession(value: ChatSession): ChatSession {
   } catch {
     const { variableDefinitions: _invalidDefinitions, ...session } = value
     return session
+  }
+}
+
+function normalizeStoredAudit(value: TavernRequestAudit): TavernRequestAudit {
+  return {
+    ...value,
+    segments: value.segments.map((segment) => {
+      const legacy = segment as PromptTraceSegment & { messageIndex?: unknown }
+      return {
+        ...segment,
+        messageIndex: typeof legacy.messageIndex === 'number' && Number.isInteger(legacy.messageIndex)
+          ? legacy.messageIndex
+          : null,
+        sent: Boolean(segment.sent),
+      }
+    }),
   }
 }
 
@@ -280,7 +296,9 @@ class DexieTavernRepository implements TavernRepository {
     await this.database.settings.put(normalizeTavernSettings(value))
   }
 
-  listRequestAudits = () => this.database.requestAudits.orderBy('createdAt').reverse().toArray()
+  async listRequestAudits() {
+    return (await this.database.requestAudits.orderBy('createdAt').reverse().toArray()).map(normalizeStoredAudit)
+  }
   async saveRequestAudit(value: TavernRequestAudit): Promise<void> {
     await this.database.requestAudits.put(value)
     const expired = await this.database.requestAudits.orderBy('createdAt').reverse().offset(20).primaryKeys()

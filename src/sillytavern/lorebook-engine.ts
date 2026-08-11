@@ -54,13 +54,16 @@ export class LorebookEngine {
         recursion: { depth, isRecursion: depth > 0, seen: new Set(allMatched.keys()) },
       })
       let added = false
+      const nextText: string[] = []
       for (const match of newMatches) {
         if (allMatched.has(match.identity) || (depth > 0 && match.entry.preventRecursion)) continue
         allMatched.set(match.identity, match)
-        if (!match.entry.excludeRecursion && !match.entry.preventRecursion) currentText += ` ${match.entry.content}`
+        const canRecurse = match.entry.scanDepth === undefined || depth < Math.max(0, match.entry.scanDepth)
+        if (canRecurse && !match.entry.excludeRecursion && !match.entry.preventRecursion) nextText.push(match.entry.content)
         added = true
       }
       if (!added) break
+      currentText = nextText.join(' ')
       depth++
     }
     return Array.from(allMatched.values()).sort((a, b) => a.score - b.score || a.identity.localeCompare(b.identity))
@@ -122,11 +125,19 @@ export class LorebookEngine {
 
   private containsKeyword(text: string, keyword: string, wholeWords: boolean): boolean {
     if (!wholeWords) return text.includes(keyword)
-    return new RegExp(`\\b${this.escapeRegex(keyword)}\\b`).test(text)
+    let start = text.indexOf(keyword)
+    while (start >= 0) {
+      const end = start + keyword.length
+      const before = start === 0 ? '' : text[start - 1]
+      const after = end === text.length ? '' : text[end]
+      if (!this.isWordCharacter(before) && !this.isWordCharacter(after)) return true
+      start = text.indexOf(keyword, start + 1)
+    }
+    return false
   }
 
-  private escapeRegex(value: string): string {
-    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  private isWordCharacter(value: string): boolean {
+    return value.length > 0 && /[\p{L}\p{N}_]/u.test(value)
   }
 }
 

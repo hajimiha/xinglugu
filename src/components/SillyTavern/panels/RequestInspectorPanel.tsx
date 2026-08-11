@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { exportToJson } from '../../../sillytavern/importer'
-import { redactRequestInspection } from '../../../sillytavern/api-adapter'
+import { redactRequestInspection, redactSensitiveValue } from '../../../sillytavern/api-adapter'
 import type { TavernRequestAudit } from '../../../sillytavern/types'
 import { useTavern } from '../../../tavern/TavernContext'
 import { GameIcon } from '../../icons/GameIcon'
@@ -13,15 +13,6 @@ const sourceLabels: Record<string, string> = {
 
 function statusLabel(audit: TavernRequestAudit) {
   return audit.status === 'succeeded' ? '已完成' : '请求失败'
-}
-
-function redactExportValue(value: unknown, key?: string): unknown {
-  if (key && /api[-_]?key|authorization|access[-_]?token|refresh[-_]?token|client[-_]?secret|password|credential|secret|^token$/i.test(key)) return '[已隐藏]'
-  if (Array.isArray(value)) return value.map((item) => redactExportValue(item))
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(Object.entries(value).map(([entryKey, entryValue]) => [entryKey, redactExportValue(entryValue, entryKey)]))
-  }
-  return value
 }
 
 export function RequestInspectorPanel() {
@@ -41,7 +32,7 @@ export function RequestInspectorPanel() {
 
   const exportAudit = () => {
     if (!selected) return
-    const exportable = redactExportValue({
+    const exportable = redactSensitiveValue({
       ...selected,
       providerRequest: redactRequestInspection(selected.providerRequest),
     })

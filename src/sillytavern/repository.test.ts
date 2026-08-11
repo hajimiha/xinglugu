@@ -375,6 +375,30 @@ describe('雾灯谷酒馆仓储', () => {
     expect(audits.at(-1)?.id).toBe('audit-3')
   })
 
+  it('读取没有 messageIndex 的旧请求审计时保留原有片段发送状态', async () => {
+    database = createTavernDatabase(`mistvale-audit-legacy-${crypto.randomUUID()}`)
+    const repository = createTavernRepository(database)
+    await repository.initialize()
+    await database.requestAudits.put({
+      id: 'legacy-audit', createdAt: 1, status: 'succeeded', sessionId: 'session', characterName: '洛岚',
+      presetId: 'preset', presetName: '旧预设', presetBinding: 'follow-active', provider: 'deepseek', model: 'model',
+      preparedRequest: { task: 'story', messages: [{ role: 'system', content: 'system' }] },
+      providerRequest: { url: 'https://example.test', method: 'POST', headers: {}, body: {} },
+      segments: [
+        { id: 'legacy-sent', source: 'preset', identifier: 'legacy-sent', role: 'system', raw: 'system', compiled: 'system', sent: true, tokenEstimate: 1, diagnostics: [] },
+        { id: 'legacy-omitted', source: 'history', identifier: 'legacy-omitted', role: 'assistant', raw: 'old', compiled: 'old', sent: false, tokenEstimate: 1, diagnostics: [] },
+      ],
+      macroOperations: [], matchedLorebookEntries: [], diagnostics: [],
+    } as never)
+
+    const [audit] = await repository.listRequestAudits()
+
+    expect(audit.segments).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'legacy-sent', sent: true, messageIndex: null }),
+      expect.objectContaining({ id: 'legacy-omitted', sent: false, messageIndex: null }),
+    ]))
+  })
+
   it('在同一事务中提交会话和回合审计', async () => {
     database = createTavernDatabase(`mistvale-commit-${crypto.randomUUID()}`)
     const repository = createTavernRepository(database)

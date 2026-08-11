@@ -180,9 +180,12 @@ export function compileTavernTurn(input: PromptCompileInput): PromptCompilation 
     }
     if (identifier === 'bias') return { content: null, source: 'preset' }
     if (settingKeys[identifier]) {
-      const characterPrompt = characterPrompts?.[settingKeys[identifier]]
+      const promptKey = settingKeys[identifier]
+      const characterPrompt = characterPrompts && promptKey in characterPrompts
+        ? characterPrompts[promptKey as keyof typeof characterPrompts]
+        : undefined
       return {
-        content: characterPrompt?.trim() ? characterPrompt : setting(settingKeys[identifier]),
+        content: characterPrompt?.trim() ? characterPrompt : setting(promptKey),
         source: identifier.startsWith('char') || identifier === 'scenario' || identifier === 'dialogueExamples'
           ? 'character'
           : 'preset',

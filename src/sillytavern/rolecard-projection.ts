@@ -1,6 +1,6 @@
-import type { CharacterCard } from './types'
+import type { CharacterCard, CharacterPromptIdentifier } from './types'
 
-export function projectCharacterPrompts(character: CharacterCard): Record<string, string> {
+export function projectCharacterPrompts(character: CharacterCard): Record<CharacterPromptIdentifier, string> {
   return {
     character_description: character.description,
     character_personality: character.personality,
