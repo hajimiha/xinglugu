@@ -1,0 +1,18 @@
+import { describe, expect, it } from 'vitest'
+import { openCookie, sealCookie } from './session'
+
+describe('GitHub 会话 Cookie', () => {
+  const secret = 'test-secret-with-at-least-thirty-two-characters'
+
+  it('加密后可恢复，篡改后不可读取', () => {
+    const value = { token: 'private-token', expiresAt: Date.now() + 60_000 }
+    const sealed = sealCookie(value, secret)
+    expect(sealed).not.toContain('private-token')
+    expect(openCookie(sealed, secret)).toEqual(value)
+    expect(openCookie(`${sealed.slice(0, -1)}x`, secret)).toBeNull()
+  })
+
+  it('拒绝过期会话', () => {
+    expect(openCookie(sealCookie({ expiresAt: Date.now() - 1 }, secret), secret)).toBeNull()
+  })
+})

@@ -1,10 +1,11 @@
-import { useCallback, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useGame } from '../game/GameContext'
 import { TavernHubModal } from '../components/SillyTavern/TavernHubModal'
 import { SettingsModal } from '../components/modals/SettingsModal'
 import { TitleScreen } from './TitleScreen'
 import { SaveCenterModal } from './SaveCenterModal'
 import { StartModalFrame } from './StartModalFrame'
+import { useCloudSave } from '../cloud/useCloudSave'
 
 export type StartModal = null | 'load' | 'workshop' | 'settings'
 
@@ -15,7 +16,19 @@ interface StartLayerProps {
 export function StartLayer({ renderGame }: StartLayerProps) {
   const { saveMeta } = useGame()
   const [inGame, setInGame] = useState(false)
-  const [modal, setModal] = useState<StartModal>(null)
+  const [modal, setModal] = useState<StartModal>(() => {
+    if (typeof window === 'undefined') return null
+    return new URLSearchParams(window.location.search).get('panel') === 'save' ? 'load' : null
+  })
+  const cloud = useCloudSave()
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const url = new URL(window.location.href)
+    if (!url.searchParams.has('panel') && !url.searchParams.has('github')) return
+    url.searchParams.delete('panel')
+    url.searchParams.delete('github')
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
+  }, [])
   const closeModal = useCallback(() => setModal(null), [])
   const enterGame = useCallback(() => { setModal(null); setInGame(true) }, [])
   const returnToTitle = useCallback(() => { setModal(null); setInGame(false) }, [])
@@ -34,7 +47,7 @@ export function StartLayer({ renderGame }: StartLayerProps) {
 
       {modal === 'load' && (
         <StartModalFrame id="start-save-center" title="读取游戏存档" onClose={closeModal}>
-          <SaveCenterModal onEnterGame={enterGame} />
+          <SaveCenterModal cloud={cloud} onEnterGame={enterGame} />
         </StartModalFrame>
       )}
       {modal === 'settings' && (
