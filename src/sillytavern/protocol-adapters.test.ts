@@ -123,4 +123,18 @@ describe('供应商协议适配', () => {
       choices: [{ delta: { reasoning_content: '增量推理', content: '' } }],
     })).toEqual({ content: '', reasoning: '增量推理' })
   })
+
+  it('rejects malformed provider response shapes without inventing content', () => {
+    for (const protocol of ['openai-chat', 'anthropic-messages', 'gemini', 'vertex-gemini', 'cohere-v2', 'cloudflare-workers-ai'] as const) {
+      expect(extractProviderContent(protocol, { error: { message: 'provider failure' } })).toEqual({ content: '', reasoning: '' })
+    }
+  })
+
+  it('constructs provider paths structurally without inheriting base URL query or fragment', () => {
+    const built = buildProviderRequest(config('deepseek', {
+      baseUrl: 'https://api.example.test/root?api_key=secret#fragment',
+    }), 'secret', request, true)
+
+    expect(built.url).toBe('https://api.example.test/root/chat/completions')
+  })
 })

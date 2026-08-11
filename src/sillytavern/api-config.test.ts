@@ -82,4 +82,27 @@ describe('酒馆 API 配置', () => {
       topP: expect.any(String),
     })
   })
+
+  it.each([
+    'https://user:password@example.test/v1',
+    'https://example.test/v1?api_key=secret',
+    'https://example.test/v1#secret',
+  ])('拒绝包含凭据、查询参数或片段的基础地址：%s', (baseUrl) => {
+    const defaults = createMistvaleDefaults().settings.api
+    expect(validateTavernApiConfig({ ...defaults, baseUrl })).toMatchObject({
+      baseUrl: expect.any(String),
+    })
+  })
+
+  it('拒绝供应商要求但未填写的选项', () => {
+    const defaults = createMistvaleDefaults().settings.api
+    expect(validateTavernApiConfig({
+      ...defaults,
+      provider: 'google-vertex-ai',
+      providerOptions: {},
+    })).toMatchObject({
+      projectId: expect.any(String),
+      location: expect.any(String),
+    })
+  })
 })

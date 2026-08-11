@@ -6,6 +6,7 @@ import {
   extractProviderContent,
   extractProviderSseContent,
 } from './protocol-adapters'
+import { parseSseEvents } from './sse-parser'
 import type { TavernApiAdapter, TavernApiConfig, TavernApiProtocol, TavernPreparedRequest, TavernProviderRequestInspection, TavernRequest, TavernStreamEvent } from './types'
 
 export type TavernApiErrorCode =
@@ -81,20 +82,41 @@ function redactHeaders(headers: HeadersInit | undefined): Record<string, string>
     : Array.isArray(headers)
       ? Object.fromEntries(headers)
       : Object.fromEntries(Object.entries(headers ?? {}).map(([key, value]) => [key, String(value)]))
-  const sensitive = new Set(['authorization', 'api-key', 'x-api-key', 'x-goog-api-key'])
-  return Object.fromEntries(Object.entries(values).map(([key, value]) => [key, sensitive.has(key.toLowerCase()) ? '[已隐藏]' : value]))
+  const sensitive = /(?:authorization|api[-_]?key|x[-_]?api[-_]?key|token|secret|credential|password|cookie)/i
+  return Object.fromEntries(Object.entries(values).map(([key, value]) => [key, sensitive.test(key) ? '[已隐藏]' : value]))
+}
+
+function redactInspectionUrl(value: string): string {
+  try {
+    const url = new URL(value)
+    url.username = ''
+    url.password = ''
+    url.search = ''
+    url.hash = ''
+    return url.toString()
+  } catch {
+    return '[已隐藏地址]'
+  }
+}
+
+export function redactRequestInspection(inspection: TavernProviderRequestInspection): TavernProviderRequestInspection {
+  return {
+    ...inspection,
+    url: redactInspectionUrl(inspection.url),
+    headers: redactHeaders(inspection.headers),
+  }
 }
 
 function inspectProviderRequest(config: TavernApiConfig, prepared: TavernPreparedRequest): TavernProviderRequestInspection {
   const built = buildProviderRequest(config, 'redacted', prepared.request, config.streaming)
   let body: Record<string, unknown> = {}
   try { body = JSON.parse(String(built.init.body ?? '{}')) as Record<string, unknown> } catch { body = {} }
-  return {
+  return redactRequestInspection({
     url: built.url,
     method: built.init.method ?? 'POST',
     headers: redactHeaders(built.init.headers),
     body,
-  }
+  })
 }
 
 function requireApiKey(apiKey: string): string {
@@ -155,31 +177,45 @@ async function* streamSse(response: Response, protocol: TavernApiProtocol): Asyn
   }
   const reader = response.body.getReader()
   const decoder = new TextDecoder()
-  let buffer = ''
+  let frameBuffer = ''
   let finished = false
 
-  while (!finished) {
-    const { done, value } = await reader.read()
-    buffer += decoder.decode(value, { stream: !done })
-    const lines = buffer.split(/\r?\n/)
-    buffer = done ? '' : lines.pop() ?? ''
-    for (const line of lines) {
-      if (!line.startsWith('data:')) continue
-      const data = line.slice(5).trim()
+  const consume = (frame: string): TavernStreamEvent[] => {
+    const events: TavernStreamEvent[] = []
+    for (const event of parseSseEvents([frame])) {
+      const data = event.data.trim()
       if (!data) continue
       if (data === '[DONE]') {
         finished = true
-        break
+        continue
       }
       try {
         const extracted = extractProviderSseContent(protocol, JSON.parse(data))
-        if (extracted.reasoning) yield { type: 'reasoning-delta', text: extracted.reasoning }
-        if (extracted.content) yield { type: 'content-delta', text: extracted.content }
+        if (extracted.reasoning) events.push({ type: 'reasoning-delta', text: extracted.reasoning })
+        if (extracted.content) events.push({ type: 'content-delta', text: extracted.content })
       } catch {
         throw new TavernApiRequestError('模型服务返回了无法解析的流式数据。', 'TAVERN_API_INVALID_RESPONSE')
       }
     }
-    if (done) finished = true
+    return events
+  }
+
+  while (!finished) {
+    const { done, value } = await reader.read()
+    frameBuffer += decoder.decode(value, { stream: !done })
+    let boundary = frameBuffer.search(/\r\n\r\n|\n\n|\r\r/)
+    while (boundary >= 0 && !finished) {
+      const separator = frameBuffer.slice(boundary).startsWith('\r\n\r\n') ? 4 : 2
+      const frame = frameBuffer.slice(0, boundary)
+      frameBuffer = frameBuffer.slice(boundary + separator)
+      for (const event of consume(`${frame}\n\n`)) yield event
+      boundary = frameBuffer.search(/\r\n\r\n|\n\n|\r\r/)
+    }
+    if (done) {
+      for (const event of consume(frameBuffer)) yield event
+      frameBuffer = ''
+      finished = true
+    }
   }
   yield { type: 'done' }
 }

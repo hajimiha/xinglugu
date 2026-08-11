@@ -8,7 +8,13 @@ export interface BuiltProviderRequest {
 }
 
 function joinUrl(baseUrl: string, path: string): string {
-  return `${normalizeApiBaseUrl(baseUrl)}${path}`
+  const base = new URL(normalizeApiBaseUrl(baseUrl))
+  const suffix = new URL(path, 'https://provider-path.invalid')
+  const basePath = base.pathname.replace(/\/+$/, '')
+  base.pathname = `${basePath}/${suffix.pathname.replace(/^\/+/, '')}`
+  base.search = suffix.search
+  base.hash = suffix.hash
+  return base.toString()
 }
 
 function systemAndMessages(request: TavernRequest) {
@@ -47,8 +53,11 @@ function providerHeaders(config: TavernApiConfig, apiKey: string): Record<string
 
 function resolveChatPath(config: TavernApiConfig, stream: boolean): string {
   const definition = getTavernProvider(config.provider)
+  const model = encodeURIComponent(config.model.replace(/^models\//, ''))
+    .replace(/%2F/gi, '/')
+    .replace(/%40/gi, '@')
   let path = definition.chatPath
-    .replace('{model}', config.model.replace(/^models\//, ''))
+    .replace('{model}', model)
     .replace('{accountId}', encodeURIComponent(config.providerOptions.accountId ?? ''))
     .replace('{projectId}', encodeURIComponent(config.providerOptions.projectId ?? ''))
     .replace('{location}', encodeURIComponent(config.providerOptions.location ?? ''))

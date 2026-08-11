@@ -5,6 +5,7 @@ import {
   createRemoteTavernApi,
   TavernApiRequestError,
   testTavernApiConnection,
+  redactRequestInspection,
 } from './api-adapter'
 
 async function collect<T>(source: AsyncIterable<T>) {
@@ -181,5 +182,44 @@ describe('本地优先酒馆 API 适配器', () => {
       code: 'TAVERN_API_KEY_MISSING',
     } satisfies Partial<TavernApiRequestError>))
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('在请求检查持久化前移除 URL 敏感组件和所有凭据形状的请求头', () => {
+    const redacted = redactRequestInspection({
+      url: 'https://user:password@example.test/v1/chat?token=url-secret#fragment-secret',
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer header-secret',
+        'X-Api-Key': 'api-secret',
+        Cookie: 'session=cookie-secret',
+        'X-Auth-Token': 'token-secret',
+        'Content-Type': 'application/json',
+      },
+      body: { messages: [{ role: 'user', content: 'safe prompt' }] },
+    })
+
+    expect(redacted.url).toBe('https://example.test/v1/chat')
+    expect(redacted.headers).toMatchObject({
+      Authorization: '[已隐藏]',
+      'X-Api-Key': '[已隐藏]',
+      Cookie: '[已隐藏]',
+      'X-Auth-Token': '[已隐藏]',
+      'Content-Type': 'application/json',
+    })
+    expect(JSON.stringify(redacted)).not.toMatch(/password|url-secret|fragment-secret|header-secret|api-secret|cookie-secret|token-secret/)
+  })
+
+  it('frames split provider JSON and accepts a complete EOF event without DONE', async () => {
+    const config = createMistvaleDefaults().settings.api
+    const fetchMock = vi.fn().mockResolvedValue(new Response([
+      'event: message\ndata: {"choices":[{"delta":{"content":"第一',
+      '段"}}]}\n\n',
+    ].join(''), { headers: { 'content-type': 'text/event-stream' } }))
+    const api = createRemoteTavernApi(config, 'secret-key', fetchMock)
+
+    expect(await collect(api.stream(api.prepare({ task: 'story', messages: [{ role: 'user', content: '继续' }] })))).toEqual([
+      { type: 'content-delta', text: '第一段' },
+      { type: 'done' },
+    ])
   })
 })

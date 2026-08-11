@@ -22,6 +22,9 @@ export function validateTavernApiConfig(config: TavernApiConfig): TavernApiField
   try {
     const parsed = new URL(baseUrl)
     if (!['http:', 'https:'].includes(parsed.protocol)) errors.baseUrl = '接口地址必须使用 HTTP 或 HTTPS。'
+    if (parsed.username || parsed.password || parsed.search || parsed.hash) {
+      errors.baseUrl = '接口地址不能包含用户名、密码、查询参数或片段。'
+    }
   } catch {
     errors.baseUrl = '请输入完整的接口地址，例如 https://api.deepseek.com。'
   }

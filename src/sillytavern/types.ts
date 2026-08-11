@@ -21,6 +21,11 @@ export interface TavernProviderRequestInspection {
   body: Record<string, unknown>
 }
 
+export interface ParsedSseEvent {
+  event?: string
+  data: string
+}
+
 export type TavernStreamEvent =
   | { type: 'content-delta'; text: string }
   | { type: 'reasoning-delta'; text: string }
