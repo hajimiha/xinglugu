@@ -17,6 +17,7 @@ export interface AssembleOptions {
   extraVariables?: Record<string, any>;
   formatPrompt?: string;
   regexScripts?: TavernRegexScript[];
+  budget?: { contextLength: number; maxResponseLength: number }
 }
 
 export type AssembleResult = PromptCompilation

@@ -3,7 +3,6 @@ import { createMistvaleDefaults } from './defaults'
 import {
   createDisabledTavernApi,
   createRemoteTavernApi,
-  limitRequestToContext,
   TavernApiRequestError,
   testTavernApiConnection,
 } from './api-adapter'
@@ -88,51 +87,17 @@ describe('本地优先酒馆 API 适配器', () => {
     expect(JSON.parse(fetchMock.mock.calls[0][1].body as string)).toMatchObject({ stream: false })
   })
 
-  it('按上下文长度保留系统消息与最近对话', () => {
-    const request = limitRequestToContext({
-      task: 'story',
-      messages: [
-        { role: 'system', content: '必须保留的系统规则' },
-        { role: 'user', content: '较早问题'.repeat(20) },
-        { role: 'assistant', content: '较早回答'.repeat(20) },
-        { role: 'user', content: '最新问题' },
-      ],
-    }, 16)
+  it('拒绝已经超出预算的编译请求，不在适配器中重排或二次裁剪', () => {
+    const config = { ...createMistvaleDefaults().settings.api, contextLength: 20, maxResponseLength: 5 }
+    const api = createRemoteTavernApi(config, 'secret-key', vi.fn())
+    const messages = [
+      { role: 'system' as const, content: '系统规则'.repeat(10) },
+      { role: 'user' as const, content: '当前输入' },
+    ]
 
-    expect(request.messages[0]).toMatchObject({ role: 'system' })
-    expect(request.messages.at(-1)).toMatchObject({ content: '最新问题' })
-    expect(request.messages).toHaveLength(2)
-  })
-
-  it('为回复预留上下文并裁剪超长系统消息与最新消息', () => {
-    const request = limitRequestToContext({
-      task: 'story',
-      messages: [
-        { role: 'system', content: 'S'.repeat(200) },
-        { role: 'user', content: 'U'.repeat(200) },
-      ],
-    }, 100, 40)
-
-    const estimate = (content: string) => Math.max(1, Math.ceil(Array.from(content).reduce((total, character) => total + (/^[\x00-\x7F]$/.test(character) ? 0.25 : 1), 0)))
-    const estimated = request.messages.reduce((total, message) => total + estimate(message.content), 0)
-    expect(estimated).toBeLessThanOrEqual(60)
-    expect(request.messages.some((message) => message.role === 'system')).toBe(true)
-    expect(request.messages.some((message) => message.role === 'user')).toBe(true)
-    expect(() => limitRequestToContext({ task: 'story', messages: [{ role: 'user', content: 'hi' }] }, 100, 100)).toThrow(/上下文/)
-  })
-
-  it('按中文至少一字一词符的保守预算限制提示长度', () => {
-    const request = limitRequestToContext({
-      task: 'story',
-      messages: [
-        { role: 'system', content: '雾灯谷世界规则'.repeat(30) },
-        { role: 'user', content: '请继续描述当前场景'.repeat(30) },
-      ],
-    }, 100, 40)
-    const chineseCharacters = request.messages.reduce((total, message) => total + Array.from(message.content).length, 0)
-
-    expect(chineseCharacters).toBeLessThanOrEqual(60)
-    expect(request.messages.map((message) => message.role)).toEqual(['system', 'user'])
+    expect(() => api.prepare({ task: 'story', messages })).toThrowError(expect.objectContaining({
+      code: 'TAVERN_API_CONTEXT_OVERFLOW',
+    }))
   })
 
   it('按 Claude 协议解析命名 SSE 事件', async () => {

@@ -22,6 +22,7 @@ export class TavernApiRequestError extends Error {
     message: string,
     readonly code: TavernApiErrorCode,
     readonly status?: number,
+    readonly diagnostics?: { promptTokens: number; promptBudget: number; reservedResponseTokens: number },
   ) {
     super(message)
     this.name = 'TavernApiRequestError'
@@ -35,56 +36,17 @@ function estimateTokens(content: string): number {
   return Math.max(1, Math.ceil(estimate))
 }
 
-function truncateMessage(message: TavernRequest['messages'][number], tokenBudget: number) {
-  if (estimateTokens(message.content) <= tokenBudget) return message
-  const characters = Array.from(message.content)
-  if (message.role !== 'system') characters.reverse()
-  const selected: string[] = []
-  let used = 0
-  for (const character of characters) {
-    const cost = /^[\x00-\x7F]$/.test(character) ? 0.25 : 1
-    if (used + cost > tokenBudget) break
-    selected.push(character)
-    used += cost
-  }
-  if (message.role !== 'system') selected.reverse()
-  const content = selected.join('')
-  return { ...message, content }
-}
-
-export function limitRequestToContext(request: TavernRequest, contextLength: number, maxResponseLength = 0): TavernRequest {
+function validateRequestBudget(request: TavernRequest, contextLength: number, maxResponseLength: number): void {
   const promptBudget = Math.floor(contextLength) - Math.max(0, Math.floor(maxResponseLength))
-  if (promptBudget < 2) {
-    throw new TavernApiRequestError('最大回复长度占满了上下文窗口，请提高上下文长度或缩短回复长度。', 'TAVERN_API_CONTEXT_OVERFLOW')
+  const promptTokens = request.messages.reduce((total, message) => total + estimateTokens(message.content), 0)
+  if (promptBudget < 1 || promptTokens > promptBudget) {
+    throw new TavernApiRequestError(
+      '编译后的酒馆提示词超过上下文预算，请缩短提示词或提高上下文长度。',
+      'TAVERN_API_CONTEXT_OVERFLOW',
+      undefined,
+      { promptTokens, promptBudget, reservedResponseTokens: Math.max(0, Math.floor(maxResponseLength)) },
+    )
   }
-  const systemMessages = request.messages.filter((message) => message.role === 'system')
-  const conversation = request.messages.filter((message) => message.role !== 'system')
-  let remaining = promptBudget
-  const selectedSystems = [] as typeof systemMessages
-  const selectedConversation = [] as typeof conversation
-
-  const latest = conversation.at(-1)
-  if (latest) {
-    const latestBudget = systemMessages.length ? Math.max(1, Math.floor(promptBudget * 0.35)) : promptBudget
-    const selected = truncateMessage(latest, Math.min(remaining, latestBudget))
-    selectedConversation.unshift(selected)
-    remaining -= estimateTokens(selected.content)
-  }
-
-  for (let index = systemMessages.length - 1; index >= 0 && remaining > 0; index -= 1) {
-    const selected = truncateMessage(systemMessages[index], remaining)
-    selectedSystems.unshift(selected)
-    remaining -= estimateTokens(selected.content)
-  }
-
-  for (let index = conversation.length - 2; index >= 0 && remaining > 0; index -= 1) {
-    const message = conversation[index]
-    const cost = estimateTokens(message.content)
-    if (cost > remaining) continue
-    selectedConversation.unshift(message)
-    remaining -= cost
-  }
-  return { ...request, messages: [...selectedSystems, ...selectedConversation] }
 }
 
 export class TavernApiDisabledError extends Error {
@@ -249,9 +211,10 @@ export function createRemoteTavernApi(
   return {
     mode: 'remote',
     label: `${provider.label} · ${config.model}`,
+    getPromptBudget: () => ({ contextLength: config.contextLength, maxResponseLength: config.maxResponseLength }),
     prepare: (request) => ({
       id: crypto.randomUUID(),
-      request: limitRequestToContext(request, config.contextLength, config.maxResponseLength),
+      request: (validateRequestBudget(request, config.contextLength, config.maxResponseLength), request),
       status: 'preview',
       createdAt: Date.now(),
     }),

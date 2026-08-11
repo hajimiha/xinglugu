@@ -17,6 +17,7 @@ import type {
   TavernRegexScript,
 } from './types'
 import { formatVariablesForPrompt } from './variables'
+import { applyPromptBudget } from './prompt-budget'
 
 export interface PromptCompileInput {
   userInput: string
@@ -30,6 +31,7 @@ export interface PromptCompileInput {
   extraVariables?: Record<string, unknown>
   formatPrompt?: string
   regexScripts?: TavernRegexScript[]
+  budget?: { contextLength: number; maxResponseLength: number }
 }
 
 function estimateTokens(content: string): number {
@@ -274,7 +276,7 @@ export function compileTavernTurn(input: PromptCompileInput): PromptCompilation 
   messages.push({ role: 'user', content: userInput })
   segments.push(traceSegment({ source: 'user', identifier: 'current-user-input', role: 'user', raw: input.userInput, compiled: userInput, sent: true, diagnostics: userRegexResult.errors.map((error) => error.message) }))
 
-  return {
+  const compilation: PromptCompilation = {
     messages,
     segments,
     matchedEntries,
@@ -282,5 +284,20 @@ export function compileTavernTurn(input: PromptCompileInput): PromptCompilation 
     macroOperations,
     diagnostics,
     systemPrompt: messages.filter((message) => message.role === 'system').map((message) => message.content).join('\n\n'),
+  }
+  if (!input.budget) return compilation
+  const budgeted = applyPromptBudget({
+    messages: compilation.messages,
+    segments: compilation.segments,
+    contextLength: input.budget.contextLength,
+    maxResponseLength: input.budget.maxResponseLength,
+    tokenEstimator: estimateTokens,
+  })
+  return {
+    ...compilation,
+    messages: budgeted.messages,
+    segments: budgeted.segments,
+    budgetDiagnostics: budgeted.diagnostics,
+    systemPrompt: budgeted.messages.filter((message) => message.role === 'system').map((message) => message.content).join('\n\n'),
   }
 }

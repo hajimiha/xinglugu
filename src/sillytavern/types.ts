@@ -32,6 +32,7 @@ export interface TavernApiAdapter {
   prepare(request: TavernRequest): TavernPreparedRequest
   inspect(request: TavernPreparedRequest): TavernProviderRequestInspection
   stream(request: TavernPreparedRequest, signal?: AbortSignal): AsyncIterable<TavernStreamEvent>
+  getPromptBudget?: () => { contextLength: number; maxResponseLength: number }
 }
 
 export interface TavernRequestAudit {
@@ -287,6 +288,15 @@ export interface PromptCompilation {
   macroOperations: MacroOperation[]
   diagnostics: string[]
   systemPrompt: string
+  budgetDiagnostics?: PromptBudgetDiagnostics
+}
+
+export interface PromptBudgetDiagnostics {
+  promptBudget: number
+  promptTokens: number
+  reservedResponseTokens: number
+  omittedSegments: string[]
+  overflow: boolean
 }
 
 export interface CharacterCard {

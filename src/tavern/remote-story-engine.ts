@@ -93,6 +93,7 @@ export async function createRemoteTurn(input: RemoteTurnInput): Promise<RemoteTu
     extraVariables: input.variables,
     formatPrompt: `${input.formatPrompt}\n\n${PLAYER_IDENTITY_CONTRACT}\n\n${REMOTE_RESPONSE_CONTRACT}`,
     regexScripts: input.regexScripts,
+    budget: input.api.getPromptBudget?.(),
   })
   const prepared = input.api.prepare({
     task: 'story',
