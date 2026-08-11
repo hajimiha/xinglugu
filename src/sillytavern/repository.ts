@@ -21,8 +21,19 @@ const defaultContentPackLoader: TavernContentPackLoader = import.meta.env.MODE =
   ? async () => null
   : loadRepositoryContentPack
 
+let defaultCharacterCache: CharacterCard[] | undefined
+
+function getDefaultCharacter(raw: Record<string, unknown>): CharacterCard | undefined {
+  defaultCharacterCache ??= createMistvaleDefaults().characters
+  return defaultCharacterCache.find((card) => (
+    (typeof raw.id === 'string' && card.id === raw.id)
+    || (typeof raw.npcId === 'string' && card.npcId === raw.npcId)
+  ))
+}
+
 function normalizeStoredCharacter(value: CharacterCard): CharacterCard {
   const raw = value as CharacterCard & { portraitSlots?: unknown; portraitByAffinity?: unknown }
+  const fallback = getDefaultCharacter(raw as unknown as Record<string, unknown>)
   let portraitSlots
   try {
     portraitSlots = raw.portraitSlots === undefined
@@ -37,7 +48,32 @@ function normalizeStoredCharacter(value: CharacterCard): CharacterCard {
   }
 
   const { portraitByAffinity: _legacyPortraits, portraitSlots: _rawSlots, ...character } = raw
-  return { ...character, portraitSlots }
+  const safeText = (candidate: unknown, fallbackValue = '') => typeof candidate === 'string' ? candidate : fallbackValue
+  const safeList = (candidate: unknown, fallbackValue: string[] = []) => Array.isArray(candidate)
+    ? candidate.filter((item): item is string => typeof item === 'string')
+    : [...fallbackValue]
+  const safeTime = (candidate: unknown, fallbackValue: number) => typeof candidate === 'number' && Number.isFinite(candidate) && candidate >= 0
+    ? candidate
+    : fallbackValue
+  const createdAt = safeTime(raw.createdAt, fallback?.createdAt ?? Date.now())
+  return {
+    ...character,
+    id: safeText(raw.id, fallback?.id ?? `recovered-character-${createdAt}`),
+    npcId: safeText(raw.npcId, fallback?.npcId ?? 'unknown-npc'),
+    name: safeText(raw.name, fallback?.name ?? '恢复的角色'),
+    role: safeText(raw.role, fallback?.role ?? '女性居民'),
+    locationId: safeText(raw.locationId, fallback?.locationId ?? 'farm'),
+    description: safeText(raw.description, fallback?.description),
+    personality: safeText(raw.personality, fallback?.personality),
+    scenario: safeText(raw.scenario, fallback?.scenario),
+    firstMessage: safeText(raw.firstMessage, fallback?.firstMessage),
+    exampleDialogue: safeText(raw.exampleDialogue, fallback?.exampleDialogue),
+    lorebookIds: safeList(raw.lorebookIds, fallback?.lorebookIds),
+    tags: safeList(raw.tags, fallback?.tags),
+    portraitSlots,
+    createdAt,
+    updatedAt: safeTime(raw.updatedAt, fallback?.updatedAt ?? createdAt),
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -268,10 +304,10 @@ class DexieTavernRepository implements TavernRepository {
         if ((await this.database.characters.count()) === 0) {
           await this.database.characters.bulkAdd(mergeById(defaults.characters, contentPack?.characters ?? []))
         } else {
+          const normalizedCharacters = (await this.database.characters.toArray()).map(normalizeStoredCharacter)
+          if (normalizedCharacters.length) await this.database.characters.bulkPut(normalizedCharacters)
           if (shouldPublishPack && contentPack?.characters.length) {
-            const existingById = new Map((await this.database.characters.toArray())
-              .map(normalizeStoredCharacter)
-              .map((card) => [card.id, card]))
+            const existingById = new Map(normalizedCharacters.map((card) => [card.id, card]))
             const publishedCharacters = contentPack.characters.map((card) => {
               const existing = existingById.get(card.id)
               return existing?.portraitSlots.some((slot) => Boolean(slot.source))
@@ -409,9 +445,18 @@ class DexieTavernRepository implements TavernRepository {
     )
   }
 
-  listCharacters = () => this.database.characters.orderBy('name').toArray()
-  getCharacter = (id: string) => this.database.characters.get(id)
-  async saveCharacter(value: CharacterCard) { await this.database.characters.put(value) }
+  async listCharacters() {
+    return (await this.database.characters.orderBy('name').toArray()).map(normalizeStoredCharacter)
+  }
+
+  async getCharacter(id: string) {
+    const character = await this.database.characters.get(id)
+    return character ? normalizeStoredCharacter(character) : undefined
+  }
+
+  async saveCharacter(value: CharacterCard) {
+    await this.database.characters.put(normalizeStoredCharacter(value))
+  }
   async deleteCharacter(id: string) { await this.database.characters.delete(id) }
 
   async listSessions() { return (await this.database.sessions.orderBy('updatedAt').reverse().toArray()).map(normalizeStoredSession) }

@@ -48,6 +48,34 @@ describe('NPC 关系与灵犀对话', () => {
     expect(screen.queryByText(/本地叙事|不发送网络请求/)).not.toBeInTheDocument()
   })
 
+  it('旧设备中的损坏角色卡会自动修复并正常打开对话', async () => {
+    const user = userEvent.setup()
+    database = createTavernDatabase(`mistvale-npc-recovery-${crypto.randomUUID()}`)
+    const repository = createTavernRepository(database)
+    await repository.initialize()
+    const mina = (await repository.listCharacters()).find((card) => card.npcId === 'mina')!
+    await database.characters.put({
+      ...mina,
+      role: null,
+      locationId: null,
+      firstMessage: null,
+      tags: null,
+      lorebookIds: null,
+    } as never)
+
+    render(
+      <GameProvider initialState={{ ...initialGameState, location: 'mayor-home' }}>
+        <TavernProvider repository={repository}><LocationStage /></TavernProvider>
+      </GameProvider>,
+    )
+
+    await user.click(await screen.findByRole('button', { name: '与风信使弥奈互动' }))
+    await user.click(screen.getByRole('button', { name: '与弥奈交谈' }))
+
+    expect(await screen.findByRole('dialog', { name: '与弥奈的酒馆会话' })).toBeVisible()
+    expect(screen.queryByText('弥奈的旧会话无法显示')).not.toBeInTheDocument()
+  })
+
   it('自由叙事模式允许零精力进入交谈', async () => {
     const user = userEvent.setup()
     database = createTavernDatabase(`mistvale-npc-free-${crypto.randomUUID()}`)

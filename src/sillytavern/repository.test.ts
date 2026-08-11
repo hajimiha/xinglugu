@@ -598,4 +598,36 @@ describe('雾灯谷酒馆仓储', () => {
       presetBinding: { mode: 'follow-active' },
     })
   })
+
+  it('读取旧设备损坏角色卡时恢复官方字段并保留玩家立绘', async () => {
+    database = createTavernDatabase(`mistvale-broken-character-${crypto.randomUUID()}`)
+    const repository = createTavernRepository(database)
+    await repository.initialize()
+    const mina = (await repository.listCharacters()).find((card) => card.npcId === 'mina')!
+    await database.characters.put({
+      ...mina,
+      role: null,
+      locationId: null,
+      firstMessage: null,
+      tags: null,
+      lorebookIds: null,
+      portraitSlots: [{ ...mina.portraitSlots[0], source: './portraits/player-mina.png' }],
+    } as never)
+    const settings = await repository.getSettings()
+    await database.settings.put({ ...settings, defaultContentVersion: 1 })
+
+    await expect(repository.initialize()).resolves.toBeUndefined()
+
+    const recovered = await repository.getCharacter(mina.id)
+
+    expect(recovered).toMatchObject({
+      npcId: 'mina',
+      role: '风信使',
+      locationId: 'mayor-home',
+      firstMessage: '我刚从北坡回来，带回一条比风还快的消息。你想先听村里的，还是矿洞那边的？',
+      tags: ['风信使', '村长家', '女性角色'],
+      lorebookIds: [WORLD_RULES_ID],
+    })
+    expect(recovered?.portraitSlots[0].source).toBe('./portraits/player-mina.png')
+  })
 })
