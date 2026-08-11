@@ -76,7 +76,10 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
     openingRef.current = true
     void tavern.openNpcSession(npc.id, dialogueVariables)
       .then((session) => { setSessionId(session.id); setSessionSnapshot(session) })
-      .catch((caught) => setError(caught instanceof Error ? caught.message : '会话初始化失败'))
+      .catch((caught) => {
+        openingRef.current = false
+        setError(caught instanceof Error ? caught.message : '会话初始化失败')
+      })
   }, [tavern.status, tavern.openNpcSession, npc.id, dialogueVariables])
 
   useEffect(() => () => abortRef.current?.abort(), [])

@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createRemoteTavernApi } from '../sillytavern/api-adapter'
 import { validateTavernApiConfig } from '../sillytavern/api-config'
 import { resolveApiKey } from '../sillytavern/api-credentials'
@@ -80,6 +80,7 @@ export function TavernProvider({ children, repository = tavernRepository, player
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const [settings, setSettings] = useState<TavernSettings | null>(null)
   const [requestAudits, setRequestAudits] = useState<TavernRequestAudit[]>([])
+  const turnQueues = useRef(new Map<string, Promise<void>>())
   const currentPlayerName = normalizePlayerName(playerName) ?? normalizePlayerName(settings?.userName) ?? DEFAULT_PLAYER_NAME
 
   useEffect(() => {
@@ -139,7 +140,10 @@ export function TavernProvider({ children, repository = tavernRepository, player
     const existing = sessions
       .filter((session) => session.npcId === npcId)
       .sort((a, b) => b.updatedAt - a.updatedAt)[0]
-    const baseSession = existing ?? {
+    const mergedExisting = existing && Object.keys(variables).length > 0
+      ? { ...existing, variables: { ...existing.variables, ...variables } }
+      : existing
+    const baseSession = mergedExisting ?? {
       id: crypto.randomUUID(),
       name: `${card.name} · 初次会话`,
       characterId: card.id,
@@ -167,8 +171,15 @@ export function TavernProvider({ children, repository = tavernRepository, player
   }, [characters, sessions, currentPlayerName, repository, persistSettings, saveSession])
 
   const sendTurn = useCallback(async (input: SendTurnInput) => {
-    const session = sessions.find((candidate) => candidate.id === input.sessionId)
-      ?? await repository.getSession(input.sessionId)
+    const previous = turnQueues.current.get(input.sessionId) ?? Promise.resolve()
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const queued = previous.then(() => gate)
+    turnQueues.current.set(input.sessionId, queued)
+    try {
+      return await previous.then(async () => {
+    const session = (await repository.getSession(input.sessionId))
+      ?? sessions.find((candidate) => candidate.id === input.sessionId)
     if (!session) throw new Error('找不到当前酒馆会话')
     const startedAt = performance.now()
     const currentSettings = settings ?? await repository.getSettings()
@@ -229,9 +240,16 @@ export function TavernProvider({ children, repository = tavernRepository, player
       })
     } catch (caught) {
       if (requestInspection) {
-        const failed = { ...auditBase(requestInspection, 'failed'), error: caught instanceof Error ? caught.message : '请求失败' }
-        await repository.saveRequestAudit(failed)
-        setRequestAudits(await repository.listRequestAudits())
+        const failed = {
+          ...auditBase(requestInspection, input.signal?.aborted ? 'aborted' : 'failed'),
+          error: caught instanceof Error ? caught.message : '请求失败',
+        }
+        try {
+          await repository.saveRequestAudit(failed)
+          setRequestAudits(await repository.listRequestAudits())
+        } catch {
+          // Preserve the provider or abort error if audit persistence fails.
+        }
       }
       throw caught
     }
@@ -269,10 +287,15 @@ export function TavernProvider({ children, repository = tavernRepository, player
       variables: turn.variablesAfter,
       updatedAt: now + 1,
     }
-    await saveSession(next)
-    await repository.saveRequestAudit(succeeded)
+    await repository.commitTurn(next, succeeded)
+    setSessions((current) => replaceById(current, next).sort((a, b) => b.updatedAt - a.updatedAt))
     setRequestAudits(await repository.listRequestAudits())
     return next
+      })
+    } finally {
+      release()
+      if (turnQueues.current.get(input.sessionId) === queued) turnQueues.current.delete(input.sessionId)
+    }
   }, [sessions, repository, settings, characters, presets, lorebooks, saveSession, currentPlayerName])
 
   const clearRequestAudits = useCallback(async () => {

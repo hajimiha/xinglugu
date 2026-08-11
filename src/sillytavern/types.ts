@@ -38,7 +38,7 @@ export interface TavernApiAdapter {
 export interface TavernRequestAudit {
   id: string
   createdAt: number
-  status: 'succeeded' | 'failed'
+  status: 'succeeded' | 'failed' | 'aborted'
   sessionId: string
   characterName: string
   presetId: string

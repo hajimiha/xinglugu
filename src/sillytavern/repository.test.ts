@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { MistvaleTavernDatabase } from './database'
 import { createTavernDatabase } from './database'
 import { createTavernRepository } from './repository'
@@ -373,5 +373,39 @@ describe('雾灯谷酒馆仓储', () => {
     expect(audits).toHaveLength(20)
     expect(audits[0].id).toBe('audit-22')
     expect(audits.at(-1)?.id).toBe('audit-3')
+  })
+
+  it('在同一事务中提交会话和回合审计', async () => {
+    database = createTavernDatabase(`mistvale-commit-${crypto.randomUUID()}`)
+    const repository = createTavernRepository(database)
+    await repository.initialize()
+    const session = {
+      id: 'durable-session', name: '持久会话', messages: [], characterName: '洛岚', userName: '玩家', presetId: null,
+      lorebookIds: [], variables: { hp: 8 }, createdAt: 1, updatedAt: 2,
+    }
+    const audit = {
+      id: 'durable-audit', createdAt: 2, status: 'succeeded' as const, sessionId: session.id, characterName: '洛岚',
+      presetId: 'preset', presetName: '预设', presetBinding: 'follow-active' as const, provider: 'deepseek' as const,
+      model: 'model', preparedRequest: { task: 'story' as const, messages: [] },
+      providerRequest: { url: 'https://example.test', method: 'POST', headers: {}, body: {} }, segments: [], macroOperations: [],
+      matchedLorebookEntries: [], diagnostics: [],
+    }
+
+    await repository.commitTurn(session, audit)
+
+    expect(await repository.getSession(session.id)).toMatchObject({ variables: { hp: 8 } })
+    expect((await repository.listRequestAudits())[0]).toMatchObject({ id: audit.id, sessionId: session.id })
+  })
+
+  it('迁移事务失败时保留旧内容版本', async () => {
+    database = createTavernDatabase(`mistvale-migration-rollback-${crypto.randomUUID()}`)
+    const repository = createTavernRepository(database)
+    await repository.initialize()
+    const settings = await repository.getSettings()
+    await database.settings.put({ ...settings, defaultContentVersion: 1 })
+    vi.spyOn(database.settings, 'update').mockRejectedValueOnce(new Error('写入失败'))
+
+    await expect(repository.initialize()).rejects.toThrow('写入失败')
+    expect((await database.settings.get('mistvale-settings'))?.defaultContentVersion).toBe(1)
   })
 })

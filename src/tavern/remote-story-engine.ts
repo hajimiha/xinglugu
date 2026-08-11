@@ -141,7 +141,7 @@ export async function createRemoteTurn(input: RemoteTurnInput): Promise<RemoteTu
   })
   raw = outputRegex.text
   const parsed = parseResponse(raw)
-  const { nextVariables } = applyParsedToChat(outputRegex.variables, parsed)
+  const { nextVariables } = applyParsedToChat(input.variables, parsed)
   return {
     raw,
     parsed,

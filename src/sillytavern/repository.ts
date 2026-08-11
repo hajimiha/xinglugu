@@ -70,6 +70,7 @@ export interface TavernRepository {
   listSessions(): Promise<ChatSession[]>
   getSession(id: string): Promise<ChatSession | undefined>
   saveSession(value: ChatSession): Promise<void>
+  commitTurn(session: ChatSession, audit: TavernRequestAudit): Promise<void>
   deleteSession(id: string): Promise<void>
   getSettings(): Promise<TavernSettings>
   saveSettings(value: TavernSettings): Promise<void>
@@ -249,6 +250,17 @@ class DexieTavernRepository implements TavernRepository {
       ? undefined
       : parseVariableDefinitions(value.variableDefinitions).filter((definition) => definition.scope === 'session')
     await this.database.sessions.put({ ...value, variableDefinitions })
+  }
+  async commitTurn(session: ChatSession, audit: TavernRequestAudit): Promise<void> {
+    const variableDefinitions = session.variableDefinitions === undefined
+      ? undefined
+      : parseVariableDefinitions(session.variableDefinitions).filter((definition) => definition.scope === 'session')
+    await this.database.transaction('rw', this.database.sessions, this.database.requestAudits, async () => {
+      await this.database.sessions.put({ ...session, variableDefinitions })
+      await this.database.requestAudits.put(audit)
+      const expired = await this.database.requestAudits.orderBy('createdAt').reverse().offset(20).primaryKeys()
+      if (expired.length) await this.database.requestAudits.bulkDelete(expired)
+    })
   }
   async deleteSession(id: string) { await this.database.sessions.delete(id) }
 

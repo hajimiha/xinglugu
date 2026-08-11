@@ -2,7 +2,7 @@
  * Variable System Utilities
  */
 
-import type { ChatSession, ParsedTags, PresetBinding } from './types';
+import type { ChatMessage, ChatSession, ParsedTags, PresetBinding } from './types';
 import type { ParserEvent } from './stream-parser';
 import { parseVarsBlock, applyVarsPatch } from './vars-merger';
 
@@ -35,6 +35,10 @@ export function formatVariablesForPrompt(variables: Record<string, string | numb
 
 export const USER_ROLE = 'user' as const;
 
+export function variablesAfterMessage(message?: ChatMessage): Record<string, unknown> {
+  return { ...(message?.variablesAfter ?? message?.variables ?? {}) };
+}
+
 /** Truncate chat at message index and restore variables from the last remaining message (or provided snapshot). */
 export function truncateChatAt(
   chat: ChatSession,
@@ -42,7 +46,7 @@ export function truncateChatAt(
   variables?: Record<string, string | number>
 ): ChatSession {
   const truncated = chat.messages.slice(0, index);
-  const restoredVars = variables ?? truncated[truncated.length - 1]?.variables ?? {};
+  const restoredVars = variables ?? variablesAfterMessage(truncated[truncated.length - 1]);
   return { ...chat, messages: truncated, variables: restoredVars, updatedAt: Date.now() };
 }
 
@@ -70,7 +74,7 @@ export function branchChat(
     presetId: options.presetId,
     presetBinding: options.presetBinding,
     lorebookIds: [...options.lorebookIds],
-    variables: options.variables ?? source.messages[index].variables ?? {},
+    variables: options.variables ?? variablesAfterMessage(source.messages[index]),
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };

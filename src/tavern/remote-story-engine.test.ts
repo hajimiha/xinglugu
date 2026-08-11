@@ -95,7 +95,7 @@ describe('远程酒馆剧情引擎', () => {
     expect(result.parsed.maintext).toBe('洛岚抬眼看向你，示意你在壁炉边坐下。')
   })
 
-  it('把预设 setvar 的结果写入会话变量，并把 getvar 编译结果发送给模型', async () => {
+  it('把预设 setvar 保留为提示词宏变量，不写入会话变量', async () => {
     const defaults = createMistvaleDefaults()
     const { adapter, prepare } = createAdapter('<maintext>我会保持温柔。</maintext><vars>{}</vars>')
     const result = await createRemoteTurn({
@@ -122,7 +122,7 @@ describe('远程酒馆剧情引擎', () => {
       formatPrompt: '',
     })
 
-    expect(result.variablesAfter).toMatchObject({ tone: '温柔' })
+    expect(result.variablesAfter).toEqual({})
     expect(prepare).toHaveBeenCalledWith(expect.objectContaining({
       messages: expect.arrayContaining([expect.objectContaining({ role: 'system', content: expect.stringContaining('本轮语气=温柔') })]),
     }))

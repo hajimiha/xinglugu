@@ -108,7 +108,7 @@ describe('NPC 酒馆会话', () => {
       content: '洛岚翻开空白委托簿，说今天先熟悉村庄就好。',
       apiUsed: 'remote',
     })
-    expect(screen.getByTestId('game-state-probe')).toHaveTextContent('精力 4 · 好感 6')
+    await waitFor(() => expect(screen.getByTestId('game-state-probe')).toHaveTextContent('精力 4 · 好感 6'))
   })
 
   it('既有会话继续交谈时使用当前激活预设，而不是创建会话时遗留的旧 presetId', async () => {
