@@ -28,6 +28,19 @@ function renderStage(initialState: typeof initialGameState) {
 }
 
 describe('地点人物动态行程', () => {
+  it.each([
+    ['mayor-home', '壁炉议事厅'],
+    ['smithy', '羽火熔炉'],
+    ['monster-market', '林下共生所'],
+    ['hunter-camp', '北林哨站'],
+    ['library', '无声书塔'],
+    ['hospital', '白槿诊所'],
+  ] as const)('%s 使用独立地点背景', (location, subtitle) => {
+    renderStage({ ...initialGameState, location })
+
+    expect(screen.getByRole('region', { name: subtitle })).toHaveClass('has-custom-background')
+  })
+
   it('角色离开工作地点后不再显示静态常驻立绘', () => {
     renderStage({ ...initialGameState, location: 'general-store', minutes: 19 * 60 })
 

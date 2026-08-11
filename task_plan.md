@@ -20,6 +20,20 @@ Phase 18（默认世界书合册与预设槽位精简）已完成并推送。
 - [x] 完成定向/全量测试、构建、桌面/手机浏览器验收、提交与推送
 - **Status:** complete
 
+### Phase 19: 独立地点高精度像素背景
+- [x] 盘点现有地点、背景图集、CSS 裁切方式与线上复用关系
+- [x] 固定新背景数量、画布规格、构图安全区、色彩与像素风生成规范
+- [x] 通过 ChatGPT image generation 生成剩余地点背景并逐张人工筛选
+- [x] 将生成资产以显式地点映射接入代码，移除默认背景复用
+- [x] 完成资源格式/尺寸/构建/本地桌面手机验收
+- [ ] 提交并推送 GitHub `main`
+- **Status:** in_progress
+
+## Phase 19 Errors Encountered
+| Error | Attempt | Resolution |
+|---|---:|---|
+| 新增独立背景测试失败（6 个地点均仍为 `scene-shop`/`scene-witch`） | 1 | 这是预期的 TDD 红灯；随后接入 `LocationStage` 映射与 custom-background CSS，定向测试已转绿。 |
+
 ### Phase 17: 玩家身份、限时委托、音频与渔获扩展
 - [x] 核对玩家姓名、酒馆请求、委托、角色卡、音频、钓鱼与礼物现状
 - [x] 使用 SillyTavern Web 与 UI/UX Pro Max 固化设计规格和测试驱动计划

@@ -254,6 +254,7 @@ h1, h2, h3, p { margin-top: 0; }
 .location-preview-copy p { margin: 0; color: var(--text-secondary); font-size: 11px; }
 .location-stage { isolation: isolate; background: #13211d; }
 .location-scene { position: absolute; inset: 0; z-index: -3; background-size: 200% 200%; image-rendering: pixelated; filter: saturate(.88) brightness(.72) contrast(1.08); transform: scale(1.015); }
+.location-stage.has-custom-background .location-scene { background-position: center; background-size: cover; }
 .scene-shop .location-scene { background-position: 0 0; }
 .scene-witch .location-scene { background-position: 100% 0; }
 .scene-mine .location-scene { background-position: 0 100%; }

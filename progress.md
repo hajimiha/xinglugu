@@ -1,5 +1,14 @@
 # Progress Log
 
+## 2026-08-11 · Phase 19 开始
+- 已读取现有地点数据、`GameStage`、`LocationStage` 和场景 CSS，确认农场使用独立 `farm-dusk.webp`，其余地点通过 2×2 `location-atlas.webp` 裁切。
+- 已查看现有农场、村庄地图和地点图集，确定新图需延续现有高精度像素光照与深苔绿/铜金色彩，并避开 UI 覆盖区域。
+- 已确定首批生成 6 张：村长家、铁匠铺、魔物娘商店、猎人帐篷、图书馆、医院；渔家、魔女之家、矿洞、杂货店保留原背景，农场保留 `farm-dusk.webp`。
+- ChatGPT Images 2.0 登录完成并上传 `location-atlas.webp` 作为风格参考；六张地点背景均已生成并逐张查看，构图为 UI/NPC 留出空间。
+- 先行回归测试按预期失败：新增 6 个独立背景断言均因 `LocationStage` 尚未接入映射而失败（6 failed, 2 existing passed）；已记录为红灯，不重复同一失败命令，下一步实现映射。
+- 已将六张 PNG 转为 WebP，新增资源总计约 2.2MB；`LocationStage` 使用 `LocationId` 显式映射并对新图启用 `background-size: cover`。
+- 定向测试 8/8、全量测试 65 文件/343 测试、生产构建和 `git diff --check` 均通过；本地浏览器逐一切换六个地点，确认实际 CSS URL 指向对应新 WebP，控制台错误为 0。
+
 ## 2026-08-09 · Phase 16 开始
 - 完整读取已安装的 `ariespo/tavernlike` skill，确认其要求活动预设提示词经装配后直接进入 API `messages`，并提供世界书、变量、六标签和思维内容折叠的完整 React 路径。
 - 已读取系统化调试、测试驱动、文件化规划与 UI/UX Pro Max 规范；下一步先做请求链根因调查和参考仓库研究，不在证据不足时修改生产代码。

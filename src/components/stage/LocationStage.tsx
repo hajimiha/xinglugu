@@ -1,4 +1,10 @@
 import locationAtlas from '../../assets/pixel/location-atlas.webp'
+import hospitalBackground from '../../assets/pixel/location-hospital.webp'
+import hunterCampBackground from '../../assets/pixel/location-hunter-camp.webp'
+import libraryBackground from '../../assets/pixel/location-library.webp'
+import mayorHomeBackground from '../../assets/pixel/location-mayor-home.webp'
+import monsterMarketBackground from '../../assets/pixel/location-monster-market.webp'
+import smithyBackground from '../../assets/pixel/location-smithy.webp'
 import { getNpcsAtLocation } from '../../game/calendar'
 import { locations, npcs } from '../../game/data'
 import { useGame } from '../../game/GameContext'
@@ -23,6 +29,15 @@ const sceneClass: Record<LocationId, string> = {
   hospital: 'scene-shop',
 }
 
+const locationBackgrounds: Partial<Record<LocationId, string>> = {
+  'mayor-home': mayorHomeBackground,
+  smithy: smithyBackground,
+  'monster-market': monsterMarketBackground,
+  'hunter-camp': hunterCampBackground,
+  library: libraryBackground,
+  hospital: hospitalBackground,
+}
+
 const primaryModal: Partial<Record<LocationId, { modal: Exclude<ModalType, null>; label: string }>> = {
   'mayor-home': { modal: 'quest-board', label: '查看村民委托板' },
   'general-store': { modal: 'trade', label: '进入种子与材料柜台' },
@@ -44,6 +59,7 @@ export function LocationStage() {
   const selectedNpc = npcs.find((npc) => npc.id === state.selectedNpcId)
   const feature = primaryModal[state.location]
   const featureNpcId = location.npcIds.find((npcId) => presentNpcs.some((npc) => npc.id === npcId))
+  const customBackground = locationBackgrounds[state.location]
 
   const upload = async (npcId: string, slotId: string, file: File) => {
     if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
@@ -74,8 +90,8 @@ export function LocationStage() {
   }
 
   return (
-    <section className={`world-stage location-stage panel-frame ${sceneClass[state.location]}`} aria-labelledby="stage-title">
-      <div className="location-scene" style={{ backgroundImage: `url(${locationAtlas})` }} aria-hidden="true" />
+    <section className={`world-stage location-stage panel-frame ${sceneClass[state.location]} ${customBackground ? 'has-custom-background' : ''}`} aria-labelledby="stage-title">
+      <div className="location-scene" style={{ backgroundImage: `url(${customBackground ?? locationAtlas})` }} aria-hidden="true" />
       <div className="location-shade" aria-hidden="true" />
       <header className="stage-titlebar"><div><p className="eyebrow">{location.name} · {location.hours}</p><h1 id="stage-title">{location.subtitle}</h1></div><span className="weather-pill">{location.hours === '全天' ? '随时开放' : `开放 ${location.hours}`}</span></header>
       <div className="location-story"><span>{location.name}</span><p>{location.description}</p>{feature && <button id={`location-feature-${state.location}`} className="primary-button" type="button" onClick={() => dispatch({ type: 'OPEN_MODAL', modal: feature.modal, npcId: featureNpcId })}>{feature.label}</button>}</div>

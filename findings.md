@@ -1,5 +1,15 @@
 # Findings & Decisions
 
+## 2026-08-11 · Phase 19 独立地点背景
+- 当前 `location-atlas.webp` 是 2×2 图集：左上杂货店、右上魔女之家、左下矿洞、右下渔家；`LocationStage` 通过 `.scene-shop/.scene-witch/.scene-mine/.scene-coast` 和 `background-position` 裁切。
+- 当前地点映射中，杂货店背景被 `farm`（但农场实际由 `FarmStage` 使用独立 `farm-dusk.webp`）、`mayor-home`、`smithy`、`library`、`hospital` 共用；魔女背景被 `monster-market`、`hunter-camp` 共用。
+- 因此本轮需要生成并接入 6 张新地点图：村长家、铁匠铺、魔物娘商店、猎人帐篷、图书馆、医院；农场已有独立背景，不重复生成。
+- 现有地点场景是 1672×941 风格，UI 会覆盖左下地点说明卡和右侧/中部 NPC 立绘；新图必须保留中下部可读空间，避免关键建筑、门、工作台和窗户被 UI 或立绘遮挡。
+- 统一视觉方向：高精度像素风、暮色乡野×隐秘魔法、深苔绿/夜蓝/铜金灯光、无文字、无 UI、无人物主体、16:9 横向场景。
+- 新资产应拆成单地点 WebP 并由 `LocationId` 显式映射，不能继续依赖四象限图集裁切；`.location-scene` 改为 `background-size: cover` 或对应单图规则。
+- ChatGPT Images 2.0 已登录可用；上传 `location-atlas.webp` 作为风格参考后，已生成村长家背景“暮色中的奇幻议事厅”和铁匠铺背景“雨夜暖炉中的奇幻铁匠铺”，均返回 1672×941 横向图。
+- 已继续生成并筛选魔物娘商店“林间秘境温室工坊”、猎人帐篷“暮色中的森林游侠营地”、图书馆“雨夜塔楼的魔法图书馆”和医院“白槿诊所”；六张新图均为 1672×941，未包含人物、文字或 UI。
+
 ## 2026-08-09 · Phase 16 严格酒馆核心重构
 - 用户实测认为导入预设未进入模型请求；本轮验收边界必须是捕获真实 `fetch` 请求体并逐条证明预设提示词、角色、顺序、采样参数和变量替换结果，而不是只验证编辑器中可见。
 - `ariespo/tavernlike` skill 已安装于 `C:/Users/qixin/.codex/skills/tavernlike`，其 React 工作流明确要求活动预设参与 `assemblePrompt`，装配后的 `promptMessages` 直接作为 API `messages`，并应用预设采样参数。
