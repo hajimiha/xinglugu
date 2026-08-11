@@ -353,3 +353,11 @@
 - Gist API 没有文档化的条件 PATCH 前置条件，因此 revision 比对只能尽力降低覆盖风险，不能承诺原子更新；冲突界面必须保留两端并让玩家明确选择。
 - 开始界面每次刷新都先出现，但 Provider 可以在背景初始化元数据；只有玩家点击进入后才渲染游戏 Shell，创意工坊与设置可在不进入游戏的情况下直接打开。
 - 品牌迁移只改玩家可见文本和系统默认内容；`mistvale-*` 存储键、Dexie 数据库、稳定内容 ID 与旧公开内容包路径保留，防止现有玩家数据失联。
+- 用户线上截图与本地源码一致证明功能尚未实施：`App.tsx` 仍无条件渲染 `.game-shell`，仓库不存在 `TitleScreen`、`SaveCenter`、`CloudSave`、`api/` 或两张 `xinglugu-title-*.webp` 资产。
+- `b0745df` 的提交内容只有设计规格和三份规划记录；本地 `HEAD`、`origin/main` 都是该提交，因此线上旧界面不是“新代码已写但 Vercel 缓存未更新”，根因是运行时代码从未进入提交。
+- 玩家可见旧品牌仍有明确证据：非测试运行时与发布文档范围中至少 29 条“雾灯谷”、4 条“雾灯酒馆”、5 条“雾灯谷纪事”；默认世界书名称和正文直接定义在 `src/sillytavern/defaults.ts`。
+- 线上首页于检查时返回 HTTP 200，HTML `<title>` 仍为“雾灯谷纪事”，脚本入口为 `./assets/index-D_YSVP9i.js`；这与用户截图和当前未实施源码一致。
+- 线上 287255 字符构建脚本明确包含“雾灯谷纪事”“雾灯酒馆中枢”“雾灯谷·全域设定集”，且不包含“性撸谷物语”、`title-start-game` 或 `xinglugu-title-desktop`；部署端没有隐藏的新开始页代码。
+- 提交 `b0745df` 只包含设计规格与 `task_plan.md`、`findings.md`、`progress.md`，没有任何图片、运行时代码或 API 文件。
+- `C:\Users\qixin\.codex\generated_images`、`src/assets` 与 `public` 中没有任何 `xinglugu/title/cover/封面` 候选文件；两张封面未生成，也没有遗漏在 ImageGen 临时目录。
+- `src`、`public`、`index.html` 与 `README.md` 中“性撸谷/性撸谷物语”、开始页 ID 和封面资源名均为零命中；旧品牌出现在 23 个相关文件中，且没有开始页组件测试。名称迁移、开始页和世界书迁移均是完全未开始，不是部分遗漏。
