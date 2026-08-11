@@ -19,7 +19,7 @@ Phase 21（GitHub 云存档与游戏开始界面）待实施。
 - [x] 用户确认采用推荐的 GitHub OAuth + 私有 Gist + Vercel Functions 方案
 - [x] 核对用户线上截图与仓库/远端提交，确认运行时尚未实施
 - [x] 核对项目/生成目录、线上 bundle 与品牌真源，完成未实施状态审计
-- [ ] 编写并提交 TDD 实施计划
+- [x] 编写并自检标题/品牌与 GitHub 云存档两份 TDD 实施计划
 - [ ] 生成桌面横屏与手机竖屏两张像素封面
 - [ ] 实现 GitHub 登录、云端/本地存档与开始菜单
 - [ ] 全项目迁移“雾灯谷”为“性撸谷”并保留旧存档兼容
@@ -261,6 +261,9 @@ Phase 21（GitHub 云存档与游戏开始界面）待实施。
 | Web 工具直接打开 `https://tavern-olive.vercel.app` 被安全策略判定为不可打开 | 1 | 不重复该调用；改用本机只读 HTTP 请求检查首页 HTML、响应头与构建脚本哈希。 |
 | 首次拼接线上相对脚本路径时得到错误 URL，`Invoke-WebRequest` 连接被关闭 | 1 | 根因是把 `./assets/...` 直接字符串拼到域名后；改用 `System.Uri` 标准解析相对地址再读取，不重复错误拼接。 |
 | 检查 ImageGen 临时目录时 `$env:CODEX_HOME` 未设置，`Join-Path` 拒绝空路径 | 1 | 不重复依赖环境变量；按已知 Codex 用户目录 `C:\Users\qixin\.codex\generated_images` 做只读检查。项目资产目录已独立确认无封面。 |
+| 规划调查命令尝试读取不存在的 `tsconfig.app.json` 与 `tsconfig.node.json` | 1 | 已确认本项目只有根 `tsconfig.json`；后续先用 `rg --files` 定位配置，不重复假定 Vite 模板分文件结构。 |
+| Web 读取 Vercel 文档页面时返回不支持 `text/markdown` 内容类型 | 1 | 不重复该读取；沿用上一轮已核对并写入设计规格的 Vercel Vite/Node Functions 契约，GitHub OAuth/Gist 页面本轮正常复核。 |
+| 更新封面设计规格的组合补丁因按钮 ID 行上下文不完全一致而失败 | 1 | 不重复整块补丁；先读取 108–142 行精确文本，再分段修改封面与按钮需求。 |
 
 ## Notes
 - 所有用户可见文案必须中文化；Logo 可保留艺术化英文副标题。

@@ -361,3 +361,13 @@
 - 提交 `b0745df` 只包含设计规格与 `task_plan.md`、`findings.md`、`progress.md`，没有任何图片、运行时代码或 API 文件。
 - `C:\Users\qixin\.codex\generated_images`、`src/assets` 与 `public` 中没有任何 `xinglugu/title/cover/封面` 候选文件；两张封面未生成，也没有遗漏在 ImageGen 临时目录。
 - `src`、`public`、`index.html` 与 `README.md` 中“性撸谷/性撸谷物语”、开始页 ID 和封面资源名均为零命中；旧品牌出现在 23 个相关文件中，且没有开始页组件测试。名称迁移、开始页和世界书迁移均是完全未开始，不是部分遗漏。
+- `GameContext` 已统一拥有 `exportGameSave`、`importGameSave` 与状态净化，云端读写必须复用这些边界；需要新增“创建当前信封/替换已解析信封/覆盖前恢复槽”能力，而不能在 CloudSaveContext 内复制净化逻辑。
+- `ModalHost` 完全由游戏 `activeModal` 驱动且位于 `.game-shell` 内；封面必须有独立的启动层状态和模态容器，才能在不渲染 HUD/地图的前提下打开设置、工坊和存档中心。
+- 用户横屏封面自带“开始游戏/继续游戏/创意工坊/设置”四块木牌；第二块木牌按新素材文字承载原“读取存档”功能，打开本地、云端和 JSON 三来源的存档中心。
+- 当前 TypeScript 只有根 `tsconfig.json` 且 `include: ["src"]`，不会校验 `api/`；实施计划必须增加单独的 API 类型检查配置或把可共享纯逻辑放在可测试边界，避免 Serverless 代码绕过编译验证。
+- UI/UX 门禁：封面图必须预留明确宽高/比例避免 CLS，交互热点至少 44×44px、支持键盘/焦点/触摸且不能只靠 hover；网络按钮必须有进行中/失败/重试状态，移动端使用 `100dvh`/safe-area 并禁止页面横向滚动，动画只使用 transform/opacity 且尊重 reduced-motion。
+- UI/UX Pro Max 针对本页推荐 Immersive/Interactive Experience + Pixel Art；结合用户已完成素材，实施时不引入额外字体/动画依赖，以图片本身承载主视觉，只给真实热点增加焦点描边、pressed 反馈和 150–300ms transform/opacity 过渡。
+- 默认酒馆内容版本当前为 7，稳定默认预设 ID 为 `mistvale-preset-narrative`、合并世界书 ID 为 `mistvale-world-rules`；品牌迁移应升至版本 8，并只迁移这些系统 ID 及系统角色卡，保留持久化 ID 和玩家自建资源。
+- 用户素材可直接作为精确断点资源：`4706.png` 为 1672×941、2.91 MB，`4707.png` 为 941×1672、3.01 MB。应转换为 WebP 后保留同尺寸和像素构图，横竖图通过 `<picture media="(orientation: portrait)">` 切换，热点坐标相对各自完整画布定位。
+- GitHub 官方再次确认 OAuth Web Flow 的 `state`、S256 PKCE、10 分钟 code、服务端 client secret 交换和每次登录后 `GET /user` 身份复核；Gist 读写只需 `gist` OAuth scope，单文件超过 1 MB 时响应会标记 `truncated` 并需读取 `raw_url`。
+- 当前系统无 ImageMagick/cwebp 命令，但 Codex bundled Python 已包含 Pillow 12.2；图片转换可用 Pillow `save(..., format='WEBP', quality=88, method=6)` 完成，不改变像素尺寸，随后检查体积和解码尺寸。
