@@ -565,3 +565,13 @@
 - 连续对话组件测试首次复用了同一个 `Response`，第二次读取触发 `ReadableStream is locked`；测试夹具已改为每次请求创建独立响应，真实代码无需规避浏览器流生命周期。
 - 最终全量回归：66 个测试文件、359 项测试全部通过；TypeScript 与 Vite 生产构建成功，4674 个模块完成转换，`git diff --check` 通过。
 - 真实浏览器验收：1440×900 桌面端与 390×844 手机端均可访问 8 个酒馆标签；正则中心和 49 条合并世界书正常渲染。桌面弹窗无溢出；手机文档宽度 375px 未超过 390px 视口，面板 619px 可视区/1431px 内容使用独立纵向滚动；控制台 0 错误。
+
+# 2026-08-11 · Phase 21
+
+- 已运行 planning-with-files 会话恢复，确认上一轮 Tavern 契约修复已提交为 `9cb44ee`，本地 `main` 与 `origin/main` 同步且工作区起点干净。
+- 已进入 Superpowers brainstorming 硬门禁：当前只进行项目探索、官方协议研究与设计，不在设计获批前编写功能代码或生成最终封面资产。
+- 已确认项目没有现成服务端，当前本地自动存档、JSON 导入导出、游戏设置和首次姓名登记可作为开始菜单与双端存档的复用基础。
+- 已核对 GitHub 官方 OAuth 与 Gist 文档：Web Flow 必须通过服务端安全保存 client secret，使用 state/PKCE 并在回调后重新验证用户；云存档只申请 `gist` 最小权限，不申请仓库访问权限。
+- 已核对 Vercel 官方 Vite/Functions 文档：可在根目录 `api/` 增加 TypeScript Serverless Functions，敏感环境变量不进入 Vite 客户端包；无需引入数据库或迁移前端框架。
+- 已完成并自检 `docs/superpowers/specs/2026-08-11-github-cloud-save-title-screen-design.md`：修正 auth 路由目录歧义，定义云端覆盖前本地恢复槽，并明确 Gist revision 检测不是原子事务。
+- 下一步在书面规格确认后编写测试驱动实施计划，再生成桌面/手机封面并实现；当前尚未触碰运行时代码。

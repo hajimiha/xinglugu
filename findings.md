@@ -1,5 +1,18 @@
 # Findings & Decisions
 
+## 2026-08-11 · Phase 21 GitHub 云存档与游戏开始界面
+- 当前应用是 React 18 + Vite 的静态单页应用，没有 `vercel.json` 或服务端目录；GitHub OAuth 的授权码交换不能安全地把 client secret 放在浏览器，因此真实联网登录必须增加最小 Serverless API 或引入托管身份服务。
+- 游戏进度当前由 `GameContext` 自动写入 `localStorage`，存档信封是 `schemaVersion: 2` 的完整 `GameState`；设置页已有导入、导出和新建游戏入口，适合复用同一序列化/净化边界给本地槽位与云端版本。
+- `App.tsx` 目前挂载后直接渲染完整游戏并显示首次姓名登记层；新开始界面应在游戏 Shell 之前建立显式启动状态，避免未进入游戏时仍初始化场景交互，但保留音频、存档元数据和设置能力。
+- 云存档若使用玩家自己的 GitHub 私有 Gist，可免建数据库并天然按 GitHub 账户隔离；仍需 OAuth 服务端交换、HttpOnly 会话与 CSRF state 校验，且必须提供本地存档优先/冲突选择与离线降级。
+- GitHub 官方 Web Application Flow 要求随机 `state` 防 CSRF，并强烈建议 PKCE；授权码有效期为 10 分钟，换取 access token 的请求仍要求 `client_secret`，且 GitHub OAuth 端点当前不支持 CORS 预检，因此浏览器直连不是可接受实现。
+- GitHub 官方要求每次收到 access token 后重新请求用户身份，避免账户切换导致数据混用；服务端回调应在建立本地会话前调用 `GET /user`，只把用户 id、login、头像等非敏感资料交给前端。
+- Gist API 明确要求 `gist` OAuth scope 才能代表用户读写；创建与更新私有 Gist 支持单文件 JSON，官方响应对单文件超过 1 MB 会标记 `truncated`，读取时必须在需要时跟随 `raw_url`。当前游戏存档通常远低于该阈值，但客户端与服务端都应设置显式大小上限。
+- 推荐用固定文件名 `xinglugu-save-v1.json` 和固定 description 标记识别本游戏的私有 Gist；第一次上传创建，后续用 Gist id 更新，并保存 Gist revision/updated_at 用于冲突检测，避免跨设备后写静默覆盖先写。
+- 代码库中玩家可见品牌与内部兼容标识混在一起：源码、内容包、测试和历史文档合计约 386 个“雾灯/Mistvale”命中。不能机械替换 `mistvale-game-save-v2`、IndexedDB 名称、内容包路径或旧设计文档，否则会让现有玩家丢档；需要把新品牌文案与旧持久化键分离，并为默认世界书执行版本化文字迁移。
+- Vercel 官方确认 Vite 项目可以直接在根目录 `api/` 放 TypeScript Functions，无需改成 Next.js；敏感值应使用 Vercel Environment Variables。该边界适合实现 OAuth start/callback、session/user、cloud-save 四类路由，同时保持现有 Vite 前端与静态资源构建不变。
+- 云端令牌不应返回到浏览器或写入 localStorage；服务端以加密、HttpOnly、Secure、SameSite=Lax cookie 保存最小会话，所有写请求额外校验同源与 CSRF token。GitHub client secret 和 cookie 加密密钥只存在 Vercel 环境变量。
+
 ## 2026-08-11 · Phase 19 独立地点背景
 - 当前 `location-atlas.webp` 是 2×2 图集：左上杂货店、右上魔女之家、左下矿洞、右下渔家；`LocationStage` 通过 `.scene-shop/.scene-witch/.scene-mine/.scene-coast` 和 `background-position` 裁切。
 - 当前地点映射中，杂货店背景被 `farm`（但农场实际由 `FarmStage` 使用独立 `farm-dusk.webp`）、`mayor-home`、`smithy`、`library`、`hospital` 共用；魔女背景被 `monster-market`、`hunter-camp` 共用。
@@ -331,3 +344,12 @@
 - SillyTavern 世界书和正则导入会保留根对象、原始条目键、UID 与未知字段；导出仅覆盖本项目可编辑字段。当前运行时不执行的世界书位置、粘滞/冷却/延迟、权重、分组、过滤和扩展扫描来源会明确提示，但不会在往返导出时丢失。
 - 角色卡不再向模型投影人物描述、性格、场景和示例对话，人物文字由合并世界书独占；仓库内容包的 HTTP、网络与结构错误不再静默回退，而是在酒馆中枢内部显示可操作错误。
 - NPC 对话改为每次成功模型回合结算 1 点精力；零精力在浏览器发起 API 请求前阻断，同一会话连续对话不再出现首轮收费、后续免费。
+
+# 2026-08-11 · Phase 21 GitHub 云存档与开始界面
+
+- 设计采用 GitHub OAuth Web Flow + 最小 `gist` scope + Vercel Serverless Functions；OAuth client secret 与 access token 永不进入 Vite 客户端包或浏览器可读存储。
+- 云存档保存到玩家自己的私有 Gist，现有 `localStorage` 自动存档继续作为离线主保障；登录只读取元数据，不自动覆盖任一端。
+- 读取云端前把本地信封写入固定恢复槽 `mistvale-game-save-backup-before-cloud-v1`；云端内容通过现有存档净化器后才能替换游戏状态。
+- Gist API 没有文档化的条件 PATCH 前置条件，因此 revision 比对只能尽力降低覆盖风险，不能承诺原子更新；冲突界面必须保留两端并让玩家明确选择。
+- 开始界面每次刷新都先出现，但 Provider 可以在背景初始化元数据；只有玩家点击进入后才渲染游戏 Shell，创意工坊与设置可在不进入游戏的情况下直接打开。
+- 品牌迁移只改玩家可见文本和系统默认内容；`mistvale-*` 存储键、Dexie 数据库、稳定内容 ID 与旧公开内容包路径保留，防止现有玩家数据失联。
