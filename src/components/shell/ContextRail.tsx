@@ -1,6 +1,7 @@
 import { getNpcsAtLocation } from '../../game/calendar'
 import { crops, locations } from '../../game/data'
 import { useGame } from '../../game/GameContext'
+import { WORLD_NAME } from '../../branding'
 
 export function ContextRail() {
   const { state } = useGame()
@@ -18,7 +19,7 @@ export function ContextRail() {
         <div><p className="eyebrow">LOCATION NOTES</p><h2 id="context-title">地点札记</h2></div>
       </div>
       <div className="context-location-card">
-        <span className="location-kicker">{location.category === 'home' ? '私人领地' : '雾灯谷公共区域'}</span>
+        <span className="location-kicker">{location.category === 'home' ? '私人领地' : `${WORLD_NAME}公共区域`}</span>
         <h3>{location.name}</h3>
         <p>{location.description}</p>
         <dl className="context-facts">

@@ -17,7 +17,7 @@ import {
   MAX_GAME_YEAR,
 } from './calendar'
 
-describe('雾灯谷日历', () => {
+describe('性撸谷日历', () => {
   it('以春季开年并按365天换算月份、星期与跨年', () => {
     expect(getCalendarDate(1, 1)).toMatchObject({ year: 1, month: 1, date: 1, season: '春', weekday: '周一' })
     expect(getCalendarDate(1, 60)).toMatchObject({ month: 3, date: 1, season: '春' })

@@ -12,6 +12,7 @@ import type { EnergyCostMode, GameRuleSettings } from '../../game/types'
 import { GameIcon } from '../icons/GameIcon'
 import { MAX_PLAYER_NAME_LENGTH, normalizePlayerName } from '../../game/player-profile'
 import { useAudio } from '../../audio/AudioContext'
+import { TITLE_SAVE_FILE_PREFIX } from '../../branding'
 
 type MultiplierKey = Exclude<keyof GameRuleSettings, 'energyCostMode'>
 type MultiplierDrafts = Record<MultiplierKey, string>
@@ -119,7 +120,7 @@ export function SettingsModal({ onReturnToTitle }: { onReturnToTitle?: () => voi
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `雾灯谷存档-${new Date().toISOString().slice(0, 10)}.json`
+    link.download = `${TITLE_SAVE_FILE_PREFIX}-${new Date().toISOString().slice(0, 10)}.json`
     link.click()
     URL.revokeObjectURL(url)
     setStatus('游戏存档已导出')

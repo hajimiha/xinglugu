@@ -490,11 +490,11 @@ export const DEFAULT_PROMPT_ORDER = [
 
 export function createDefaultPreset(): Omit<ChatPreset, 'id' | 'createdAt' | 'updatedAt'> {
   return {
-    name: '雾灯叙事预设',
+    name: '性撸谷叙事预设',
     description: '面向模型 API 的 SillyTavern 风格中文叙事结构，组合角色卡、世界书与游戏变量。',
     settings: {
       max_length: 4096,
-      main: '以精细、克制的中文描写推进 {{char}} 与 {{user}} 在雾灯谷的互动。',
+      main: '以精细、克制的中文描写推进 {{char}} 与 {{user}} 在性撸谷的互动。',
       character_description: '',
       character_personality: '',
       scenario: '',

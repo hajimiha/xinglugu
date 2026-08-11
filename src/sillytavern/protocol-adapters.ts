@@ -1,6 +1,7 @@
 import { normalizeApiBaseUrl, validateProviderSamplingConfig } from './api-config'
 import { getTavernProvider } from './provider-registry'
 import type { TavernApiConfig, TavernApiProtocol, TavernRequest } from './types'
+import { GAME_TITLE } from '../branding'
 
 export interface BuiltProviderRequest {
   url: string
@@ -60,7 +61,7 @@ function providerHeaders(config: TavernApiConfig, apiKey: string): Record<string
   if (provider.auth === 'google-api-key') headers['x-goog-api-key'] = apiKey
   if (config.provider === 'openrouter') {
     headers['HTTP-Referer'] = 'https://github.com/hajimiha/tavern'
-    headers['X-Title'] = '雾灯谷纪事'
+    headers['X-Title'] = GAME_TITLE
   }
   return headers
 }

@@ -40,7 +40,7 @@ export const affinityStageNames = {
 } as const
 
 export const npcs: Npc[] = [
-  { id: 'loran', name: '洛岚', role: '村长', locationId: 'mayor-home', description: '语气从容的村长，熟知雾灯谷每一条旧路。', availableActions: ['chat','gift','quest','profile'], preferredGifts: ['moonflower','amber-tea'], birthday: { month: 1, day: 18 } },
+  { id: 'loran', name: '洛岚', role: '村长', locationId: 'mayor-home', description: '语气从容的村长，熟知性撸谷每一条旧路。', availableActions: ['chat','gift','quest','profile'], preferredGifts: ['moonflower','amber-tea'], birthday: { month: 1, day: 18 } },
   { id: 'freya', name: '芙蕾雅', role: '草药师', locationId: 'mayor-home', description: '负责村里的草药园，也会悄悄照料受伤的魔物。', availableActions: ['chat','gift','quest','profile'], preferredGifts: ['milk','moonflower'], birthday: { month: 3, day: 6 } },
   { id: 'mina', name: '弥奈', role: '风信使', locationId: 'mayor-home', description: '村长家的女儿，总是第一个听到远方的新鲜事。', availableActions: ['chat','gift','quest','profile'], preferredGifts: ['moon-tail','tide-bass'], birthday: { month: 5, day: 17 } },
   { id: 'liuan', name: '柳安', role: '杂货店主', locationId: 'general-store', description: '擅长从每一枚铜板里找出最好用的种子。', availableActions: ['chat','gift','trade','quest','profile'], preferredGifts: ['amber-tea','sun-wheat'], birthday: { month: 4, day: 12 } },

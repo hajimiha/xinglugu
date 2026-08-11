@@ -4,6 +4,7 @@ import { useGame } from '../../game/GameContext'
 import type { SkillId } from '../../game/types'
 import { GameIcon, type GameIconName } from '../icons/GameIcon'
 import { useFullscreen } from '../../hooks/useFullscreen'
+import { BRAND_CHRONICLES, GAME_TITLE } from '../../branding'
 
 const skillMeta: Record<SkillId, { label: string; icon: GameIconName }> = {
   fishing: { label: '钓鱼', icon: 'fishing' },
@@ -29,8 +30,8 @@ export function TopHud() {
       <div className="hud-brand">
         <span className="brand-sigil" aria-hidden="true">M</span>
         <div>
-          <p className="eyebrow">MISTVALE CHRONICLES</p>
-          <strong>雾灯谷纪事</strong>
+          <p className="eyebrow">{BRAND_CHRONICLES}</p>
+          <strong>{GAME_TITLE}</strong>
           <span className="hud-player-name">{state.playerProfile.name}</span>
         </div>
       </div>

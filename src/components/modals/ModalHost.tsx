@@ -15,10 +15,11 @@ import { FishingModal } from './FishingModal'
 import { TavernHubModal } from '../SillyTavern/TavernHubModal'
 import { SettingsModal } from './SettingsModal'
 import { CalendarModal } from './CalendarModal'
+import { BRAND_INTERFACE, TAVERN_TITLE } from '../../branding'
 
 const unmanaged = new Set<ModalType>([null, 'plot', 'npc', 'dialogue'])
 const titles: Partial<Record<Exclude<ModalType, null>, string>> = {
-  inventory: '行囊与成长档案', character: '角色属性', journal: '任务手册', settings: '游戏设置', tavern: '雾灯酒馆中枢', calendar: '岁时手册', trade: '经营交易柜台', 'quest-board': '村民委托板', ranch: '魔物娘共生牧场', hunter: '猎人训练', hospital: '白槿诊所', library: '五行法术书塔', mine: '回声矿洞', battle: '回合制战斗', fishing: '潮汐钓场',
+  inventory: '行囊与成长档案', character: '角色属性', journal: '任务手册', settings: '游戏设置', tavern: TAVERN_TITLE, calendar: '岁时手册', trade: '经营交易柜台', 'quest-board': '村民委托板', ranch: '魔物娘共生牧场', hunter: '猎人训练', hospital: '白槿诊所', library: '五行法术书塔', mine: '回声矿洞', battle: '回合制战斗', fishing: '潮汐钓场',
 }
 
 function FutureFeature({ type }: { type: Exclude<ModalType, null> }) {
@@ -95,5 +96,5 @@ export function ModalHost({ onReturnToTitle }: { onReturnToTitle?: () => void })
   if (!managed) return null
   const title = titles[managed] ?? '游戏界面'
   const close = () => dispatch({ type: 'CLOSE_MODAL' })
-  return <div id={`modal-${managed}-overlay`} className={`modal-overlay ${managed === 'tavern' ? 'is-tavern' : ''}`} onMouseDown={(event) => { if (event.target === event.currentTarget) close() }}><section id={`modal-${managed}`} ref={panelRef} className={`modal-panel modal-${managed}`} role="dialog" aria-modal="true" aria-labelledby={managed === 'tavern' ? 'tavern-hub-title' : `modal-title-${managed}`} tabIndex={-1}>{managed !== 'tavern' && <header className="modal-header"><div><p className="eyebrow">MISTVALE INTERFACE</p><h2 id={`modal-title-${managed}`}>{title}</h2></div><button id={`modal-close-${managed}`} className="icon-button" type="button" aria-label={`关闭${title}`} onClick={close}><GameIcon name="close" size={18} /></button></header>}<div className="modal-body">{contentFor(managed, close, onReturnToTitle)}</div></section></div>
+  return <div id={`modal-${managed}-overlay`} className={`modal-overlay ${managed === 'tavern' ? 'is-tavern' : ''}`} onMouseDown={(event) => { if (event.target === event.currentTarget) close() }}><section id={`modal-${managed}`} ref={panelRef} className={`modal-panel modal-${managed}`} role="dialog" aria-modal="true" aria-labelledby={managed === 'tavern' ? 'tavern-hub-title' : `modal-title-${managed}`} tabIndex={-1}>{managed !== 'tavern' && <header className="modal-header"><div><p className="eyebrow">{BRAND_INTERFACE}</p><h2 id={`modal-title-${managed}`}>{title}</h2></div><button id={`modal-close-${managed}`} className="icon-button" type="button" aria-label={`关闭${title}`} onClick={close}><GameIcon name="close" size={18} /></button></header>}<div className="modal-body">{contentFor(managed, close, onReturnToTitle)}</div></section></div>
 }

@@ -1,0 +1,7 @@
+export const GAME_TITLE = '性撸谷物语'
+export const WORLD_NAME = '性撸谷'
+export const TAVERN_TITLE = '性撸谷酒馆中枢'
+export const TITLE_SAVE_FILE_PREFIX = '性撸谷存档'
+export const BRAND_CHRONICLES = 'XINGLUGU CHRONICLES'
+export const BRAND_ATLAS = 'XINGLUGU ATLAS'
+export const BRAND_INTERFACE = 'XINGLUGU INTERFACE'

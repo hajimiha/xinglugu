@@ -81,7 +81,7 @@ describe('连续像素村庄地图', () => {
     const user = userEvent.setup()
     render(<GameProvider><VillageMap /></GameProvider>)
 
-    const viewport = screen.getByRole('application', { name: '可拖动的雾灯谷地图' })
+    const viewport = screen.getByRole('application', { name: '可拖动的性撸谷地图' })
     expect(screen.getByRole('button', { name: '定位当前地点' })).toHaveAttribute('id', 'map-center-current')
     expect(screen.getByRole('button', { name: '重置地图视野' })).toHaveAttribute('id', 'map-reset-view')
     expect(screen.queryByRole('button', { name: '向左移动地图' })).not.toBeInTheDocument()
@@ -99,7 +99,7 @@ describe('连续像素村庄地图', () => {
     vi.useFakeTimers()
     render(<GameProvider><VillageMap /></GameProvider>)
 
-    const viewport = screen.getByRole('application', { name: '可拖动的雾灯谷地图' })
+    const viewport = screen.getByRole('application', { name: '可拖动的性撸谷地图' })
     fireEvent.pointerDown(viewport, { pointerId: 7, button: 0, clientX: 320, clientY: 180 })
     fireEvent.pointerMove(viewport, { pointerId: 7, clientX: 260, clientY: 130 })
     fireEvent.pointerUp(viewport, { pointerId: 7, clientX: 260, clientY: 130 })
@@ -111,7 +111,7 @@ describe('连续像素村庄地图', () => {
 
   it('只有移动跨过阈值后才捕获指针并进入拖动态', () => {
     render(<GameProvider><VillageMap /></GameProvider>)
-    const viewport = screen.getByRole('application', { name: '可拖动的雾灯谷地图' })
+    const viewport = screen.getByRole('application', { name: '可拖动的性撸谷地图' })
     const setPointerCapture = vi.fn()
     const releasePointerCapture = vi.fn()
     Object.defineProperties(viewport, {

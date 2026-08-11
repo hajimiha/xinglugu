@@ -14,6 +14,7 @@ import { useGame } from '../../game/GameContext'
 import type { Location } from '../../game/types'
 import { GameIcon } from '../icons/GameIcon'
 import { clampMapOffset, offsetForPoint, type MapPoint, type MapSize } from './mapViewport'
+import { BRAND_ATLAS, WORLD_NAME } from '../../branding'
 
 const MAP_ASPECT_RATIO = 1672 / 941
 const PAN_STEP = 56
@@ -204,7 +205,7 @@ export function VillageMap() {
       <header className="village-map-header">
         <div className="map-title-group">
           <GameIcon name="map" size={22} weight="duotone" />
-          <div><p className="eyebrow">MISTVALE ATLAS</p><h2 id="village-map-title">村庄地图</h2></div>
+          <div><p className="eyebrow">{BRAND_ATLAS}</p><h2 id="village-map-title">村庄地图</h2></div>
         </div>
         <p><span className="map-current-dot" aria-hidden="true" /> 当前：{currentLocation?.name}</p>
         <span className="map-hint">拖动地图，选择建筑预览行程</span>
@@ -215,7 +216,7 @@ export function VillageMap() {
         id="village-map-viewport"
         className={`village-map-canvas ${isDragging ? 'is-dragging' : ''}`}
         role="application"
-        aria-label="可拖动的雾灯谷地图"
+        aria-label={`可拖动的${WORLD_NAME}地图`}
         aria-describedby="map-navigation-help"
         tabIndex={0}
         data-offset-x={offset.x}
@@ -235,7 +236,7 @@ export function VillageMap() {
             transform: `translate3d(${offset.x}px, ${offset.y}px, 0)`,
           }}
         >
-          <img src={villageMapImage} width="1672" height="941" alt="雾灯谷暮色地图，森林、村庄、矿山与海岸由道路相连" draggable="false" />
+          <img src={villageMapImage} width="1672" height="941" alt={`${WORLD_NAME}暮色地图，森林、村庄、矿山与海岸由道路相连`} draggable="false" />
           {mapLocations.map((location) => (
             <button
               key={location.id}

@@ -26,7 +26,7 @@ export type FishSize = 'small' | 'medium' | 'large'
 export interface FishDefinition extends ItemDefinition { id: FishId; size: FishSize }
 
 export const FISH_CATALOG: Record<FishId, FishDefinition> = {
-  'silver-carp': { id: 'silver-carp', name: '银鳞鲫', size: 'small', category: 'product', sellPrice: 95, description: '雾灯谷河湾常见的轻巧银色鱼类。', sources: ['薄雾海湾或旧木码头钓鱼'], uses: ['完成逆潮的银光委托', '出售或赠礼'] },
+  'silver-carp': { id: 'silver-carp', name: '银鳞鲫', size: 'small', category: 'product', sellPrice: 95, description: '性撸谷河湾常见的轻巧银色鱼类。', sources: ['薄雾海湾或旧木码头钓鱼'], uses: ['完成逆潮的银光委托', '出售或赠礼'] },
   'moon-tail': { id: 'moon-tail', name: '月尾鱼', size: 'small', category: 'product', sellPrice: 120, description: '尾鳍像一弯淡月，常躲在林间河道的石影里。', sources: ['林间河道钓鱼'], uses: ['出售或赠送给偏爱小型鱼的角色'] },
   'moss-trout': { id: 'moss-trout', name: '青苔鳟', size: 'medium', category: 'product', sellPrice: 180, description: '背部带有青苔般的斑纹，拉力稳定。', sources: ['林间河道钓鱼'], uses: ['出售或赠送给偏爱河鲜的角色'] },
   'tide-bass': { id: 'tide-bass', name: '潮纹鲈', size: 'medium', category: 'product', sellPrice: 240, description: '鱼身潮纹会随着海水明暗变化。', sources: ['薄雾海湾钓鱼'], uses: ['出售或赠送给偏爱海鱼的角色'] },

@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { useGame } from '../../game/GameContext'
 import { MAX_PLAYER_NAME_LENGTH, normalizePlayerName } from '../../game/player-profile'
 import { GameIcon } from '../icons/GameIcon'
+import { WORLD_NAME } from '../../branding'
 
 export function PlayerNameGate() {
   const { state, dispatch } = useGame()
@@ -14,7 +15,7 @@ export function PlayerNameGate() {
     event.preventDefault()
     const name = normalizePlayerName(draft)
     if (!name) {
-      setError(draft.trim() ? `姓名需为 1–${MAX_PLAYER_NAME_LENGTH} 个字符，且不能包含控制字符。` : '请输入姓名后再进入雾灯谷。')
+      setError(draft.trim() ? `姓名需为 1–${MAX_PLAYER_NAME_LENGTH} 个字符，且不能包含控制字符。` : `请输入姓名后再进入${WORLD_NAME}。`)
       return
     }
     dispatch({ type: 'SET_PLAYER_NAME', name })
@@ -33,7 +34,7 @@ export function PlayerNameGate() {
           <span aria-hidden="true">{Array.from(draft.trim()).length}/{MAX_PLAYER_NAME_LENGTH}</span>
         </div>
         {error ? <p id="player-name-registration-error" className="player-name-error" role="alert">{error}</p> : <p id="player-name-registration-help" className="player-name-help">之后可在游戏设置的“玩家档案”中更改。</p>}
-        <button id="player-name-registration-submit" className="primary-button" type="submit"><GameIcon name="success" size={18} weight="duotone" />确认姓名并进入雾灯谷</button>
+        <button id="player-name-registration-submit" className="primary-button" type="submit"><GameIcon name="success" size={18} weight="duotone" />确认姓名并进入{WORLD_NAME}</button>
       </form>
     </section>
   </div>
