@@ -15,6 +15,15 @@ function statusLabel(audit: TavernRequestAudit) {
   return audit.status === 'succeeded' ? '已完成' : '请求失败'
 }
 
+function redactExportValue(value: unknown, key?: string): unknown {
+  if (key && /api[-_]?key|authorization|access[-_]?token|refresh[-_]?token|client[-_]?secret|password|credential|secret|^token$/i.test(key)) return '[已隐藏]'
+  if (Array.isArray(value)) return value.map((item) => redactExportValue(item))
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([entryKey, entryValue]) => [entryKey, redactExportValue(entryValue, entryKey)]))
+  }
+  return value
+}
+
 export function RequestInspectorPanel() {
   const tavern = useTavern()
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -32,7 +41,11 @@ export function RequestInspectorPanel() {
 
   const exportAudit = () => {
     if (!selected) return
-    exportToJson(selected, `酒馆请求审计-${new Date(selected.createdAt).toISOString().replace(/[:.]/g, '-')}.json`)
+    const exportable = redactExportValue({
+      ...selected,
+      providerRequest: redactRequestInspection(selected.providerRequest),
+    })
+    exportToJson(exportable, `酒馆请求审计-${new Date(selected.createdAt).toISOString().replace(/[:.]/g, '-')}.json`)
   }
 
   return <section className="tavern-panel request-inspector-panel" aria-labelledby="request-inspector-title">

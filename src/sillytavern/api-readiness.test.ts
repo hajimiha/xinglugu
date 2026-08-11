@@ -17,6 +17,7 @@ describe('酒馆 API 就绪契约', () => {
 
   it('拒绝缺少供应商专属账户、项目或区域字段的配置', () => {
     expect(getTavernApiReadiness(settings({ provider: 'cloudflare-workers-ai', providerOptions: {} }))).toMatchObject({ ready: false })
+    expect(getTavernApiReadiness(settings({ provider: 'google-vertex-ai', providerOptions: { location: 'global' } }))).toMatchObject({ ready: false })
     expect(getTavernApiReadiness(settings({ provider: 'google-vertex-ai', providerOptions: { projectId: 'project' } }))).toMatchObject({ ready: false })
     expect(getTavernApiReadiness(settings({ provider: 'google-vertex-ai', providerOptions: { projectId: 'project', location: 'global' } }))).toMatchObject({ ready: true })
   })

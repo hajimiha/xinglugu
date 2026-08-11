@@ -2,7 +2,8 @@ import 'fake-indexeddb/auto'
 import '../../test/setup'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import * as importer from '../../sillytavern/importer'
 import { GameProvider } from '../../game/GameContext'
 import { createTavernDatabase, type MistvaleTavernDatabase } from '../../sillytavern/database'
 import { createTavernRepository } from '../../sillytavern/repository'
@@ -208,7 +209,7 @@ describe('酒馆中枢', () => {
       id: 'audit-ui', createdAt: Date.now(), status: 'succeeded', sessionId: 'session', characterName: '洛岚',
       presetId: 'preset', presetName: '当前测试预设', presetBinding: 'follow-active', provider: 'deepseek', model: 'deepseek-v4-flash',
       preparedRequest: { task: 'story', messages: [{ role: 'system', content: 'CURRENT-PRESET-SENTINEL' }, { role: 'user', content: '继续' }] },
-      providerRequest: { url: 'https://user:secret@api.deepseek.com/chat/completions?api_key=secret', method: 'POST', headers: { Authorization: '[已隐藏]' }, body: { model: 'deepseek-v4-flash', messages: [{ role: 'system', content: 'CURRENT-PRESET-SENTINEL' }] } },
+       providerRequest: { url: 'https://user:secret@api.deepseek.com/chat/completions?api_key=secret', method: 'POST', headers: { Authorization: '[已隐藏]' }, body: { model: 'deepseek-v4-flash', messages: [{ role: 'system', content: 'CURRENT-PRESET-SENTINEL' }] } },
       segments: [{ id: 'segment', source: 'preset', identifier: 'main', role: 'system', raw: 'CURRENT-PRESET-SENTINEL', compiled: 'CURRENT-PRESET-SENTINEL', sent: true, messageIndex: 0, tokenEstimate: 6, diagnostics: [] }],
       macroOperations: [], matchedLorebookEntries: [], diagnostics: [],
     })
@@ -227,6 +228,44 @@ describe('酒馆中枢', () => {
     expect(screen.getByText('https://api.deepseek.com/chat/completions')).toBeVisible()
     expect(screen.queryByText(/api_key=secret|user:secret/)).not.toBeInTheDocument()
     expect(screen.queryByText(/session-secret/)).not.toBeInTheDocument()
+  })
+
+  it('导出请求档案时不包含地址或凭据字段中的敏感值', async () => {
+    const user = userEvent.setup()
+    const exportSpy = vi.spyOn(importer, 'exportToJson').mockImplementation(() => undefined)
+    database = createTavernDatabase(`mistvale-request-export-${crypto.randomUUID()}`)
+    const repository = createTavernRepository(database)
+    await repository.initialize()
+    await repository.saveRequestAudit({
+      id: 'audit-export', createdAt: Date.now(), status: 'succeeded', sessionId: 'session', characterName: '洛岚',
+      presetId: 'preset', presetName: '导出测试预设', presetBinding: 'follow-active', provider: 'deepseek', model: 'deepseek-v4-flash',
+      preparedRequest: { task: 'story', messages: [{ role: 'user', content: '继续' }], context: { apiKey: 'context-secret' } },
+      providerRequest: {
+        url: 'https://user:secret@api.deepseek.com/chat/completions?api_key=query-secret#fragment',
+        method: 'POST',
+        headers: { Authorization: 'Bearer header-secret', 'X-Api-Key': 'header-key-secret' },
+        body: { model: 'deepseek-v4-flash', api_key: 'body-key-secret', token: 'body-token-secret', password: 'body-password-secret' },
+      },
+      segments: [], macroOperations: [], matchedLorebookEntries: [], diagnostics: [],
+    })
+    render(<GameProvider><TavernProvider repository={repository}><TavernHubModal onClose={() => undefined} /></TavernProvider></GameProvider>)
+
+    await screen.findByText('浏览器直连提醒')
+    await user.click(screen.getByRole('tab', { name: '检查器' }))
+    await screen.findByText('导出测试预设')
+    await user.click(screen.getByRole('button', { name: '导出本次' }))
+
+    const exported = JSON.stringify(exportSpy.mock.calls[0]?.[0])
+    expect(exported).not.toContain('user:secret')
+    expect(exported).not.toContain('query-secret')
+    expect(exported).not.toContain('header-secret')
+    expect(exported).not.toContain('header-key-secret')
+    expect(exported).not.toContain('body-key-secret')
+    expect(exported).not.toContain('body-token-secret')
+    expect(exported).not.toContain('body-password-secret')
+    expect(exported).not.toContain('context-secret')
+    expect(exported).toContain('[已隐藏]')
+    exportSpy.mockRestore()
   })
 
   it('点击关闭按钮后卸载角色卡编辑器', async () => {
