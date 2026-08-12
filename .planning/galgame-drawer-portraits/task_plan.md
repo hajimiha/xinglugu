@@ -5,12 +5,13 @@ Make dialogue scene-first with an on-demand interaction drawer and refresh all a
 
 ## Phases
 - [x] Confirm design and write specification
-- [ ] Add failing interaction tests
-- [ ] Implement dialogue drawer and responsive CSS
-- [ ] Generate and process portrait assets
-- [ ] Run full verification and independent review
+- [x] Add failing interaction tests
+- [x] Implement dialogue drawer and responsive CSS
+- [x] Generate and process portrait assets
+- [x] Run full verification and independent review
 - [ ] Commit, push, deploy, and live-verify
 
 ## Errors
 | Error | Resolution |
 |---|---|
+| PowerShell rejected a compound chroma-key loop | Processed the affected assets with explicit, scoped helper invocations. |

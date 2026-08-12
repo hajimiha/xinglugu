@@ -71,6 +71,9 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
   const [streamingReasoning, setStreamingReasoning] = useState('')
   const [historyOpen, setHistoryOpen] = useState(false)
   const [cinemaMode, setCinemaMode] = useState(false)
+  const cinemaModeRef = useRef(false)
+  const [interactionOpen, setInteractionOpen] = useState(false)
+  const interactionOpenRef = useRef(false)
   const [frameIndex, setFrameIndex] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const openingRef = useRef(false)
@@ -78,6 +81,8 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
   const abortRef = useRef<AbortController | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const dialogueRef = useRef<HTMLElement | null>(null)
+  const interactionToggleRef = useRef<HTMLButtonElement | null>(null)
+  const interactionCloseRef = useRef<HTMLButtonElement | null>(null)
   const focusBeforeCinemaRef = useRef<HTMLElement | null>(null)
   const dialogueVariables = useMemo(
     () => createDialogueVariables(state, npc, relationship.affinity),
@@ -97,17 +102,51 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
 
   useEffect(() => () => abortRef.current?.abort(), [])
 
+  const closeInteraction = () => {
+    interactionOpenRef.current = false
+    setInteractionOpen(false)
+    requestAnimationFrame(() => interactionToggleRef.current?.focus())
+  }
+
+  const toggleInteraction = () => {
+    const next = !interactionOpenRef.current
+    interactionOpenRef.current = next
+    setInteractionOpen(next)
+  }
+
+  useEffect(() => {
+    if (!interactionOpen || cinemaMode) return
+    requestAnimationFrame(() => interactionCloseRef.current?.focus())
+  }, [interactionOpen, cinemaMode])
+
+  useEffect(() => {
+    if (!interactionOpen || !cinemaMode) return
+    requestAnimationFrame(() => interactionCloseRef.current?.focus())
+  }, [interactionOpen, cinemaMode])
+
+  useEffect(() => {
+    const closeTopLayerOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      if (interactionOpenRef.current) {
+        event.preventDefault()
+        closeInteraction()
+      } else if (cinemaModeRef.current) {
+        event.preventDefault()
+        cinemaModeRef.current = false
+        setCinemaMode(false)
+      }
+    }
+    document.addEventListener('keydown', closeTopLayerOnEscape)
+    return () => document.removeEventListener('keydown', closeTopLayerOnEscape)
+  }, [])
+
   useEffect(() => {
     if (!cinemaMode) return
     const previousOverflow = document.body.style.overflow
-    const exitOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        setCinemaMode(false)
-        return
-      }
+    const trapFocus = (event: KeyboardEvent) => {
       if (event.key !== 'Tab' || !dialogueRef.current) return
       const focusable = Array.from(dialogueRef.current.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])'))
+        .filter((element) => !element.closest('[inert]'))
       if (!focusable.length) return
       const first = focusable[0]
       const last = focusable[focusable.length - 1]
@@ -122,10 +161,10 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
     }
     document.body.style.overflow = 'hidden'
     requestAnimationFrame(() => dialogueRef.current?.focus())
-    document.addEventListener('keydown', exitOnEscape)
+    document.addEventListener('keydown', trapFocus)
     return () => {
       document.body.style.overflow = previousOverflow
-      document.removeEventListener('keydown', exitOnEscape)
+      document.removeEventListener('keydown', trapFocus)
       const previousId = focusBeforeCinemaRef.current?.id
       requestAnimationFrame(() => {
         if (previousId) document.getElementById(previousId)?.focus()
@@ -280,7 +319,7 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
           <h2 id={`tavern-dialogue-title-${npc.id}`}>与{npc.name}的酒馆会话</h2>
         </div>
         <div className="tavern-dialogue-header-actions">
-          <button id={`dialogue-cinema-${npc.id}`} className="icon-button" type="button" aria-label={cinemaMode ? '退出对话全屏' : '对话全屏显示'} aria-pressed={cinemaMode} onClick={() => { if (!cinemaMode) focusBeforeCinemaRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; setCinemaMode((current) => !current) }}><GameIcon name={cinemaMode ? 'fullscreenExit' : 'fullscreen'} size={18} /></button>
+          <button id={`dialogue-cinema-${npc.id}`} className="icon-button" type="button" aria-label={cinemaMode ? '退出对话全屏' : '对话全屏显示'} aria-pressed={cinemaMode} onClick={() => { if (!cinemaMode) focusBeforeCinemaRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; const next = !cinemaModeRef.current; cinemaModeRef.current = next; setCinemaMode(next) }}><GameIcon name={cinemaMode ? 'fullscreenExit' : 'fullscreen'} size={18} /></button>
           <button id={`tavern-history-open-${npc.id}`} className="icon-button" type="button" aria-label="查看会话历史" disabled={!session} onClick={() => setHistoryOpen(true)}><GameIcon name="history" size={18} /></button>
           <button id={`dialogue-close-${npc.id}`} className="icon-button" type="button" aria-label={`关闭与${npc.name}的对话`} onClick={() => dispatch({ type: 'CLOSE_MODAL' })}><GameIcon name="close" size={17} /></button>
         </div>
@@ -311,7 +350,36 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
         </div>
       </div>
 
-      <div ref={scrollRef} className="tavern-dialogue-scroll" data-testid="tavern-dialogue-scroll" role="region" aria-label="酒馆会话记录">
+      <button
+        ref={interactionToggleRef}
+        id={`dialogue-interaction-toggle-${npc.id}`}
+        className={`dialogue-interaction-toggle ${interactionOpen ? 'is-open' : ''}`}
+        type="button"
+        aria-label={interactionOpen ? '对话互动面板已打开' : '打开对话互动面板'}
+        aria-expanded={interactionOpen}
+        aria-controls={`dialogue-interaction-drawer-${npc.id}`}
+        tabIndex={interactionOpen ? -1 : 0}
+        onClick={toggleInteraction}
+      >
+        <GameIcon name="chat" size={23} weight="duotone" />
+        <span>互动</span>
+      </button>
+
+      <aside
+        id={`dialogue-interaction-drawer-${npc.id}`}
+        className={`dialogue-interaction-drawer ${interactionOpen ? 'is-open' : ''}`}
+        role="complementary"
+        aria-label="对话互动面板"
+        aria-hidden={!interactionOpen}
+        {...(!interactionOpen ? { inert: '' } : {})}
+        data-testid="dialogue-interaction-drawer"
+      >
+        <header className="dialogue-interaction-header">
+          <div><span>CONVERSATION DESK</span><strong>对话与行动</strong></div>
+          <button ref={interactionCloseRef} id={`dialogue-interaction-close-${npc.id}`} className="icon-button" type="button" aria-label="关闭对话互动面板" onClick={closeInteraction}><GameIcon name="close" size={17} /></button>
+        </header>
+
+        <div ref={scrollRef} className="tavern-dialogue-scroll" data-testid="tavern-dialogue-scroll" role="region" aria-label="酒馆会话记录">
         <div className="tavern-context-strip">
           <div><GameIcon name="memory" size={16} /><span>她记得</span><p>{relationship.memoryTags.length ? relationship.memoryTags.join(' · ') : '今天的话会成为第一笔共同记忆。'}</p></div>
           <div><GameIcon name="book" size={16} /><span>角色卡</span><p>{card ? `${card.role} · ${card.tags.slice(1).join(' · ')}` : '正在读取人物档案'}</p></div>
@@ -345,9 +413,9 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
         </div>
 
         {displayedError && <div className="tavern-dialogue-error" role="alert"><GameIcon name="warning" size={17} /><span>{displayedError}</span><button id={`dialogue-open-api-${npc.id}`} type="button" aria-label="打开接口设置" onClick={() => dispatch({ type: 'OPEN_MODAL', modal: 'tavern' })}>打开接口设置</button></div>}
-      </div>
+        </div>
 
-      <form className="dialogue-composer tavern-composer" aria-label="自由输入对话" onSubmit={submit}>
+        <form className="dialogue-composer tavern-composer" aria-label="自由输入对话" onSubmit={submit}>
         <label htmlFor={`dialogue-input-${npc.id}`}>自由输入</label>
         <textarea id={`dialogue-input-${npc.id}`} value={input} maxLength={220} rows={2} disabled={working || !session || !tavern.apiReady} placeholder={tavern.apiReady ? '描述你的选择、问题或此刻的心情……' : '请先完成 API 接口配置'} onChange={(event) => setInput(event.target.value)} />
         <div>
@@ -356,7 +424,8 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
             ? <button id={`dialogue-stop-${npc.id}`} className="secondary-button" type="button" onClick={() => abortRef.current?.abort()}><GameIcon name="stop" size={16} />停止生成</button>
             : <button id={`dialogue-send-${npc.id}`} className="primary-button" type="submit" disabled={!input.trim() || !session || !tavern.apiReady}><GameIcon name="send" size={16} />送出话语</button>}
         </div>
-      </form>
+        </form>
+      </aside>
 
       {historyOpen && session && <HistoryDrawer session={session} onClose={() => setHistoryOpen(false)} onBranch={branch} onTruncate={truncate} />}
     </section>

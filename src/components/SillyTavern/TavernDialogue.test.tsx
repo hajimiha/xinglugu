@@ -14,6 +14,12 @@ import { TavernDialogue } from './TavernDialogue'
 
 let database: MistvaleTavernDatabase | undefined
 
+async function openInteraction(user: ReturnType<typeof userEvent.setup>) {
+  const toggle = screen.getByRole('button', { name: '打开对话互动面板' })
+  await user.click(toggle)
+  await waitFor(() => expect(screen.getByRole('button', { name: '关闭对话互动面板' })).toHaveFocus())
+}
+
 function GameStateProbe() {
   const { state } = useGame()
   return <output data-testid="game-state-probe">精力 {state.energy} · 好感 {state.relationships.loran.affinity}</output>
@@ -49,14 +55,37 @@ describe('NPC 酒馆会话', () => {
     expect(await screen.findByRole('heading', { name: '与洛岚的酒馆会话' })).toBeVisible()
     expect(screen.getByTestId('galgame-scene')).toBeVisible()
     expect(await screen.findByRole('img', { name: '洛岚立绘' })).toHaveAttribute('src', './assets/portraits/generated/loran.png')
+    const interactionToggle = screen.getByRole('button', { name: '打开对话互动面板' })
+    const interactionDrawer = screen.getByTestId('dialogue-interaction-drawer')
+    expect(interactionToggle).toHaveAttribute('aria-expanded', 'false')
+    expect(interactionDrawer).toHaveAttribute('aria-hidden', 'true')
+    expect(interactionDrawer).toHaveAttribute('inert')
+    await user.click(interactionToggle)
+    expect(interactionToggle).toHaveAttribute('aria-expanded', 'true')
+    expect(interactionDrawer).toHaveClass('is-open')
+    expect(interactionDrawer).not.toHaveAttribute('inert')
+    await waitFor(() => expect(screen.getByRole('button', { name: '关闭对话互动面板' })).toHaveFocus())
+    expect(interactionToggle).toHaveAttribute('tabindex', '-1')
+    await user.keyboard('{Escape}')
+    expect(interactionDrawer).not.toHaveClass('is-open')
+    await waitFor(() => expect(interactionToggle).toHaveFocus())
+    await user.click(interactionToggle)
     const cinemaButton = screen.getByRole('button', { name: '对话全屏显示' })
     await user.click(cinemaButton)
     expect(screen.getByRole('dialog')).toHaveClass('is-cinema')
     expect(screen.getByRole('dialog').parentElement).toBe(document.body)
     await waitFor(() => expect(screen.getByRole('dialog')).toHaveFocus())
+    const cinemaDrawer = screen.getByTestId('dialogue-interaction-drawer')
+    const cinemaInteractionToggle = screen.getByRole('button', { name: '对话互动面板已打开' })
+    await user.keyboard('{Escape}')
+    expect(screen.getByRole('dialog')).toHaveClass('is-cinema')
+    await waitFor(() => expect(cinemaDrawer).not.toHaveClass('is-open'))
+    await waitFor(() => expect(cinemaInteractionToggle).toHaveFocus())
+    screen.getByRole('dialog').focus()
     await user.tab({ shift: true })
-    expect(screen.getByRole('button', { name: '打开接口设置' })).toHaveFocus()
+    expect(screen.getByRole('button', { name: '打开对话互动面板' })).toHaveFocus()
     expect(screen.getByRole('button', { name: '退出对话全屏' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(screen.getByRole('button', { name: '打开对话互动面板' }))
     const scrollRegion = screen.getByTestId('tavern-dialogue-scroll')
     const composer = screen.getByRole('form', { name: '自由输入对话' })
     expect(scrollRegion).toContainElement(screen.getByLabelText('本回合可选行动'))
@@ -104,6 +133,7 @@ describe('NPC 酒馆会话', () => {
       </GameProvider>,
     )
 
+    await openInteraction(user)
     const action = await screen.findByRole('button', { name: /选择行动：询问今日委托/ })
     await waitFor(() => expect(action).toBeEnabled())
     await user.click(action)
@@ -145,6 +175,7 @@ describe('NPC 酒馆会话', () => {
       </GameProvider>,
     )
 
+    await openInteraction(user)
     const firstAction = await screen.findByRole('button', { name: /选择行动：询问今日委托/ })
     await waitFor(() => expect(firstAction).toBeEnabled())
     await user.click(firstAction)
@@ -177,6 +208,7 @@ describe('NPC 酒馆会话', () => {
       </GameProvider>,
     )
 
+    await openInteraction(user)
     const action = await screen.findByRole('button', { name: /选择行动：询问今日委托/ })
     await waitFor(() => expect(action).toBeEnabled())
     await user.click(action)
@@ -244,6 +276,7 @@ describe('NPC 酒馆会话', () => {
       </GameProvider>,
     )
 
+    await openInteraction(user)
     const action = await screen.findByRole('button', { name: /选择行动：询问今日委托/ })
     await waitFor(() => expect(action).toBeEnabled())
     await user.click(action)
@@ -286,6 +319,7 @@ describe('NPC 酒馆会话', () => {
       </GameProvider>,
     )
 
+    await openInteraction(user)
     const action = await screen.findByRole('button', { name: /选择行动：询问今日委托/ })
     await waitFor(() => expect(action).toBeEnabled())
     await user.click(action)
@@ -317,6 +351,7 @@ describe('NPC 酒馆会话', () => {
       </GameProvider>,
     )
 
+    await openInteraction(user)
     const input = await screen.findByLabelText('自由输入')
     await waitFor(() => expect(input).toBeEnabled())
     await user.type(input, '今天有什么委托？')
