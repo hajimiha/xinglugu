@@ -64,9 +64,8 @@ export function parseRegexScripts(
     const placement = Array.isArray(source.placement) ? source.placement.filter((entry): entry is number => typeof entry === 'number') : []
     const promptOnly = source.promptOnly === true
     const markdownOnly = source.markdownOnly === true
-    if (promptOnly && markdownOnly) throw new Error(`regexScripts[${index}] 的 promptOnly 与 markdownOnly 不能同时为 true。`)
     const stages = stageArray(source.stages)
-      ?? (promptOnly ? ['prompt'] : markdownOnly ? ['display'] : ['prompt', 'output', 'display'])
+      ?? (promptOnly && markdownOnly ? ['prompt', 'display'] : promptOnly ? ['prompt'] : markdownOnly ? ['display'] : ['prompt', 'output', 'display'])
     const targets = targetArray(source.targets)
       ?? Array.from(new Set([
         ...(placement.includes(1) ? ['user' as const] : []),
@@ -117,8 +116,16 @@ export function getPresetRegexScripts(settings: Record<string, unknown>): Tavern
   return parseRegexScripts(raw, 'preset')
 }
 
+export function getRuntimePresetRegexScripts(settings: Record<string, unknown>): TavernRegexScript[] {
+  try {
+    return getPresetRegexScripts(settings)
+  } catch {
+    return []
+  }
+}
+
 function stagesFromRaw(raw: Record<string, unknown>): TavernRegexStage[] {
-  if (raw.promptOnly === true && raw.markdownOnly === true) return []
+  if (raw.promptOnly === true && raw.markdownOnly === true) return ['prompt', 'display']
   if (raw.promptOnly === true) return ['prompt']
   if (raw.markdownOnly === true) return ['display']
   return ['prompt', 'output', 'display']

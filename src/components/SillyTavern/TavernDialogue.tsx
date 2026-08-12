@@ -7,7 +7,7 @@ import type { GameState, Npc } from '../../game/types'
 import type { ChatSession } from '../../sillytavern/types'
 import { resolveSessionResources } from '../../sillytavern/prompt-compiler'
 import { resolvePortraitSlot } from '../../sillytavern/portrait-slots'
-import { applyRegexScripts, getPresetRegexScripts } from '../../sillytavern/regex-engine'
+import { applyRegexScripts, getRuntimePresetRegexScripts } from '../../sillytavern/regex-engine'
 import { useTavern } from '../../tavern/TavernContext'
 import { parseGalgameSegments, type GalgameSegment } from '../../tavern/galgame-dialogue'
 import { GameIcon } from '../icons/GameIcon'
@@ -143,7 +143,7 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
   }, [session, tavern.settings, tavern.presets, tavern.lorebooks])
   const displayScripts = useMemo(() => [
     ...(tavern.settings?.regexScripts ?? []),
-    ...(activeResources ? getPresetRegexScripts(activeResources.preset.settings) : []),
+    ...(activeResources ? getRuntimePresetRegexScripts(activeResources.preset.settings) : []),
   ], [tavern.settings?.regexScripts, activeResources])
   const displayedMessages = useMemo(() => (session?.messages ?? []).map((message, index, messages) => ({
     ...message,

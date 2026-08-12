@@ -14,7 +14,7 @@ import {
   type TavernProviderRequestInspection,
 } from '../sillytavern/types'
 import { aggregateEvents } from '../sillytavern/variables'
-import { applyRegexScripts, getPresetRegexScripts } from '../sillytavern/regex-engine'
+import { applyRegexScripts, getRuntimePresetRegexScripts } from '../sillytavern/regex-engine'
 import type { TavernRegexScript } from '../sillytavern/types'
 
 export interface RemoteTurnInput {
@@ -126,7 +126,7 @@ export async function createRemoteTurn(input: RemoteTurnInput): Promise<RemoteTu
       : '模型没有返回可显示的剧情文字。')
   }
 
-  const outputRegex = applyRegexScripts(raw, [...(input.regexScripts ?? []), ...getPresetRegexScripts(input.preset.settings)], {
+  const outputRegex = applyRegexScripts(raw, [...(input.regexScripts ?? []), ...getRuntimePresetRegexScripts(input.preset.settings)], {
     stage: 'output',
     target: 'assistant',
     depth: 0,

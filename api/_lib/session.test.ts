@@ -9,7 +9,10 @@ describe('GitHub 会话 Cookie', () => {
     const sealed = sealCookie(value, secret)
     expect(sealed).not.toContain('private-token')
     expect(openCookie(sealed, secret)).toEqual(value)
-    expect(openCookie(`${sealed.slice(0, -1)}x`, secret)).toBeNull()
+    const tamperAt = Math.floor(sealed.length / 2)
+    const replacement = sealed[tamperAt] === 'A' ? 'B' : 'A'
+    const tampered = `${sealed.slice(0, tamperAt)}${replacement}${sealed.slice(tamperAt + 1)}`
+    expect(openCookie(tampered, secret)).toBeNull()
   })
 
   it('拒绝过期会话', () => {

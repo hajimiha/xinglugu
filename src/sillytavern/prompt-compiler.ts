@@ -1,6 +1,6 @@
 import { createLorebookEngine } from './lorebook-engine'
 import { evaluateMacros } from './macro-engine'
-import { applyRegexScripts, getPresetRegexScripts } from './regex-engine'
+import { applyRegexScripts, getRuntimePresetRegexScripts } from './regex-engine'
 import { getPresetPromptDefinitions, getPresetPromptOrder, normalizePresetPromptRole } from './preset-compat'
 import type {
   CharacterCard,
@@ -151,7 +151,7 @@ export function compileTavernTurn(input: PromptCompileInput): PromptCompilation 
     lastUserMessage: [...input.history].reverse().find((message) => message.role === 'user')?.content ?? '',
     lastCharacterMessage: [...input.history].reverse().find((message) => message.role === 'assistant')?.content ?? '',
   }
-  const regexScripts = [...(input.regexScripts ?? []), ...getPresetRegexScripts(preset.settings)]
+  const regexScripts = [...(input.regexScripts ?? []), ...getRuntimePresetRegexScripts(preset.settings)]
   const compileMacros = (raw: string) => {
     const evaluation = evaluateMacros(raw, macroVariables, macroContext)
     macroVariables = evaluation.variables

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { applyRegexScripts, exportRegexScripts, parseRegexScripts } from './regex-engine'
+import {
+  applyRegexScripts,
+  exportRegexScripts,
+  getPresetRegexScripts,
+  getRuntimePresetRegexScripts,
+  parseRegexScripts,
+} from './regex-engine'
 
 const context = {
   stage: 'prompt' as const,
@@ -67,9 +73,22 @@ describe('SillyTavern 正则运行时', () => {
     expect(exported).not.toHaveProperty('markdownOnly')
   })
 
-  it('拒绝同时声明 promptOnly 与 markdownOnly 的矛盾脚本', () => {
-    expect(() => parseRegexScripts([{
-      id: 'contradictory', findRegex: '/foo/g', replaceString: '', promptOnly: true, markdownOnly: true,
-    }])).toThrow(/promptOnly.*markdownOnly/)
+  it('兼容 SillyTavern 同时声明 promptOnly 与 markdownOnly 的非持久双阶段脚本', () => {
+    const [script] = parseRegexScripts([{
+      id: 'ephemeral-both', findRegex: '/foo/g', replaceString: 'bar', promptOnly: true, markdownOnly: true,
+    }])
+
+    expect(script.stages).toEqual(['prompt', 'display'])
+    expect(applyRegexScripts('foo', [script], context).text).toBe('bar')
+    expect(applyRegexScripts('foo', [script], { ...context, stage: 'display' }).text).toBe('bar')
+    expect(applyRegexScripts('foo', [script], { ...context, stage: 'output' }).text).toBe('foo')
+    expect(exportRegexScripts([script])[0]).toMatchObject({ promptOnly: true, markdownOnly: true })
+  })
+
+  it('运行时隔离损坏正则，但编辑接口仍保留严格校验以防误覆盖', () => {
+    const settings = { extensions: { regex_scripts: { invalid: true } } }
+
+    expect(() => getPresetRegexScripts(settings)).toThrow(/必须是数组/)
+    expect(getRuntimePresetRegexScripts(settings)).toEqual([])
   })
 })
