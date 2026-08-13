@@ -38,4 +38,18 @@ describe('游戏启动层', () => {
     expect(dialog).toHaveTextContent('发布资源')
     expect(dialog).not.toHaveTextContent('酒馆中枢')
   })
+
+  it('GitHub OAuth 未配置时不提供会跳向不可用接口的登录链接', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: '创意工坊' }))
+
+    const dialog = screen.getByRole('dialog', { name: '创意工坊' })
+    expect(await screen.findByText('GitHub 登录尚未配置')).toBeInTheDocument()
+    expect(dialog).not.toContainElement(document.querySelector('#workshop-github-login'))
+    await user.click(screen.getByRole('tab', { name: '我的发布' }))
+    expect(dialog).toHaveTextContent('部署端尚未配置 GitHub 登录')
+    expect(dialog).not.toHaveTextContent('使用 GitHub 登录')
+  })
 })
