@@ -1,6 +1,6 @@
-import { parseContentPack } from '../sillytavern/content-pack'
-import { parsePortraitSlots } from '../sillytavern/portrait-slots'
-import type { WorkshopKind, WorkshopPackage, WorkshopPortraitCharacter } from './types'
+import { parseContentPack } from '../sillytavern/content-pack.js'
+import { parsePortraitSlots } from '../sillytavern/portrait-slots.js'
+import type { WorkshopKind, WorkshopPackage, WorkshopPortraitCharacter } from './types.js'
 
 export const MAX_WORKSHOP_PACKAGE_BYTES = 8 * 1024 * 1024
 export const MAX_TEXT_WORKSHOP_PACKAGE_BYTES = 2 * 1024 * 1024

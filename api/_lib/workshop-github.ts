@@ -1,8 +1,8 @@
-import { foldWorkshopCatalog } from '../../src/workshop/catalog'
-import { parseWorkshopPackage } from '../../src/workshop/package-schema'
-import type { WorkshopCatalogEvent, WorkshopCatalogItem, WorkshopPackage } from '../../src/workshop/types'
+import { foldWorkshopCatalog } from '../../src/workshop/catalog.js'
+import { parseWorkshopPackage } from '../../src/workshop/package-schema.js'
+import type { WorkshopCatalogEvent, WorkshopCatalogItem, WorkshopPackage } from '../../src/workshop/types.js'
 import { createHmac, timingSafeEqual } from 'node:crypto'
-import { publisherKeyForGitHubId } from './session'
+import { publisherKeyForGitHubId } from './session.js'
 
 export const WORKSHOP_PACKAGE_FILENAME = 'xinglugu-workshop-package-v1.json'
 export const WORKSHOP_EVENT_PREFIX = 'XINGLUGU_WORKSHOP_EVENT_V1\n'

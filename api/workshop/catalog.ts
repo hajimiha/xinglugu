@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { sendJson } from '../_lib/http'
-import { readPublicCatalog } from '../_lib/workshop-github'
-import { getWorkshopConfiguration } from '../_lib/workshop-request'
-import { sortWorkshopItems } from '../../src/workshop/catalog'
-import type { WorkshopKind, WorkshopSort } from '../../src/workshop/types'
+import { sendJson } from '../_lib/http.js'
+import { readPublicCatalog } from '../_lib/workshop-github.js'
+import { getWorkshopConfiguration } from '../_lib/workshop-request.js'
+import { sortWorkshopItems } from '../../src/workshop/catalog.js'
+import type { WorkshopKind, WorkshopSort } from '../../src/workshop/types.js'
 
 export default async function handler(request: VercelRequest, response: VercelResponse): Promise<void> {
   if (request.method !== 'GET') return sendJson(response, 405, { error: 'method_not_allowed' })

@@ -1,6 +1,6 @@
 import type { VercelRequest } from '@vercel/node'
-import { parseCookies } from './http'
-import { openCookie, SESSION_COOKIE, type GitHubSession } from './session'
+import { parseCookies } from './http.js'
+import { openCookie, SESSION_COOKIE, type GitHubSession } from './session.js'
 
 export interface WorkshopConfiguration {
   catalogGistId: string

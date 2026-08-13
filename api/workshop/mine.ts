@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { sendJson } from '../_lib/http'
-import { readCatalog } from '../_lib/workshop-github'
-import { getGitHubSession, getWorkshopConfiguration } from '../_lib/workshop-request'
+import { sendJson } from '../_lib/http.js'
+import { readCatalog } from '../_lib/workshop-github.js'
+import { getGitHubSession, getWorkshopConfiguration } from '../_lib/workshop-request.js'
 
 export default async function handler(request: VercelRequest, response: VercelResponse): Promise<void> {
   if (request.method !== 'GET') return sendJson(response, 405, { error: 'method_not_allowed' })

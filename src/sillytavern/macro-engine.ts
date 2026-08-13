@@ -1,4 +1,4 @@
-import type { MacroOperation } from './types'
+import type { MacroOperation } from './types.js'
 
 export interface MacroContext {
   userName: string

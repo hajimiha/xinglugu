@@ -1,4 +1,4 @@
-import type { PortraitSlot } from './types'
+import type { PortraitSlot } from './types.js'
 
 const LEGACY_STAGES = [
   { key: 'stranger', minAffinity: 0, maxAffinity: 19 },
@@ -126,4 +126,3 @@ export function legacyPortraitsToSlots(value: unknown): PortraitSlot[] {
   })
   return parsePortraitSlots(slots)
 }
-

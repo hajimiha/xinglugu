@@ -1,4 +1,4 @@
-import { evaluateMacros, type MacroContext } from './macro-engine'
+import { evaluateMacros, type MacroContext } from './macro-engine.js'
 import type {
   TavernRegexError,
   TavernRegexMatch,
@@ -6,7 +6,7 @@ import type {
   TavernRegexScript,
   TavernRegexStage,
   TavernRegexTarget,
-} from './types'
+} from './types.js'
 
 export interface RegexExecutionContext {
   stage: TavernRegexStage

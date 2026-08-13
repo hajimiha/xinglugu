@@ -1,4 +1,4 @@
-import { parseRegexScripts } from './regex-engine'
+import { parseRegexScripts } from './regex-engine.js'
 
 export type PresetPromptRole = 'system' | 'user' | 'assistant'
 export type PresetPromptSourceRole = PresetPromptRole | 'model'

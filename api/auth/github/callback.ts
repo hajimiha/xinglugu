@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { clearPrivateCookie, getRequestOrigin, parseCookies, setPrivateCookie } from '../../_lib/http'
-import { equalState, OAUTH_COOKIE, openCookie, publisherKeyForGitHubId, sealCookie, SESSION_COOKIE, type GitHubSession, type OAuthAttempt } from '../../_lib/session'
+import { clearPrivateCookie, getRequestOrigin, parseCookies, setPrivateCookie } from '../../_lib/http.js'
+import { equalState, OAUTH_COOKIE, openCookie, publisherKeyForGitHubId, sealCookie, SESSION_COOKIE, type GitHubSession, type OAuthAttempt } from '../../_lib/session.js'
 
 interface GitHubTokenResponse { access_token?: string; error?: string }
 interface GitHubUserResponse { id?: number; login?: string; avatar_url?: string }

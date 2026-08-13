@@ -1,6 +1,6 @@
-import type { CharacterCard, ChatPreset, Lorebook, PortraitSlot } from '../sillytavern/types'
-import { parseWorkshopPackage } from './package-schema'
-import type { WorkshopKind, WorkshopPackage } from './types'
+import type { CharacterCard, ChatPreset, Lorebook, PortraitSlot } from '../sillytavern/types.js'
+import { parseWorkshopPackage } from './package-schema.js'
+import type { WorkshopKind, WorkshopPackage } from './types.js'
 
 type Fetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
 

@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { clearPrivateCookie, getRequestOrigin, isSameOriginMutation, sendJson } from '../../_lib/http'
-import { SESSION_COOKIE } from '../../_lib/session'
+import { clearPrivateCookie, getRequestOrigin, isSameOriginMutation, sendJson } from '../../_lib/http.js'
+import { SESSION_COOKIE } from '../../_lib/session.js'
 
 export default function handler(request: VercelRequest, response: VercelResponse): void {
   if (request.method !== 'POST') return sendJson(response, 405, { error: 'method_not_allowed' })

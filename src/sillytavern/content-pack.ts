@@ -1,6 +1,6 @@
-import type { CharacterCard, ChatPreset, Lorebook, LorebookEntry } from './types'
-import { validatePresetSettings } from './preset-compat'
-import { legacyPortraitsToSlots, parsePortraitSlots } from './portrait-slots'
+import type { CharacterCard, ChatPreset, Lorebook, LorebookEntry } from './types.js'
+import { validatePresetSettings } from './preset-compat.js'
+import { legacyPortraitsToSlots, parsePortraitSlots } from './portrait-slots.js'
 
 export const TAVERN_CONTENT_PACK_PATH = 'content/mistvale-content-pack.json'
 export const MAX_CONTENT_PACK_BYTES = 12 * 1024 * 1024

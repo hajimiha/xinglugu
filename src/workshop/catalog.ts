@@ -1,4 +1,4 @@
-import type { WorkshopCatalogEvent, WorkshopCatalogItem, WorkshopCatalogResult, WorkshopSort } from './types'
+import type { WorkshopCatalogEvent, WorkshopCatalogItem, WorkshopCatalogResult, WorkshopSort } from './types.js'
 
 export type { WorkshopCatalogEvent } from './types'
 

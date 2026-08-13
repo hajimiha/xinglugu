@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { randomBytes } from 'node:crypto'
-import { getRequestOrigin, safeReturnPath, setPrivateCookie } from '../../_lib/http'
-import { createPkcePair, OAUTH_COOKIE, sealCookie, type OAuthAttempt } from '../../_lib/session'
+import { getRequestOrigin, safeReturnPath, setPrivateCookie } from '../../_lib/http.js'
+import { createPkcePair, OAUTH_COOKIE, sealCookie, type OAuthAttempt } from '../../_lib/session.js'
 
 export default function handler(request: VercelRequest, response: VercelResponse): void {
   if (request.method !== 'GET') return void response.status(405).end()

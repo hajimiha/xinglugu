@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { isSameOriginMutation, sendJson } from '../_lib/http'
-import type { WorkshopCatalogEvent } from '../../src/workshop/types'
-import { appendCatalogEvent, readCatalog } from '../_lib/workshop-github'
-import { getGitHubSession, getWorkshopConfiguration, newOperationId, requestBody } from '../_lib/workshop-request'
+import { isSameOriginMutation, sendJson } from '../_lib/http.js'
+import type { WorkshopCatalogEvent } from '../../src/workshop/types.js'
+import { appendCatalogEvent, readCatalog } from '../_lib/workshop-github.js'
+import { getGitHubSession, getWorkshopConfiguration, newOperationId, requestBody } from '../_lib/workshop-request.js'
 
 export default async function handler(request: VercelRequest, response: VercelResponse): Promise<void> {
   if (request.method !== 'PUT' && request.method !== 'DELETE') return sendJson(response, 405, { error: 'method_not_allowed' })

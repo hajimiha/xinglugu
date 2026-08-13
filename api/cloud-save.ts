@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { isSameOriginMutation, parseCookies, sendJson } from './_lib/http'
-import { readCloudGist, validateSerializedSave, writeCloudGist } from './_lib/github-gist'
-import { openCookie, SESSION_COOKIE, type GitHubSession } from './_lib/session'
+import { isSameOriginMutation, parseCookies, sendJson } from './_lib/http.js'
+import { readCloudGist, validateSerializedSave, writeCloudGist } from './_lib/github-gist.js'
+import { openCookie, SESSION_COOKIE, type GitHubSession } from './_lib/session.js'
 
 function getSession(request: VercelRequest): GitHubSession | null {
   const secret = process.env.XINGLUGU_SESSION_SECRET

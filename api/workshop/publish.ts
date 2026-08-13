@@ -1,10 +1,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { isSameOriginMutation, sendJson } from '../_lib/http'
-import { parseWorkshopPackage } from '../../src/workshop/package-schema'
-import type { WorkshopCatalogEvent } from '../../src/workshop/types'
-import { appendCatalogEvent, catalogItemFromPackage, createWorkshopGist, githubOwnerMatchesPublisher, invalidatePublicCatalogCache, readCatalog, readWorkshopPackage, updateWorkshopGist } from '../_lib/workshop-github'
-import { getGitHubSession, getWorkshopConfiguration, newOperationId, requestBody } from '../_lib/workshop-request'
-import { stampWorkshopPackageDates } from '../../src/workshop/publisher'
+import { isSameOriginMutation, sendJson } from '../_lib/http.js'
+import { parseWorkshopPackage } from '../../src/workshop/package-schema.js'
+import type { WorkshopCatalogEvent } from '../../src/workshop/types.js'
+import { appendCatalogEvent, catalogItemFromPackage, createWorkshopGist, githubOwnerMatchesPublisher, invalidatePublicCatalogCache, readCatalog, readWorkshopPackage, updateWorkshopGist } from '../_lib/workshop-github.js'
+import { getGitHubSession, getWorkshopConfiguration, newOperationId, requestBody } from '../_lib/workshop-request.js'
+import { stampWorkshopPackageDates } from '../../src/workshop/publisher.js'
 
 export default async function handler(request: VercelRequest, response: VercelResponse): Promise<void> {
   if (request.method !== 'POST' && request.method !== 'PATCH' && request.method !== 'DELETE') return sendJson(response, 405, { error: 'method_not_allowed' })

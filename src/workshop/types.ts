@@ -1,4 +1,4 @@
-import type { ChatPreset, Lorebook, PortraitSlot } from '../sillytavern/types'
+import type { ChatPreset, Lorebook, PortraitSlot } from '../sillytavern/types.js'
 
 export type WorkshopKind = 'lorebook' | 'preset' | 'portrait-pack'
 export type WorkshopSort = 'trending' | 'popular' | 'newest' | 'updated'
