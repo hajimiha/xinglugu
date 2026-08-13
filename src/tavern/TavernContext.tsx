@@ -19,6 +19,8 @@ import { applyDefinedVariablePatch, variableDefinitionsToRecord } from '../silly
 import { branchChat, truncateChatAt } from '../sillytavern/variables'
 import { createRemoteTurn, type RemoteTurnInspection, type RemoteTurnResult } from './remote-story-engine'
 import { DEFAULT_PLAYER_NAME, normalizePlayerName } from '../game/player-profile'
+import { installWorkshopPackage as installPackage, type WorkshopInstallResult } from '../workshop/install-package'
+import type { WorkshopPackage } from '../workshop/types'
 
 type TavernStatus = 'loading' | 'ready' | 'error'
 
@@ -56,6 +58,7 @@ interface TavernContextValue {
   savePreset(value: ChatPreset): Promise<void>
   deletePreset(id: string): Promise<void>
   saveCharacter(value: CharacterCard): Promise<void>
+  installWorkshopPackage(value: WorkshopPackage): Promise<WorkshopInstallResult>
   saveSession(value: ChatSession): Promise<void>
   deleteSession(id: string): Promise<void>
   branchSession(sessionId: string, messageIndex: number, name: string): Promise<ChatSession>
@@ -349,6 +352,26 @@ export function TavernProvider({ children, repository = tavernRepository, player
     await repository.saveCharacter(value)
     setCharacters((current) => replaceById(current, value))
   }, [repository])
+
+  const installWorkshopPackage = useCallback(async (workshopPackage: WorkshopPackage) => {
+    const result = await installPackage(workshopPackage, {
+      lorebooks,
+      presets,
+      characters,
+      saveLorebook,
+      savePreset,
+      saveCharacter,
+    })
+    const [nextLorebooks, nextPresets, nextCharacters] = await Promise.all([
+      repository.listLorebooks(),
+      repository.listPresets(),
+      repository.listCharacters(),
+    ])
+    setLorebooks(nextLorebooks)
+    setPresets(nextPresets)
+    setCharacters(nextCharacters)
+    return result
+  }, [characters, lorebooks, presets, repository, saveCharacter, saveLorebook, savePreset])
   const deleteSession = useCallback(async (id: string) => {
     await repository.deleteSession(id)
     setSessions((current) => current.filter((item) => item.id !== id))
@@ -417,13 +440,14 @@ export function TavernProvider({ children, repository = tavernRepository, player
     savePreset,
     deletePreset,
     saveCharacter,
+    installWorkshopPackage,
     saveSession,
     deleteSession,
     branchSession,
     truncateSession,
     updateVariables,
     clearRequestAudits,
-  }), [status, error, apiLabel, apiReady, apiReadinessError, lorebooks, presets, characters, presentedSessions, requestAudits, settings, activeSession, openNpcSession, sendTurn, selectSession, persistSettings, saveLorebook, deleteLorebook, savePreset, deletePreset, saveCharacter, saveSession, deleteSession, branchSession, truncateSession, updateVariables, clearRequestAudits])
+  }), [status, error, apiLabel, apiReady, apiReadinessError, lorebooks, presets, characters, presentedSessions, requestAudits, settings, activeSession, openNpcSession, sendTurn, selectSession, persistSettings, saveLorebook, deleteLorebook, savePreset, deletePreset, saveCharacter, installWorkshopPackage, saveSession, deleteSession, branchSession, truncateSession, updateVariables, clearRequestAudits])
 
   return <TavernContext.Provider value={value}>{children}</TavernContext.Provider>
 }
