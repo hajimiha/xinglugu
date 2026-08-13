@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { parseCookies, sendJson } from '../../_lib/http'
-import { openCookie, SESSION_COOKIE, type GitHubSession } from '../../_lib/session'
+import { parseCookies, sendJson } from '../../_lib/http.ts'
+import { openCookie, SESSION_COOKIE, type GitHubSession } from '../../_lib/session.ts'
 
 export default function handler(request: VercelRequest, response: VercelResponse): void {
   if (request.method !== 'GET') return sendJson(response, 405, { error: 'method_not_allowed' })
