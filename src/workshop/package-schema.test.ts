@@ -42,11 +42,19 @@ describe('创意工坊资源包结构', () => {
           npcId: 'cow-girl', name: '牛奶娘',
           portraitSlots: [
             { id: 'low', minAffinity: 0, maxAffinity: 69, source: 'data:image/png;base64,aGVsbG8=' },
-            { id: 'high', minAffinity: 70, maxAffinity: 100, source: 'https://example.com/cow.webp' },
+            { id: 'high', minAffinity: 70, maxAffinity: 100, source: 'data:image/webp;base64,aGVsbG8=' },
           ],
         }],
       },
     }).kind).toBe('portrait-pack')
+  })
+
+  it('拒绝仍指向第三方服务器的远端立绘地址', () => {
+    expect(() => parseWorkshopPackage({
+      ...base, kind: 'portrait-pack', payload: { characters: [{ npcId: 'cow-girl', name: '牛奶娘', portraitSlots: [
+        { id: 'all', minAffinity: 0, maxAffinity: 100, source: 'https://private.example/image.png?token=secret' },
+      ] }] },
+    })).toThrow(/图片来源/)
   })
 
   it('拒绝不安全图片、重叠区间、越界元数据与私密字段', () => {
@@ -64,6 +72,7 @@ describe('创意工坊资源包结构', () => {
     expect(() => parseWorkshopPackage({ ...base, title: ' ', kind: 'lorebook', payload: { lorebook } })).toThrow(/标题/)
     expect(() => parseWorkshopPackage({ ...base, tags: Array.from({ length: 9 }, (_, index) => `标签${index}`), kind: 'preset', payload: { preset } })).toThrow(/标签/)
     expect(() => parseWorkshopPackage({ ...base, apiKey: 'secret', kind: 'preset', payload: { preset } })).toThrow(/不允许字段/)
+    expect(() => parseWorkshopPackage({ ...base, kind: 'preset', payload: { preset: { ...preset, settings: { provider: { access_token: 'secret' } } } } })).toThrow(/敏感凭据/)
   })
 
   it('按 UTF-8 字节而非字符串长度执行体积预算', () => {
@@ -71,4 +80,3 @@ describe('创意工坊资源包结构', () => {
     expect(() => parseWorkshopPackage(large, 220)).toThrow(/大小上限/)
   })
 })
-

@@ -17,7 +17,7 @@ describe('创意工坊本地安装事务', () => {
   it('世界书和预设使用新 ID，不覆盖远端或同名本地对象', async () => {
     const saveLorebook = vi.fn(async (_value: Lorebook) => undefined)
     const savePreset = vi.fn(async (_value: ChatPreset) => undefined)
-    const adapter = { lorebooks: [book], presets: [preset], characters: [], saveLorebook, savePreset, saveCharacter: vi.fn(async (_value: CharacterCard) => undefined) }
+    const adapter = { lorebooks: [book], presets: [preset], characters: [], saveLorebook, savePreset, saveCharacters: vi.fn(async (_values: CharacterCard[]) => undefined) }
     await installWorkshopPackage({ ...base, kind: 'lorebook', payload: { lorebook: book } }, adapter)
     await installWorkshopPackage({ ...base, kind: 'preset', payload: { preset } }, adapter)
     expect(saveLorebook.mock.calls[0]?.[0]?.id).not.toBe(book.id)
@@ -25,20 +25,20 @@ describe('创意工坊本地安装事务', () => {
     expect(saveLorebook.mock.calls[0]?.[0]?.name).toContain('工坊')
   })
 
-  it('立绘组只修改匹配角色并在中途失败时恢复先前角色', async () => {
+  it('立绘组只修改匹配角色并通过一次原子写入提交', async () => {
     const cow = character('cow-girl')
     const bee = character('bee-girl')
-    const saveCharacter = vi.fn(async (value: CharacterCard) => {
-      if (value.npcId === 'bee-girl' && value.portraitSlots[0].source === 'https://example.com/new-bee.png') throw new Error('disk full')
-    })
+    const saveCharacters = vi.fn(async (_values: CharacterCard[]) => undefined)
     const pkg: WorkshopPackage = { ...base, kind: 'portrait-pack', payload: { characters: [
-      { npcId: 'cow-girl', name: '牛奶娘', portraitSlots: [{ id: 'all', minAffinity: 0, maxAffinity: 100, source: 'https://example.com/new-cow.png' }] },
-      { npcId: 'bee-girl', name: '蜂娘', portraitSlots: [{ id: 'all', minAffinity: 0, maxAffinity: 100, source: 'https://example.com/new-bee.png' }] },
-      { npcId: 'missing', name: '不存在', portraitSlots: [{ id: 'all', minAffinity: 0, maxAffinity: 100, source: 'https://example.com/missing.png' }] },
+      { npcId: 'cow-girl', name: '牛奶娘', portraitSlots: [{ id: 'all', minAffinity: 0, maxAffinity: 100, source: 'data:image/png;base64,bmV3LWNvdw==' }] },
+      { npcId: 'bee-girl', name: '蜂娘', portraitSlots: [{ id: 'all', minAffinity: 0, maxAffinity: 100, source: 'data:image/png;base64,bmV3LWJlZQ==' }] },
+      { npcId: 'missing', name: '不存在', portraitSlots: [{ id: 'all', minAffinity: 0, maxAffinity: 100, source: 'data:image/png;base64,bWlzc2luZw==' }] },
     ] } }
-    const adapter = { lorebooks: [], presets: [], characters: [cow, bee], saveLorebook: vi.fn(async (_value: Lorebook) => undefined), savePreset: vi.fn(async (_value: ChatPreset) => undefined), saveCharacter }
+    const adapter = { lorebooks: [], presets: [], characters: [cow, bee], saveLorebook: vi.fn(async (_value: Lorebook) => undefined), savePreset: vi.fn(async (_value: ChatPreset) => undefined), saveCharacters }
     expect(previewWorkshopInstall(pkg, adapter)).toMatchObject({ matchedCharacters: 2, skippedCharacters: ['不存在'] })
-    await expect(installWorkshopPackage(pkg, adapter)).rejects.toThrow('disk full')
-    expect(saveCharacter).toHaveBeenCalledWith(cow)
+    await installWorkshopPackage(pkg, adapter)
+    expect(saveCharacters).toHaveBeenCalledTimes(1)
+    expect(saveCharacters.mock.calls[0]?.[0]).toHaveLength(2)
+    expect(saveCharacters.mock.calls[0]?.[0]?.map((value) => value.npcId)).toEqual(['cow-girl', 'bee-girl'])
   })
 })

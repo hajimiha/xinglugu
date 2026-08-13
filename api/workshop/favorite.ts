@@ -15,7 +15,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
   try {
     const catalog = await readCatalog(config.catalogGistId, config.signingSecret, session.token)
     if (!catalog.items.some((item) => item.packageId === packageId)) return sendJson(response, 404, { error: 'package_unavailable' })
-    const event: WorkshopCatalogEvent = { schemaVersion: 1, eventId: newOperationId(), action: request.method === 'PUT' ? 'favorite' : 'unfavorite', actor: session.user.login, packageId, occurredAt: new Date().toISOString() }
+    const event: WorkshopCatalogEvent = { schemaVersion: 1, eventId: newOperationId(), action: request.method === 'PUT' ? 'favorite' : 'unfavorite', actorKey: session.user.publisherId, actor: session.user.login, packageId, occurredAt: new Date().toISOString() }
     await appendCatalogEvent(session.token, config.catalogGistId, event, config.signingSecret)
     sendJson(response, 200, { favorite: request.method === 'PUT' })
   } catch (error) {
@@ -23,4 +23,3 @@ export default async function handler(request: VercelRequest, response: VercelRe
     sendJson(response, 502, { error: 'github_service_unavailable' })
   }
 }
-

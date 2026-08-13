@@ -6,6 +6,7 @@ import { TitleScreen } from './TitleScreen'
 import { SaveCenterModal } from './SaveCenterModal'
 import { StartModalFrame } from './StartModalFrame'
 import { useCloudSave } from '../cloud/useCloudSave'
+import { WorkshopHub } from '../workshop/WorkshopHub'
 
 export type StartModal = null | 'load' | 'workshop' | 'settings'
 
@@ -16,9 +17,11 @@ interface StartLayerProps {
 export function StartLayer({ renderGame }: StartLayerProps) {
   const { saveMeta } = useGame()
   const [inGame, setInGame] = useState(false)
+  const [workshopStudio, setWorkshopStudio] = useState(false)
   const [modal, setModal] = useState<StartModal>(() => {
     if (typeof window === 'undefined') return null
-    return new URLSearchParams(window.location.search).get('panel') === 'save' ? 'load' : null
+    const panel = new URLSearchParams(window.location.search).get('panel')
+    return panel === 'save' ? 'load' : panel === 'workshop' ? 'workshop' : null
   })
   const cloud = useCloudSave()
   useEffect(() => {
@@ -29,7 +32,7 @@ export function StartLayer({ renderGame }: StartLayerProps) {
     url.searchParams.delete('github')
     window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
   }, [])
-  const closeModal = useCallback(() => setModal(null), [])
+  const closeModal = useCallback(() => { setWorkshopStudio(false); setModal(null) }, [])
   const enterGame = useCallback(() => { setModal(null); setInGame(true) }, [])
   const returnToTitle = useCallback(() => { setModal(null); setInGame(false) }, [])
 
@@ -56,8 +59,10 @@ export function StartLayer({ renderGame }: StartLayerProps) {
         </StartModalFrame>
       )}
       {modal === 'workshop' && (
-        <StartModalFrame id="start-workshop" title="创意工坊" onClose={closeModal} tavern>
-          <TavernHubModal onClose={closeModal} initialTab="lorebooks" />
+        <StartModalFrame id="start-workshop" title="创意工坊" onClose={workshopStudio ? () => setWorkshopStudio(false) : closeModal} tavern={workshopStudio}>
+          {workshopStudio
+            ? <TavernHubModal onClose={() => setWorkshopStudio(false)} initialTab="lorebooks" />
+            : <WorkshopHub account={cloud.account} onOpenStudio={() => setWorkshopStudio(true)} />}
         </StartModalFrame>
       )}
     </>

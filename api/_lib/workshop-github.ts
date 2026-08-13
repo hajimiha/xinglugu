@@ -2,6 +2,7 @@ import { foldWorkshopCatalog } from '../../src/workshop/catalog'
 import { parseWorkshopPackage } from '../../src/workshop/package-schema'
 import type { WorkshopCatalogEvent, WorkshopCatalogItem, WorkshopPackage } from '../../src/workshop/types'
 import { createHmac, timingSafeEqual } from 'node:crypto'
+import { publisherKeyForGitHubId } from './session'
 
 export const WORKSHOP_PACKAGE_FILENAME = 'xinglugu-workshop-package-v1.json'
 export const WORKSHOP_EVENT_PREFIX = 'XINGLUGU_WORKSHOP_EVENT_V1\n'
@@ -10,7 +11,7 @@ const API = 'https://api.github.com'
 export interface GitHubWorkshopGist {
   id: string
   public: boolean
-  owner: { login: string; avatar_url: string }
+  owner: { id: number; login: string; avatar_url: string }
   files: Record<string, { content?: string; raw_url?: string; truncated?: boolean; size?: number }>
   created_at: string
   updated_at: string
@@ -21,33 +22,42 @@ export interface GitHubWorkshopGist {
 interface GitHubGistComment {
   id: number
   body: string
-  user: { login: string; avatar_url: string }
+  user: { id: number; login: string; avatar_url: string }
   created_at: string
 }
 
 interface SignedCatalogEvent {
-  event: Omit<WorkshopCatalogEvent, 'actor' | 'occurredAt'>
+  event: Omit<WorkshopCatalogEvent, 'actor' | 'actorKey' | 'occurredAt'>
   signature: string
 }
 
 type Fetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
 
 function headers(token?: string): HeadersInit {
+  const clientId = process.env.GITHUB_CLIENT_ID
+  const clientSecret = process.env.GITHUB_CLIENT_SECRET
+  const appAuthorization = !token && clientId && clientSecret
+    ? `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`
+    : undefined
   return {
     Accept: 'application/vnd.github+json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : appAuthorization ? { Authorization: appAuthorization } : {}),
     'Content-Type': 'application/json',
     'User-Agent': 'xinglugu-workshop',
     'X-GitHub-Api-Version': '2022-11-28',
   }
 }
 
-async function githubJson<T>(path: string, token: string | undefined, fetcher: Fetcher, init: RequestInit = {}): Promise<T> {
+async function githubResponse<T>(path: string, token: string | undefined, fetcher: Fetcher, init: RequestInit = {}): Promise<{ value: T; response: Response }> {
   const response = await fetcher(`${API}${path}`, { ...init, headers: { ...headers(token), ...init.headers } })
   const value = await response.json().catch(() => null) as (T & { message?: string }) | null
   if (!response.ok) throw new Error(value?.message || `GitHub API 请求失败（${response.status}）`)
   if (value === null) throw new Error('GitHub API 返回空响应。')
-  return value
+  return { value, response }
+}
+
+async function githubJson<T>(path: string, token: string | undefined, fetcher: Fetcher, init: RequestInit = {}): Promise<T> {
+  return (await githubResponse<T>(path, token, fetcher, init)).value
 }
 
 export async function createWorkshopGist(token: string, pkg: WorkshopPackage, fetcher: Fetcher = fetch): Promise<GitHubWorkshopGist> {
@@ -73,14 +83,19 @@ export async function updateWorkshopGist(token: string, gistId: string, pkg: Wor
   })
 }
 
-export async function readWorkshopPackage(gistId: string, token?: string, fetcher: Fetcher = fetch): Promise<{ gist: GitHubWorkshopGist; package: WorkshopPackage }> {
-  const gist = await githubJson<GitHubWorkshopGist>(`/gists/${encodeURIComponent(gistId)}`, token, fetcher)
+export async function readWorkshopPackage(gistId: string, token?: string, fetcher: Fetcher = fetch, gistVersion?: string): Promise<{ gist: GitHubWorkshopGist; package: WorkshopPackage }> {
+  const versionPath = gistVersion ? `/${encodeURIComponent(gistVersion)}` : ''
+  const gist = await githubJson<GitHubWorkshopGist>(`/gists/${encodeURIComponent(gistId)}${versionPath}`, token, fetcher)
   if (!gist.public) throw new Error('创意工坊资源必须是公开 Gist。')
   const file = gist.files[WORKSHOP_PACKAGE_FILENAME]
   if (!file) throw new Error('Gist 中没有创意工坊资源文件。')
   let content = file.content
   if ((!content || file.truncated) && file.raw_url) {
-    const response = await fetcher(file.raw_url, { headers: headers(token) })
+    const rawUrl = new URL(file.raw_url)
+    if (rawUrl.protocol !== 'https:' || !['gist.githubusercontent.com', 'raw.githubusercontent.com'].includes(rawUrl.hostname)) {
+      throw new Error('invalid_github_raw_url')
+    }
+    const response = await fetcher(rawUrl, { headers: { Accept: 'application/json', 'User-Agent': 'xinglugu-workshop' } })
     if (!response.ok) throw new Error(`读取工坊资源正文失败（${response.status}）`)
     content = await response.text()
   }
@@ -90,8 +105,8 @@ export async function readWorkshopPackage(gistId: string, token?: string, fetche
   return { gist, package: parseWorkshopPackage(parsed) }
 }
 
-function eventPayload(event: WorkshopCatalogEvent): Omit<WorkshopCatalogEvent, 'actor' | 'occurredAt'> {
-  const { actor: _actor, occurredAt: _occurredAt, ...payload } = event
+function eventPayload(event: WorkshopCatalogEvent): Omit<WorkshopCatalogEvent, 'actor' | 'actorKey' | 'occurredAt'> {
+  const { actor: _actor, actorKey: _actorKey, occurredAt: _occurredAt, ...payload } = event
   return payload
 }
 
@@ -118,16 +133,17 @@ function parseCatalogComment(comment: GitHubGistComment, signingSecret: string):
     if (!validSignature(envelope, signingSecret)) return null
     const raw = envelope.event
     if (!raw || raw.schemaVersion !== 1 || typeof raw.packageId !== 'string' || typeof raw.eventId !== 'string') return null
-    return { ...raw, actor: comment.user.login, occurredAt: comment.created_at } as WorkshopCatalogEvent
+    return { ...raw, actorKey: publisherKeyForGitHubId(comment.user.id, signingSecret), actor: comment.user.login, occurredAt: comment.created_at } as WorkshopCatalogEvent
   } catch { return null }
 }
 
 export async function listCatalogEvents(catalogGistId: string, signingSecret: string, token?: string, fetcher: Fetcher = fetch): Promise<WorkshopCatalogEvent[]> {
   const events: WorkshopCatalogEvent[] = []
-  for (let page = 1; page <= 10; page += 1) {
-    const comments = await githubJson<GitHubGistComment[]>(`/gists/${encodeURIComponent(catalogGistId)}/comments?per_page=100&page=${page}`, token, fetcher)
+  for (let page = 1; ; page += 1) {
+    const result = await githubResponse<GitHubGistComment[]>(`/gists/${encodeURIComponent(catalogGistId)}/comments?per_page=100&page=${page}`, token, fetcher)
+    const comments = result.value
     events.push(...comments.map((comment) => parseCatalogComment(comment, signingSecret)).filter((value): value is WorkshopCatalogEvent => Boolean(value)))
-    if (comments.length < 100) break
+    if (!result.response.headers.get('Link')?.includes('rel="next"') && comments.length < 100) break
   }
   return events
 }
@@ -143,7 +159,27 @@ export async function readCatalog(catalogGistId: string, signingSecret: string, 
   return foldWorkshopCatalog(await listCatalogEvents(catalogGistId, signingSecret, token, fetcher))
 }
 
-export function catalogItemFromPackage(pkg: WorkshopPackage, gist: GitHubWorkshopGist, revision: number): WorkshopCatalogItem {
+let publicCatalogCache: { key: string; expiresAt: number; value: Awaited<ReturnType<typeof readCatalog>> } | null = null
+
+export async function readPublicCatalog(catalogGistId: string, signingSecret: string, fetcher: Fetcher = fetch, now = Date.now()) {
+  const key = `${catalogGistId}:${signatureFor({ catalogGistId }, signingSecret)}`
+  if (publicCatalogCache?.key === key && publicCatalogCache.expiresAt > now) return publicCatalogCache.value
+  const value = await readCatalog(catalogGistId, signingSecret, undefined, fetcher)
+  publicCatalogCache = { key, expiresAt: now + 30_000, value }
+  return value
+}
+
+export function invalidatePublicCatalogCache(): void {
+  publicCatalogCache = null
+}
+
+export function githubOwnerMatchesPublisher(githubId: number, publisherId: string, signingSecret: string): boolean {
+  return publisherKeyForGitHubId(githubId, signingSecret) === publisherId
+}
+
+export function catalogItemFromPackage(pkg: WorkshopPackage, gist: GitHubWorkshopGist, revision: number, publisherId: string): WorkshopCatalogItem {
+  const gistVersion = gist.history?.[0]?.version
+  if (!gistVersion) throw new Error('github_gist_version_missing')
   const entryCount = pkg.kind === 'lorebook'
     ? pkg.payload.lorebook.entries.length
     : pkg.kind === 'portrait-pack'
@@ -156,10 +192,11 @@ export function catalogItemFromPackage(pkg: WorkshopPackage, gist: GitHubWorksho
     description: pkg.description,
     version: pkg.version,
     tags: [...pkg.tags],
-    author: { login: gist.owner.login, avatarUrl: gist.owner.avatar_url },
+    author: { publisherId, login: gist.owner.login, avatarUrl: gist.owner.avatar_url },
     createdAt: pkg.createdAt,
     updatedAt: pkg.updatedAt,
     revision,
+    gistVersion,
     stats: { entryCount, bytes: new TextEncoder().encode(JSON.stringify(pkg)).byteLength },
   }
 }

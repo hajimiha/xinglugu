@@ -16,6 +16,16 @@ describe('创意工坊浏览器客户端', () => {
     expect(fetcher).toHaveBeenCalledWith('/api/workshop/catalog?search=%E6%A3%AE%E6%9E%97+%E5%89%A7%E6%83%85&kind=lorebook&sort=newest', expect.objectContaining({ credentials: 'same-origin' }))
   })
 
+  it('目录刷新失败时返回本次页面会话最近一次成功结果', async () => {
+    const cachedItem = { packageId: 'abcdef12' }
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ items: [cachedItem] })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: 'github_service_unavailable' }), { status: 502 }))
+    const client = createWorkshopClient(fetcher)
+    await expect(client.list({ sort: 'popular' })).resolves.toEqual([cachedItem])
+    await expect(client.list({ sort: 'popular' })).resolves.toEqual([cachedItem])
+  })
+
   it('发布资源并映射登录、配置和冲突错误', async () => {
     const success = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify({ item: { packageId: 'gist-a' } }), { status: 201 }))
     await createWorkshopClient(success).publish(pkg)

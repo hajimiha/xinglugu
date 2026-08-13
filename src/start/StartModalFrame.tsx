@@ -19,11 +19,18 @@ export function StartModalFrame({ id, title, onClose, children, tavern = false }
     const keydown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault()
+        const activeLayer = panelRef.current?.querySelector<HTMLElement>('[data-modal-layer="true"]')
+        const layerClose = activeLayer?.querySelector<HTMLElement>('[data-layer-close="true"]')
+        if (layerClose) {
+          layerClose.click()
+          return
+        }
         onClose()
         return
       }
       if (event.key !== 'Tab' || !panelRef.current) return
-      const focusable = Array.from(panelRef.current.querySelectorAll<HTMLElement>(
+      const scope = panelRef.current.querySelector<HTMLElement>('[data-modal-layer="true"]') ?? panelRef.current
+      const focusable = Array.from(scope.querySelectorAll<HTMLElement>(
         'button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])',
       ))
       if (!focusable.length) return
@@ -37,9 +44,9 @@ export function StartModalFrame({ id, title, onClose, children, tavern = false }
         first.focus()
       }
     }
-    document.addEventListener('keydown', keydown)
+    document.addEventListener('keydown', keydown, true)
     return () => {
-      document.removeEventListener('keydown', keydown)
+      document.removeEventListener('keydown', keydown, true)
       previousFocus.current?.focus()
     }
   }, [onClose])

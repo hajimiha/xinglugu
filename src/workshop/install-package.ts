@@ -8,7 +8,7 @@ export interface WorkshopInstallAdapter {
   characters: CharacterCard[]
   saveLorebook(value: Lorebook): Promise<void>
   savePreset(value: ChatPreset): Promise<void>
-  saveCharacter(value: CharacterCard): Promise<void>
+  saveCharacters(values: CharacterCard[]): Promise<void>
 }
 
 export interface WorkshopInstallPreview {
@@ -60,20 +60,8 @@ export async function installWorkshopPackage(input: WorkshopPackage, adapter: Wo
 
   const updates = pkg.payload.characters.flatMap((published) => {
     const current = adapter.characters.find((card) => card.npcId === published.npcId)
-    return current ? [{ original: structuredClone(current), next: { ...current, portraitSlots: structuredClone(published.portraitSlots), updatedAt: now } }] : []
+    return current ? [{ ...current, portraitSlots: structuredClone(published.portraitSlots), updatedAt: now }] : []
   })
-  const completed: typeof updates = []
-  try {
-    for (const update of updates) {
-      await adapter.saveCharacter(update.next)
-      completed.push(update)
-    }
-  } catch (error) {
-    for (const update of completed.reverse()) {
-      try { await adapter.saveCharacter(update.original) } catch { /* preserve the first storage error */ }
-    }
-    throw error
-  }
-  return { ...preview, installedIds: updates.map((update) => update.next.id) }
+  await adapter.saveCharacters(updates)
+  return { ...preview, installedIds: updates.map((update) => update.id) }
 }
-

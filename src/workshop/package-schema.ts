@@ -19,8 +19,17 @@ function assertDate(value: unknown, label: string): string {
 }
 
 function assertNoPrivateFields(value: Record<string, unknown>): void {
-  const forbidden = ['apiKey', 'persistedApiKey', 'sessions', 'chatHistory', 'gameSave', 'globalVariables', 'apiConfig']
-  if (forbidden.some((key) => key in value)) throw new Error('资源包包含不允许字段。')
+  const privateKeys = /^(?:api[_-]?key|persisted[_-]?api[_-]?key|access[_-]?token|refresh[_-]?token|authorization|password|secret|session(?:s)?|chat[_-]?history|game[_-]?save|global[_-]?variables|api[_-]?config)$/i
+  const visit = (candidate: unknown, depth: number) => {
+    if (depth > 32) throw new Error('资源包嵌套层级过深。')
+    if (Array.isArray(candidate)) { for (const item of candidate) visit(item, depth + 1); return }
+    if (!isRecord(candidate)) return
+    for (const [key, nested] of Object.entries(candidate)) {
+      if (privateKeys.test(key)) throw new Error(depth === 0 ? '资源包包含不允许字段。' : '资源包包含敏感凭据字段。')
+      visit(nested, depth + 1)
+    }
+  }
+  visit(value, 0)
 }
 
 function parseTags(value: unknown): string[] {
@@ -32,7 +41,6 @@ function parseTags(value: unknown): string[] {
 
 function isWorkshopPortraitSource(source: string): boolean {
   if (!source) return true
-  if (/^https:\/\//i.test(source)) return true
   return /^data:image\/(?:png|webp);base64,[a-z0-9+/=\s]+$/i.test(source)
 }
 
@@ -83,4 +91,3 @@ export function parseWorkshopPackage(value: unknown, byteLimit = MAX_WORKSHOP_PA
   }
   return structuredClone({ ...base, kind, payload: { characters: parsePortraitCharacters(value.payload.characters) } })
 }
-

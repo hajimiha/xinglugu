@@ -8,8 +8,8 @@ export default function handler(request: VercelRequest, response: VercelResponse
   const configured = Boolean(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET && secret)
   if (!configured || !secret) return sendJson(response, 200, { authenticated: false, configured: false })
   const session = openCookie<GitHubSession>(parseCookies(request)[SESSION_COOKIE], secret)
-  if (!session || session.version !== 1 || !session.token || !session.user?.login) {
+  if (!session || session.version !== 1 || !session.token || !session.user?.publisherId || !session.user.login) {
     return sendJson(response, 200, { authenticated: false, configured: true })
   }
-  sendJson(response, 200, { authenticated: true, configured: true, user: session.user })
+  sendJson(response, 200, { authenticated: true, configured: true, user: { login: session.user.login, avatarUrl: session.user.avatarUrl } })
 }

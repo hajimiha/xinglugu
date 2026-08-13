@@ -11,10 +11,9 @@ export default async function handler(request: VercelRequest, response: VercelRe
   if (!session) return sendJson(response, 401, { error: 'github_login_required' })
   try {
     const catalog = await readCatalog(config.catalogGistId, config.signingSecret, session.token)
-    sendJson(response, 200, { items: catalog.items.filter((item) => item.author.login === session.user.login) })
+    sendJson(response, 200, { items: catalog.items.filter((item) => item.author.publisherId === session.user.publisherId) })
   } catch (error) {
     console.error('Workshop owner list failed:', error instanceof Error ? error.message : 'unknown_error')
     sendJson(response, 502, { error: 'github_service_unavailable' })
   }
 }
-

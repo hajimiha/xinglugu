@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { clearPrivateCookie, getRequestOrigin, parseCookies, setPrivateCookie } from '../../_lib/http'
-import { equalState, OAUTH_COOKIE, openCookie, sealCookie, SESSION_COOKIE, type GitHubSession, type OAuthAttempt } from '../../_lib/session'
+import { equalState, OAUTH_COOKIE, openCookie, publisherKeyForGitHubId, sealCookie, SESSION_COOKIE, type GitHubSession, type OAuthAttempt } from '../../_lib/session'
 
 interface GitHubTokenResponse { access_token?: string; error?: string }
-interface GitHubUserResponse { login?: string; avatar_url?: string }
+interface GitHubUserResponse { id?: number; login?: string; avatar_url?: string }
 
 function redirectResult(response: VercelResponse, origin: string, returnTo: string, result: string): void {
   const target = new URL(returnTo, origin)
@@ -46,11 +46,11 @@ export default async function handler(request: VercelRequest, response: VercelRe
       },
     })
     const user = await userResponse.json() as GitHubUserResponse
-    if (!userResponse.ok || !user.login) throw new Error('user_lookup_failed')
+    if (!userResponse.ok || !Number.isSafeInteger(user.id) || !user.id || !user.login) throw new Error('user_lookup_failed')
     const session: GitHubSession = {
       version: 1,
       token: tokenData.access_token,
-      user: { login: user.login, avatarUrl: user.avatar_url || '' },
+      user: { publisherId: publisherKeyForGitHubId(user.id, secret), login: user.login, avatarUrl: user.avatar_url || '' },
       expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
     }
     setPrivateCookie(response, SESSION_COOKIE, sealCookie(session, secret), 30 * 24 * 60 * 60, origin.startsWith('https://'))

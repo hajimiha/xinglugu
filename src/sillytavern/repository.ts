@@ -203,6 +203,7 @@ export interface TavernRepository {
   listCharacters(): Promise<CharacterCard[]>
   getCharacter(id: string): Promise<CharacterCard | undefined>
   saveCharacter(value: CharacterCard): Promise<void>
+  saveCharacters(values: CharacterCard[]): Promise<void>
   deleteCharacter(id: string): Promise<void>
   listSessions(): Promise<ChatSession[]>
   getSession(id: string): Promise<ChatSession | undefined>
@@ -456,6 +457,11 @@ class DexieTavernRepository implements TavernRepository {
 
   async saveCharacter(value: CharacterCard) {
     await this.database.characters.put(normalizeStoredCharacter(value))
+  }
+  async saveCharacters(values: CharacterCard[]) {
+    await this.database.transaction('rw', this.database.characters, async () => {
+      await this.database.characters.bulkPut(values.map(normalizeStoredCharacter))
+    })
   }
   async deleteCharacter(id: string) { await this.database.characters.delete(id) }
 

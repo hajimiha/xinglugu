@@ -4,5 +4,6 @@ import App from './App'
 import './styles/tokens.css'
 import './styles/global.css'
 import './styles/sillytavern.css'
+import './styles/workshop.css'
 
 createRoot(document.getElementById('root')!).render(<StrictMode><App /></StrictMode>)

@@ -360,7 +360,7 @@ export function TavernProvider({ children, repository = tavernRepository, player
       characters,
       saveLorebook,
       savePreset,
-      saveCharacter,
+      saveCharacters: (values) => repository.saveCharacters(values),
     })
     const [nextLorebooks, nextPresets, nextCharacters] = await Promise.all([
       repository.listLorebooks(),

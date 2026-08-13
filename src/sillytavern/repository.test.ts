@@ -23,6 +23,22 @@ afterEach(async () => {
 })
 
 describe('雾灯谷酒馆仓储', () => {
+  it('批量保存角色使用一个 Dexie 事务，任一写入失败时不留下半套立绘', async () => {
+    database = createTavernDatabase(`mistvale-character-batch-${crypto.randomUUID()}`)
+    const repository = createTavernRepository(database)
+    await repository.initialize()
+    const [first, second] = await repository.listCharacters()
+    const beforeFirst = structuredClone(first)
+    const beforeSecond = structuredClone(second)
+    vi.spyOn(database.characters, 'bulkPut').mockImplementationOnce((async () => {
+      await database!.characters.put({ ...first, portraitSlots: [{ ...first.portraitSlots[0], source: '/changed.png' }] })
+      throw new Error('simulated transaction failure')
+    }) as unknown as typeof database.characters.bulkPut)
+    await expect(repository.saveCharacters([first, second])).rejects.toThrow('simulated transaction failure')
+    expect(await repository.getCharacter(first.id)).toEqual(beforeFirst)
+    expect(await repository.getCharacter(second.id)).toEqual(beforeSecond)
+  })
+
   it('仅为空表写入默认内容，保留玩家修改', async () => {
     database = createTavernDatabase(`mistvale-test-${crypto.randomUUID()}`)
     const repository = createTavernRepository(database)

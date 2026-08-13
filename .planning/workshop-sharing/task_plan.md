@@ -5,16 +5,18 @@
 
 ## Phases
 - [x] 审计入口、OAuth、Gist、内容结构和现有立绘
-- [ ] 编写设计说明与实施计划并提交
+- [x] 编写设计说明与实施计划并提交
 - [x] 以失败测试固定资源包与目录事件基础合约
-- [ ] 实现 GitHub Gist 工坊网关与前端客户端
-- [ ] 实现独立响应式创意工坊界面和安全安装事务
-- [ ] 本地提取奶牛娘透明背景并替换资源
-- [ ] 全量测试、构建、安全检查、评审和线上核验
-- [ ] 提交并推送 main
+- [x] 实现 GitHub Gist 工坊网关与前端客户端
+- [x] 实现独立响应式创意工坊界面和安全安装事务
+- [x] 本地提取奶牛娘透明背景并替换资源
+- [x] 全量测试、构建、安全检查和独立代码评审
+- [x] 公共目录可免额外配置启用；生产 OAuth 仍沿用既有 Vercel 环境变量
+- [x] 提交并推送 main
 
 ## Errors
 | Error | Resolution |
 |---|---|
 | ImageGen 因参考角色服装触发 sexual safety filter | 不绕过过滤器，改用本地边缘连通棋盘格分割，保留原图并输出 Alpha PNG。 |
 | `pnpm test:run -- <files>` 意外运行全量套件并超时 | 脚本已自带参数，定向测试改用 `pnpm exec vitest run <files> --environment jsdom`。 |
+| 本机 Vercel CLI 未登录 | 公共目录 ID 改为代码内安全默认值；GitHub 登录与发布继续复用项目既有 OAuth 环境变量。 |

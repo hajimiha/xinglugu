@@ -26,6 +26,7 @@ export type WorkshopPackage =
   | WorkshopPackageBase & { kind: 'portrait-pack'; payload: { characters: WorkshopPortraitCharacter[] } }
 
 export interface WorkshopAuthor {
+  publisherId: string
   login: string
   avatarUrl: string
 }
@@ -41,6 +42,7 @@ export interface WorkshopCatalogItem {
   createdAt: string
   updatedAt: string
   revision: number
+  gistVersion: string
   stats: { entryCount: number; bytes: number }
   favoriteCount?: number
   withdrawn?: boolean
@@ -50,6 +52,7 @@ interface WorkshopEventBase {
   schemaVersion: 1
   eventId: string
   actor: string
+  actorKey: string
   packageId: string
   occurredAt: string
 }
@@ -65,4 +68,3 @@ export interface WorkshopCatalogResult {
   accepted: WorkshopCatalogEvent[]
   rejected: WorkshopCatalogEvent[]
 }
-

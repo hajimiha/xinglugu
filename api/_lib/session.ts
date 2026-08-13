@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEqual } from 'node:crypto'
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 
 export const SESSION_COOKIE = 'xinglugu_github_session'
 export const OAUTH_COOKIE = 'xinglugu_github_oauth'
@@ -6,8 +6,13 @@ export const OAUTH_COOKIE = 'xinglugu_github_oauth'
 export interface GitHubSession {
   version: 1
   token: string
-  user: { login: string; avatarUrl: string }
+  user: { publisherId: string; login: string; avatarUrl: string }
   expiresAt: number
+}
+
+export function publisherKeyForGitHubId(githubId: number, secret: string): string {
+  if (!Number.isSafeInteger(githubId) || githubId <= 0) throw new Error('invalid_github_user_id')
+  return createHmac('sha256', encryptionKey(secret)).update(`github-publisher:${githubId}`).digest('base64url')
 }
 
 export interface OAuthAttempt {

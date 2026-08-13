@@ -4,7 +4,7 @@ export type { WorkshopCatalogEvent } from './types'
 
 const validDate = (value: string) => Number.isFinite(Date.parse(value))
 const isOwnedItem = (event: WorkshopCatalogEvent, item: WorkshopCatalogItem) => (
-  event.actor === item.author.login && event.packageId === item.packageId && validDate(event.occurredAt)
+  event.actorKey === item.author.publisherId && event.packageId === item.packageId && validDate(event.occurredAt)
 )
 
 export function foldWorkshopCatalog(events: readonly WorkshopCatalogEvent[]): WorkshopCatalogResult {
@@ -15,7 +15,7 @@ export function foldWorkshopCatalog(events: readonly WorkshopCatalogEvent[]): Wo
 
   for (const event of events) {
     const current = records.get(event.packageId)
-    if (event.schemaVersion !== 1 || !event.actor || !event.packageId || !validDate(event.occurredAt)) {
+    if (event.schemaVersion !== 1 || !event.actorKey || !event.actor || !event.packageId || !validDate(event.occurredAt)) {
       rejected.push(event); continue
     }
     if (event.action === 'publish') {
@@ -24,19 +24,19 @@ export function foldWorkshopCatalog(events: readonly WorkshopCatalogEvent[]): Wo
       continue
     }
     if (event.action === 'update') {
-      if (!current || current.withdrawn || event.actor !== current.author.login || event.expectedRevision !== current.revision || event.revision !== current.revision + 1 || !isOwnedItem(event, event.item) || event.item.revision !== event.revision) rejected.push(event)
+      if (!current || current.withdrawn || event.actorKey !== current.author.publisherId || event.expectedRevision !== current.revision || event.revision !== current.revision + 1 || !isOwnedItem(event, event.item) || event.item.revision !== event.revision) rejected.push(event)
       else { records.set(event.packageId, { ...event.item, createdAt: current.createdAt }); accepted.push(event) }
       continue
     }
     if (event.action === 'withdraw') {
-      if (!current || current.withdrawn || event.actor !== current.author.login || event.expectedRevision !== current.revision || event.revision !== current.revision + 1) rejected.push(event)
+      if (!current || current.withdrawn || event.actorKey !== current.author.publisherId || event.expectedRevision !== current.revision || event.revision !== current.revision + 1) rejected.push(event)
       else { records.set(event.packageId, { ...current, revision: event.revision, withdrawn: true }); accepted.push(event) }
       continue
     }
     if (!current || current.withdrawn) { rejected.push(event); continue }
     const actors = favorites.get(event.packageId) ?? new Set<string>()
-    if (event.action === 'favorite') actors.add(event.actor)
-    else actors.delete(event.actor)
+    if (event.action === 'favorite') actors.add(event.actorKey)
+    else actors.delete(event.actorKey)
     favorites.set(event.packageId, actors)
     accepted.push(event)
   }
@@ -58,4 +58,3 @@ export function sortWorkshopItems(items: readonly WorkshopCatalogItem[], sort: W
     return score(right) - score(left) || Date.parse(right.updatedAt) - Date.parse(left.updatedAt)
   })
 }
-

@@ -28,6 +28,7 @@ async function readJson<T>(response: Response): Promise<T> {
 }
 
 export function createWorkshopClient(fetcher: Fetcher = (input, init) => fetch(input, init)) {
+  const catalogCache = new Map<string, WorkshopCatalogItem[]>()
   const request = (url: string, init: RequestInit = {}) => fetcher(url, {
     ...init,
     credentials: 'same-origin',
@@ -39,8 +40,16 @@ export function createWorkshopClient(fetcher: Fetcher = (input, init) => fetch(i
       if (filters.search?.trim()) query.set('search', filters.search.trim())
       if (filters.kind) query.set('kind', filters.kind)
       if (filters.sort) query.set('sort', filters.sort)
-      const result = await readJson<{ items: WorkshopCatalogItem[] }>(await request(`/api/workshop/catalog${query.size ? `?${query}` : ''}`))
-      return result.items
+      const url = `/api/workshop/catalog${query.size ? `?${query}` : ''}`
+      try {
+        const result = await readJson<{ items: WorkshopCatalogItem[] }>(await request(url))
+        catalogCache.set(url, result.items)
+        return result.items
+      } catch (error) {
+        const cached = catalogCache.get(url)
+        if (cached) return cached
+        throw error
+      }
     },
     async detail(packageId: string): Promise<{ package: WorkshopPackage; owner: { login: string; avatarUrl: string } }> {
       const result = await readJson<{ package: unknown; owner: { login: string; avatarUrl: string } }>(await request(`/api/workshop/package?id=${encodeURIComponent(packageId)}`))
@@ -74,4 +83,3 @@ export function createWorkshopClient(fetcher: Fetcher = (input, init) => fetch(i
 }
 
 export const workshopClient = createWorkshopClient()
-

@@ -73,8 +73,8 @@ GitHub access token 只存在于服务端 AES-256-GCM 加密的 `HttpOnly`、`Sa
 
 创意工坊使用玩家自己的公开 Gist 托管世界书、预设和立绘组，仍只需要 OAuth 的 `gist` 权限。要启用发布、热度和时间排序：
 
-1. 用部署者 GitHub 账号新建一个公开 Gist，正文写明“性撸谷创意工坊目录”，并确保 Gist 评论可用。
-2. 把该 Gist 地址末尾的 ID 设置为 Vercel 环境变量 `XINGLUGU_WORKSHOP_CATALOG_GIST_ID`，重新部署。
+1. 官方公共目录已经创建为 Gist `27a706cfd0a648fee5f43788b47ec615`。
+2. 该 ID 已作为官方目录的代码默认值；多实例或自建部署可用 `XINGLUGU_WORKSHOP_CATALOG_GIST_ID` 覆盖并重新部署。
 3. Functions 会给通过结构、体积、作者和修订校验的目录事件添加 HMAC 签名；直接在 GitHub 伪造的未签名评论不会进入目录。匿名玩家可浏览和下载，登录玩家可发布、更新、撤回与收藏。
 
 资源包公开前会排除 API 配置、密钥、会话、聊天历史、游戏存档和全局变量。世界书/预设导入会创建新的本地副本，不覆盖玩家草稿；立绘组只修改匹配角色的立绘槽位。
