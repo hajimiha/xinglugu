@@ -6,7 +6,7 @@
 ## Phases
 - [x] 审计入口、OAuth、Gist、内容结构和现有立绘
 - [ ] 编写设计说明与实施计划并提交
-- [ ] 以失败测试固定资源包、目录事件、客户端和界面行为
+- [x] 以失败测试固定资源包与目录事件基础合约
 - [ ] 实现 GitHub Gist 工坊网关与前端客户端
 - [ ] 实现独立响应式创意工坊界面和安全安装事务
 - [ ] 本地提取奶牛娘透明背景并替换资源
@@ -17,4 +17,4 @@
 | Error | Resolution |
 |---|---|
 | ImageGen 因参考角色服装触发 sexual safety filter | 不绕过过滤器，改用本地边缘连通棋盘格分割，保留原图并输出 Alpha PNG。 |
-
+| `pnpm test:run -- <files>` 意外运行全量套件并超时 | 脚本已自带参数，定向测试改用 `pnpm exec vitest run <files> --environment jsdom`。 |
