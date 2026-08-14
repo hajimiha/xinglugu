@@ -9,6 +9,7 @@
     "typecheck:api": "tsc -p tsconfig.api.json",
     "test": "vitest --environment jsdom",
     "test:run": "vitest run --environment jsdom",
+    "validate:scenes": "node scripts/validate-scene-variants.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

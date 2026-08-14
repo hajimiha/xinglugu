@@ -1,12 +1,13 @@
-import { memo, useMemo } from 'react'
+import { memo, useEffect, useMemo } from 'react'
 import type { CSSProperties, Dispatch } from 'react'
-import farmDuskImage from '../../assets/pixel/farm-dusk.webp'
 import { crops, shopItems } from '../../game/data'
 import { useGame } from '../../game/GameContext'
 import { getEnergyCost, scaleGrowthHours, scaleReward } from '../../game/rules'
 import type { GameAction, Plot } from '../../game/types'
 import { GameIcon } from '../icons/GameIcon'
 import { FarmWorkshop } from './FarmWorkshop'
+import { getLocationBackground, getLocationSceneAssets } from './location-scenes'
+import { getScenePeriod, preloadSceneAssets, scenePeriodLabels } from '../../visual/scene-lighting'
 
 function formatRemaining(hours: number) {
   if (hours <= 0) return '已经成熟'
@@ -47,6 +48,9 @@ const FarmPlotButton = memo(function FarmPlotButton({ plot, dispatch }: { plot: 
 
 export function FarmStage() {
   const { state, dispatch } = useGame()
+  const scenePeriod = getScenePeriod(state.minutes)
+  const farmScene = getLocationBackground('farm', state.minutes)
+  useEffect(() => preloadSceneAssets(getLocationSceneAssets('farm'), state.minutes), [scenePeriod])
   const selected = state.activeModal === 'plot'
     ? state.plots.find((plot) => plot.id === state.selectedPlotId)
     : undefined
@@ -78,7 +82,7 @@ export function FarmStage() {
 
   return (
     <section className="world-stage farm-stage panel-frame" aria-labelledby="stage-title">
-      <img className="farm-scene" src={farmDuskImage} width="1672" height="941" alt="苔灯农场暮色场景，田垄、温室与农舍被薄雾笼罩" decoding="async" />
+      <img key={scenePeriod} className="farm-scene" src={farmScene} width="1672" height="941" alt={`苔灯农场${scenePeriodLabels[scenePeriod]}场景，田垄、温室与农舍环绕南坡田区`} decoding="async" data-scene-period={scenePeriod} />
       <div className="farm-vignette" aria-hidden="true" />
       <div className="stage-atmosphere" aria-hidden="true"><i /><i /><i /></div>
       <header className="stage-titlebar">

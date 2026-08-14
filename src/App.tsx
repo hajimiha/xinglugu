@@ -10,6 +10,7 @@ import { TavernProvider } from './tavern/TavernContext'
 import { PlayerNameGate } from './components/onboarding/PlayerNameGate'
 import { AudioProvider } from './audio/AudioContext'
 import { StartLayer } from './start/StartLayer'
+import { UiThemeProvider } from './visual/UiThemeContext'
 
 function AppContent({ onReturnToTitle }: { onReturnToTitle(): void }) {
   return (
@@ -37,5 +38,5 @@ function GameBoundTavern({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  return <AudioProvider><GameProvider><GameBoundTavern><StartLayer renderGame={(onReturnToTitle) => <AppContent onReturnToTitle={onReturnToTitle} />} /></GameBoundTavern></GameProvider></AudioProvider>
+  return <UiThemeProvider><AudioProvider><GameProvider><GameBoundTavern><StartLayer renderGame={(onReturnToTitle) => <AppContent onReturnToTitle={onReturnToTitle} />} /></GameBoundTavern></GameProvider></AudioProvider></UiThemeProvider>
 }

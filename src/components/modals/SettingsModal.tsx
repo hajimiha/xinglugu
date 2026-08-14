@@ -13,6 +13,8 @@ import { GameIcon } from '../icons/GameIcon'
 import { MAX_PLAYER_NAME_LENGTH, normalizePlayerName } from '../../game/player-profile'
 import { useAudio } from '../../audio/AudioContext'
 import { TITLE_SAVE_FILE_PREFIX } from '../../branding'
+import { useUiTheme } from '../../visual/UiThemeContext'
+import { UI_THEME_OPTIONS } from '../../visual/ui-theme'
 
 type MultiplierKey = Exclude<keyof GameRuleSettings, 'energyCostMode'>
 type MultiplierDrafts = Record<MultiplierKey, string>
@@ -65,6 +67,7 @@ function createMultiplierDrafts(rules: GameRuleSettings): MultiplierDrafts {
 export function SettingsModal({ onReturnToTitle }: { onReturnToTitle?: () => void } = {}) {
   const { state, dispatch, saveMeta, exportGameSave, importGameSave, resetGameSave } = useGame()
   const audio = useAudio()
+  const { theme, setTheme } = useUiTheme()
   const [draft, setDraft] = useState<GameRuleSettings>(() => ({ ...state.rules }))
   const [multiplierDrafts, setMultiplierDrafts] = useState<MultiplierDrafts>(() => createMultiplierDrafts(state.rules))
   const [pendingReset, setPendingReset] = useState(false)
@@ -182,6 +185,32 @@ export function SettingsModal({ onReturnToTitle }: { onReturnToTitle?: () => voi
         <div><input id="settings-player-name" autoComplete="nickname" maxLength={MAX_PLAYER_NAME_LENGTH + 1} value={playerNameDraft} onChange={(event) => { setPlayerNameDraft(event.target.value); setPlayerNameError(''); setStatus('') }} aria-invalid={Boolean(playerNameError)} aria-describedby={playerNameError ? 'settings-player-name-error' : undefined} /><button id="settings-player-name-save" type="button" aria-label="保存玩家姓名" onClick={savePlayerName}><GameIcon name="save" size={16} />保存称呼</button></div>
         {playerNameError && <p id="settings-player-name-error" role="alert">{playerNameError}</p>}
       </div>
+    </section>
+
+    <section className="settings-theme-console" aria-labelledby="settings-theme-title">
+      <header className="settings-theme-heading">
+        <div className="settings-theme-mark" aria-hidden="true"><GameIcon name="magic" size={24} weight="duotone" /></div>
+        <div><span>CHROMA ATELIER</span><h4 id="settings-theme-title">彩色界面主题</h4><p>界面配色独立于昼夜场景，选择后立即预览，并保存在当前设备。</p></div>
+      </header>
+      <fieldset className="settings-theme-grid">
+        <legend className="sr-only">选择界面主题</legend>
+        {UI_THEME_OPTIONS.map((option) => <label key={option.id} className={`settings-theme-card ${theme === option.id ? 'is-selected' : ''}`} htmlFor={`settings-theme-${option.id}`}>
+          <input
+            id={`settings-theme-${option.id}`}
+            type="radio"
+            name="ui-theme"
+            value={option.id}
+            checked={theme === option.id}
+            onChange={() => {
+              setTheme(option.id)
+              setStatus(`界面主题已切换为“${option.name}”`)
+            }}
+          />
+          <span className="settings-theme-swatches" aria-hidden="true">{option.swatches.map((color) => <i key={color} style={{ backgroundColor: color }} />)}</span>
+          <span className="settings-theme-copy"><small>{option.subtitle}</small><strong>{option.name}</strong><em>{option.description}</em></span>
+          <span className="settings-theme-check" aria-hidden="true"><GameIcon name="success" size={15} weight="bold" /></span>
+        </label>)}
+      </fieldset>
     </section>
 
     <section className="settings-audio-console" aria-labelledby="settings-audio-title">

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { getNpcsAtLocation } from '../../game/calendar'
 import { locations, npcs } from '../../game/data'
 import { useGame } from '../../game/GameContext'
@@ -9,7 +9,8 @@ import { DialogueErrorBoundary } from '../SillyTavern/DialogueErrorBoundary'
 import { DialogueView } from '../npc/DialogueView'
 import { NpcPanel } from '../npc/NpcPanel'
 import { NpcPortrait } from '../npc/NpcPortrait'
-import { getLocationBackground, hasCustomLocationBackground } from './location-scenes'
+import { getLocationBackground, getLocationSceneAssets, hasCustomLocationBackground } from './location-scenes'
+import { getScenePeriod, preloadSceneAssets } from '../../visual/scene-lighting'
 
 const sceneClass: Record<LocationId, string> = {
   farm: 'scene-shop',
@@ -46,9 +47,12 @@ export function LocationStage() {
   const selectedNpc = npcs.find((npc) => npc.id === state.selectedNpcId)
   const feature = primaryModal[state.location]
   const featureNpcId = location.npcIds.find((npcId) => presentNpcs.some((npc) => npc.id === npcId))
-  const locationBackground = getLocationBackground(state.location)
+  const locationBackground = getLocationBackground(state.location, state.minutes)
+  const scenePeriod = getScenePeriod(state.minutes)
   const customBackground = hasCustomLocationBackground(state.location)
   const [dialogueRecoveryKey, setDialogueRecoveryKey] = useState(0)
+
+  useEffect(() => preloadSceneAssets(getLocationSceneAssets(state.location), state.minutes), [scenePeriod, state.location])
 
   const resetNpcDialogue = async (npcId: string) => {
     try {
@@ -91,7 +95,7 @@ export function LocationStage() {
 
   return (
     <section className={`world-stage location-stage panel-frame ${sceneClass[state.location]} ${customBackground ? 'has-custom-background' : ''}`} aria-labelledby="stage-title">
-      <div className="location-scene" style={{ backgroundImage: `url(${locationBackground})` }} aria-hidden="true" />
+      <div key={`${state.location}-${scenePeriod}`} className="location-scene" style={{ backgroundImage: `url(${locationBackground})` }} data-scene-period={scenePeriod} aria-hidden="true" />
       <div className="location-shade" aria-hidden="true" />
       <header className="stage-titlebar"><div><p className="eyebrow">{location.name} · {location.hours}</p><h1 id="stage-title">{location.subtitle}</h1></div><span className="weather-pill">{location.hours === '全天' ? '随时开放' : `开放 ${location.hours}`}</span></header>
       <div className="location-story"><span>{location.name}</span><p>{location.description}</p>{feature && <button id={`location-feature-${state.location}`} className="primary-button" type="button" onClick={() => dispatch({ type: 'OPEN_MODAL', modal: feature.modal, npcId: featureNpcId })}>{feature.label}</button>}</div>

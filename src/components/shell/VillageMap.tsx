@@ -7,7 +7,9 @@ import {
   type KeyboardEvent,
   type PointerEvent,
 } from 'react'
-import villageMapImage from '../../assets/pixel/village-map.webp'
+import villageMapDay from '../../assets/pixel/village-map-day.webp'
+import villageMapDusk from '../../assets/pixel/village-map-dusk.webp'
+import villageMapNight from '../../assets/pixel/village-map.webp'
 import { advanceCalendarClock, getNpcsAtLocation } from '../../game/calendar'
 import { locations } from '../../game/data'
 import { useGame } from '../../game/GameContext'
@@ -15,12 +17,14 @@ import type { Location } from '../../game/types'
 import { GameIcon } from '../icons/GameIcon'
 import { clampMapOffset, offsetForPoint, type MapPoint, type MapSize } from './mapViewport'
 import { BRAND_ATLAS, WORLD_NAME } from '../../branding'
+import { getScenePeriod, preloadSceneAssets, resolveSceneAsset, scenePeriodLabels, type SceneAssetSet } from '../../visual/scene-lighting'
 
 const MAP_ASPECT_RATIO = 1672 / 941
 const PAN_STEP = 56
 const DRAG_THRESHOLD = 6
 const DEFAULT_VIEWPORT: MapSize = { width: 760, height: 210 }
 const DEFAULT_WORLD: MapSize = { width: 1120, height: 1120 / MAP_ASPECT_RATIO }
+const villageMapAssets: SceneAssetSet = { day: villageMapDay, dusk: villageMapDusk, night: villageMapNight }
 
 interface DragState {
   pointerId: number
@@ -32,6 +36,8 @@ interface DragState {
 
 export function VillageMap() {
   const { state, dispatch } = useGame()
+  const scenePeriod = getScenePeriod(state.minutes)
+  const villageMapImage = resolveSceneAsset(villageMapAssets, state.minutes)
   const [destination, setDestination] = useState<Location | null>(null)
   const [viewportSize, setViewportSize] = useState<MapSize>(DEFAULT_VIEWPORT)
   const [worldSize, setWorldSize] = useState<MapSize>(DEFAULT_WORLD)
@@ -108,6 +114,8 @@ export function VillageMap() {
     observer.observe(viewport)
     return () => observer.disconnect()
   }, [])
+
+  useEffect(() => preloadSceneAssets(villageMapAssets, state.minutes), [scenePeriod])
 
   useEffect(() => () => {
     if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current)
@@ -236,7 +244,7 @@ export function VillageMap() {
             transform: `translate3d(${offset.x}px, ${offset.y}px, 0)`,
           }}
         >
-          <img src={villageMapImage} width="1672" height="941" alt={`${WORLD_NAME}暮色地图，森林、村庄、矿山与海岸由道路相连`} draggable="false" />
+          <img key={scenePeriod} src={villageMapImage} width="1672" height="941" alt={`${WORLD_NAME}${scenePeriodLabels[scenePeriod]}地图，森林、村庄、矿山与海岸由道路相连`} data-scene-period={scenePeriod} draggable="false" />
           {mapLocations.map((location) => (
             <button
               key={location.id}

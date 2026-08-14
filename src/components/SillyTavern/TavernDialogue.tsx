@@ -214,7 +214,7 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
   const frames = streamingFrames.length ? [...dialogueFrames, ...streamingFrames] : dialogueFrames
   const activeFrame = frames[Math.min(frameIndex, Math.max(0, frames.length - 1))]
   const portraitSource = card ? resolvePortraitSlot(card.portraitSlots, relationship.affinity)?.source : undefined
-  const sceneBackground = getLocationBackground(state.location)
+  const sceneBackground = getLocationBackground(state.location, state.minutes)
 
   useEffect(() => {
     if (frames.length) setFrameIndex(frames.length - 1)
