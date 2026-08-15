@@ -14,6 +14,7 @@ dist/
 # Browser automation state and generated captures
 .playwright-mcp/
 .planning/*.png
+.planning/**/visual-qa/
 outputs/
 work/*
 !work/verification-report.md

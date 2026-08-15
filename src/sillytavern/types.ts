@@ -1,4 +1,6 @@
-export type TavernTask = 'story' | 'summary' | 'vars'
+import type { ImageGenerationSettings } from './image-generation/types'
+
+export type TavernTask = 'story' | 'summary' | 'vars' | 'image-prompt'
 export type TavernMessageRole = 'system' | 'user' | 'assistant'
 
 export interface TavernRequest {
@@ -412,6 +414,7 @@ export interface TavernSettings {
   thinkingDisplay: 'fold' | 'hide' | 'inline'
   globalVariables: TavernVariableDefinition[]
   regexScripts: TavernRegexScript[]
+  imageGeneration: ImageGenerationSettings
   contentPackVersion?: string
   defaultContentVersion?: number
   updatedAt: number

@@ -21,6 +21,25 @@ import { createRemoteTurn, type RemoteTurnInspection, type RemoteTurnResult } fr
 import { DEFAULT_PLAYER_NAME, normalizePlayerName } from '../game/player-profile'
 import { installWorkshopPackage as installPackage, type WorkshopInstallResult } from '../workshop/install-package'
 import type { WorkshopPackage } from '../workshop/types'
+import { assembleImagePrompt, extractTaggedImagePrompt, type StructuredImagePrompt } from '../sillytavern/image-generation/prompt'
+import { generateStructuredImagePrompt } from '../sillytavern/image-generation/prompt-service'
+import { createImageProviderAdapters } from '../sillytavern/image-generation/providers'
+import type { ImageProviderResources } from '../sillytavern/image-generation/providers'
+import { ImageGenerationService } from '../sillytavern/image-generation/service'
+import {
+  clearImageProviderCredential,
+  resolveImageProviderCredential,
+  setImageProviderCredential,
+} from '../sillytavern/image-generation/credentials'
+import type {
+  ImageGenerationAsset,
+  ImageGenerationJob,
+  ImageGenerationProvider,
+  ImageGenerationSettings,
+  ImageGenerationReference,
+  ImageReferenceKind,
+  ImagePromptMode,
+} from '../sillytavern/image-generation/types'
 
 type TavernStatus = 'loading' | 'ready' | 'error'
 
@@ -36,6 +55,17 @@ interface SendTurnInput {
   onReasoningDelta?: (reasoning: string) => void
 }
 
+export interface GenerateDialogueImageInput {
+  sessionId: string
+  npcId: string
+  messageId?: string
+  instruction?: string
+  sourceText?: string
+  mode?: ImagePromptMode
+  signal?: AbortSignal
+  prepared?: StructuredImagePrompt
+}
+
 interface TavernContextValue {
   status: TavernStatus
   error: string | null
@@ -47,6 +77,10 @@ interface TavernContextValue {
   characters: CharacterCard[]
   sessions: ChatSession[]
   requestAudits: TavernRequestAudit[]
+  imageJobs: ImageGenerationJob[]
+  imageAssets: ImageGenerationAsset[]
+  imageReferences: ImageGenerationReference[]
+  imageError: string | null
   settings: TavernSettings | null
   activeSession: ChatSession | null
   openNpcSession(npcId: string, variables?: Record<string, unknown>): Promise<ChatSession>
@@ -65,6 +99,21 @@ interface TavernContextValue {
   truncateSession(sessionId: string, messageIndex: number): Promise<ChatSession>
   updateVariables(sessionId: string, variables: Record<string, unknown>): Promise<ChatSession>
   clearRequestAudits(): Promise<void>
+  generateDialogueImage(input: GenerateDialogueImageInput): Promise<ImageGenerationJob>
+  prepareDialogueImagePrompt(input: Omit<GenerateDialogueImageInput, 'prepared'>): Promise<StructuredImagePrompt>
+  retryImageJob(jobId: string): Promise<ImageGenerationJob>
+  cancelImageJob(jobId: string): Promise<void>
+  deleteImageAsset(assetId: string): Promise<void>
+  deleteImageJob(jobId: string): Promise<void>
+  clearImageArchive(): Promise<void>
+  addImageReference(file: File, kind: ImageReferenceKind): Promise<void>
+  updateImageReference(referenceId: string, patch: Partial<Pick<ImageGenerationReference, 'name' | 'kind' | 'strength' | 'informationExtracted' | 'enabled'>>): Promise<void>
+  deleteImageReference(referenceId: string): Promise<void>
+  testImageProvider(provider?: ImageGenerationProvider, signal?: AbortSignal): Promise<string>
+  listImageProviderResources(settingsOverride?: ImageGenerationSettings, signal?: AbortSignal): Promise<ImageProviderResources>
+  saveImageProviderCredential(provider: ImageGenerationProvider, value: string, remember: boolean): void
+  clearImageProviderCredential(provider: ImageGenerationProvider): void
+  hasImageProviderCredential(provider: ImageGenerationProvider): boolean
 }
 
 const TavernContext = createContext<TavernContextValue | null>(null)
@@ -83,7 +132,16 @@ export function TavernProvider({ children, repository = tavernRepository, player
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const [settings, setSettings] = useState<TavernSettings | null>(null)
   const [requestAudits, setRequestAudits] = useState<TavernRequestAudit[]>([])
+  const [imageJobs, setImageJobs] = useState<ImageGenerationJob[]>([])
+  const [imageAssets, setImageAssets] = useState<ImageGenerationAsset[]>([])
+  const [imageReferences, setImageReferences] = useState<ImageGenerationReference[]>([])
+  const [imageError, setImageError] = useState<string | null>(null)
   const turnQueues = useRef(new Map<string, Promise<void>>())
+  const imageRepository = useMemo(() => repository.getImageGenerationRepository(), [repository])
+  const imageService = useMemo(
+    () => new ImageGenerationService(imageRepository, createImageProviderAdapters()),
+    [imageRepository],
+  )
   const currentPlayerName = normalizePlayerName(playerName) ?? normalizePlayerName(settings?.userName) ?? DEFAULT_PLAYER_NAME
 
   useEffect(() => {
@@ -91,13 +149,17 @@ export function TavernProvider({ children, repository = tavernRepository, player
     const initialize = async () => {
       try {
         await repository.initialize()
-        const [nextLorebooks, nextPresets, nextCharacters, nextSessions, nextSettings, nextAudits] = await Promise.all([
+        await imageRepository.recoverInterruptedJobs()
+        const [nextLorebooks, nextPresets, nextCharacters, nextSessions, nextSettings, nextAudits, nextImageJobs, nextImageAssets, nextImageReferences] = await Promise.all([
           repository.listLorebooks(),
           repository.listPresets(),
           repository.listCharacters(),
           repository.listSessions(),
           repository.getSettings(),
           repository.listRequestAudits(),
+          imageRepository.listJobs(),
+          imageRepository.listAssets(),
+          imageRepository.listReferences(),
         ])
         if (cancelled) return
         setLorebooks(nextLorebooks)
@@ -106,6 +168,9 @@ export function TavernProvider({ children, repository = tavernRepository, player
         setSessions(nextSessions)
         setSettings(nextSettings)
         setRequestAudits(nextAudits)
+        setImageJobs(nextImageJobs)
+        setImageAssets(nextImageAssets)
+        setImageReferences(nextImageReferences)
         setStatus('ready')
       } catch (caught) {
         if (cancelled) return
@@ -115,7 +180,7 @@ export function TavernProvider({ children, repository = tavernRepository, player
     }
     void initialize()
     return () => { cancelled = true }
-  }, [repository])
+  }, [repository, imageRepository])
 
   const persistSettings = useCallback(async (patch: Partial<TavernSettings>) => {
     const current = settings ?? await repository.getSettings()
@@ -408,6 +473,190 @@ export function TavernProvider({ children, repository = tavernRepository, player
     return next
   }, [sessions, repository, saveSession, currentPlayerName])
 
+  const refreshImageArchive = useCallback(async () => {
+    const [nextJobs, nextAssets, nextReferences] = await Promise.all([
+      imageRepository.listJobs(),
+      imageRepository.listAssets(),
+      imageRepository.listReferences(),
+    ])
+    setImageJobs(nextJobs)
+    setImageAssets(nextAssets)
+    setImageReferences(nextReferences)
+  }, [imageRepository])
+
+  const prepareDialogueImagePrompt = useCallback(async (input: Omit<GenerateDialogueImageInput, 'prepared'>): Promise<StructuredImagePrompt> => {
+    const currentSettings = settings ?? await repository.getSettings()
+    const imageSettings = currentSettings.imageGeneration
+    const session = sessions.find((item) => item.id === input.sessionId) ?? await repository.getSession(input.sessionId)
+    if (!session) throw new Error('找不到用于绘图的酒馆会话。')
+    const character = characters.find((item) => item.npcId === input.npcId)
+      ?? (await repository.listCharacters()).find((item) => item.npcId === input.npcId)
+    if (!character) throw new Error(`找不到绘图角色卡：${input.npcId}`)
+    const sourceText = input.sourceText
+      ?? (input.messageId ? session.messages.find((message) => message.id === input.messageId)?.content : undefined)
+      ?? [...session.messages].reverse().find((message) => message.role === 'assistant')?.content
+      ?? ''
+    const mode = input.mode ?? imageSettings.prompt.mode
+    let title = `${character.name}的场景`
+    let generatedPositive = ''
+    let generatedNegative = ''
+    let valid = true
+    if (mode === 'manual') {
+      generatedPositive = input.instruction?.trim() ?? ''
+      if (!generatedPositive) throw new Error('请输入希望生成的画面描述。')
+    } else if (mode === 'tagged') {
+      generatedPositive = extractTaggedImagePrompt(sourceText, imageSettings.prompt.triggerStart, imageSettings.prompt.triggerEnd)
+      if (!generatedPositive) throw new Error('当前回复中没有找到绘图标记，请改用智能整理或手动描述。')
+    } else {
+      const resources = resolveSessionResources(session, currentSettings, presets.length ? presets : await repository.listPresets(), lorebooks)
+      const effectiveApiConfig = applyPresetGenerationSettings(currentSettings.api, resources.preset.settings)
+      const api = createRemoteTavernApi(effectiveApiConfig, resolveApiKey(currentSettings))
+      const structured = await generateStructuredImagePrompt(api, {
+        session, character, lorebooks: resources.lorebooks, settings: imageSettings,
+        instruction: input.instruction, sourceText, variables: session.variables,
+      }, input.signal)
+      title = structured.title
+      generatedPositive = structured.positive
+      generatedNegative = structured.negative
+      valid = structured.valid
+    }
+    const preset = imageSettings.prompt.presets.find((item) => item.id === imageSettings.prompt.activePresetId) ?? imageSettings.prompt.presets[0]
+    if (!preset) throw new Error('当前没有可用的绘图提示词预设。')
+    const prompt = assembleImagePrompt({ generatedPositive, generatedNegative, preset, replacements: imageSettings.prompt.replacements })
+    return { title, positive: prompt.positive, negative: prompt.negative, valid }
+  }, [settings, repository, sessions, characters, presets, lorebooks])
+
+  const generateDialogueImage = useCallback(async (input: GenerateDialogueImageInput) => {
+    const currentSettings = settings ?? await repository.getSettings()
+    const imageSettings = currentSettings.imageGeneration
+    if (!imageSettings.enabled) throw new Error('对话绘图尚未启用，请先前往酒馆中枢的“绘图”页开启。')
+    const session = sessions.find((item) => item.id === input.sessionId) ?? await repository.getSession(input.sessionId)
+    if (!session) throw new Error('找不到用于绘图的酒馆会话。')
+    const character = characters.find((item) => item.npcId === input.npcId)
+      ?? (await repository.listCharacters()).find((item) => item.npcId === input.npcId)
+    if (!character) throw new Error(`找不到绘图角色卡：${input.npcId}`)
+    if (input.messageId && !input.prepared) {
+      const existing = imageJobs.find((job) => job.messageId === input.messageId && !['failed', 'cancelled', 'interrupted'].includes(job.status))
+        ?? (await imageRepository.listJobsForSession(session.id)).find((job) => job.messageId === input.messageId && !['failed', 'cancelled', 'interrupted'].includes(job.status))
+      if (existing) return existing
+    }
+    const prompt = input.prepared ?? await prepareDialogueImagePrompt(input)
+    setImageError(null)
+    try {
+      const job = await imageService.generate({
+        sessionId: session.id,
+        npcId: character.npcId,
+        messageId: input.messageId,
+        settings: imageSettings,
+        title: prompt.title,
+        positivePrompt: prompt.positive,
+        negativePrompt: prompt.negative,
+        credential: resolveImageProviderCredential(imageSettings.provider),
+        references: imageReferences,
+      })
+      await imageRepository.enforceCacheBudget(imageSettings.cache)
+      await refreshImageArchive()
+      if (job.status === 'failed') throw new Error(job.error || '绘图任务失败。')
+      return job
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : '绘图任务失败。'
+      setImageError(message)
+      await refreshImageArchive()
+      throw caught
+    }
+  }, [settings, repository, sessions, characters, imageJobs, imageRepository, imageService, refreshImageArchive, prepareDialogueImagePrompt, imageReferences])
+
+  const retryImageJob = useCallback(async (jobId: string) => {
+    const source = imageJobs.find((job) => job.id === jobId) ?? await imageRepository.getJob(jobId)
+    if (!source) throw new Error('找不到要重试的绘图任务。')
+    const currentSettings = settings ?? await repository.getSettings()
+    const retrySettings = { ...currentSettings.imageGeneration, provider: source.provider }
+    const job = await imageService.generate({
+      sessionId: source.sessionId, npcId: source.npcId, messageId: source.messageId,
+      settings: retrySettings, title: source.title, positivePrompt: source.positivePrompt,
+      negativePrompt: source.negativePrompt, credential: resolveImageProviderCredential(source.provider), retryOfJobId: source.id,
+      references: imageReferences,
+    })
+    await refreshImageArchive()
+    return job
+  }, [imageJobs, imageRepository, settings, repository, imageService, refreshImageArchive, imageReferences])
+
+  const cancelImageJob = useCallback(async (jobId: string) => {
+    await imageService.cancel(jobId)
+    await refreshImageArchive()
+  }, [imageService, refreshImageArchive])
+
+  const deleteImageAsset = useCallback(async (assetId: string) => {
+    await imageRepository.deleteAsset(assetId)
+    await refreshImageArchive()
+  }, [imageRepository, refreshImageArchive])
+
+  const deleteImageJob = useCallback(async (jobId: string) => {
+    await imageRepository.deleteJob(jobId)
+    await refreshImageArchive()
+  }, [imageRepository, refreshImageArchive])
+
+  const clearImageArchive = useCallback(async () => {
+    const activeJobs = await imageRepository.listActiveJobs()
+    await Promise.all(activeJobs.map((job) => imageService.cancel(job.id)))
+    await imageRepository.clearArchive()
+    await refreshImageArchive()
+  }, [imageRepository, imageService, refreshImageArchive])
+
+  const addImageReference = useCallback(async (file: File, kind: ImageReferenceKind) => {
+    if (!file.type.startsWith('image/') || !file.size || file.size > 20 * 1024 * 1024) {
+      throw new Error('参考图必须是 20 MB 以内的有效图片。')
+    }
+    await imageRepository.saveReference({
+      id: crypto.randomUUID(), name: file.name.slice(0, 120), kind, blob: file,
+      mimeType: file.type, bytes: file.size, strength: 0.6, informationExtracted: 1,
+      enabled: true, createdAt: Date.now(),
+    })
+    await refreshImageArchive()
+  }, [imageRepository, refreshImageArchive])
+
+  const deleteImageReference = useCallback(async (referenceId: string) => {
+    await imageRepository.deleteReference(referenceId)
+    await refreshImageArchive()
+  }, [imageRepository, refreshImageArchive])
+
+  const updateImageReference = useCallback(async (referenceId: string, patch: Partial<Pick<ImageGenerationReference, 'name' | 'kind' | 'strength' | 'informationExtracted' | 'enabled'>>) => {
+    const reference = imageReferences.find((item) => item.id === referenceId)
+    if (!reference) throw new Error('找不到要修改的参考图。')
+    await imageRepository.saveReference({
+      ...reference,
+      ...patch,
+      strength: Math.min(1, Math.max(0, patch.strength ?? reference.strength)),
+      informationExtracted: Math.min(1, Math.max(0, patch.informationExtracted ?? reference.informationExtracted)),
+    })
+    await refreshImageArchive()
+  }, [imageReferences, imageRepository, refreshImageArchive])
+
+  const testImageProvider = useCallback(async (provider?: ImageGenerationProvider, signal?: AbortSignal) => {
+    const currentSettings = settings ?? await repository.getSettings()
+    const selected = provider ?? currentSettings.imageGeneration.provider
+    const adapter = createImageProviderAdapters()[selected]
+    const result = await adapter.testConnection(currentSettings.imageGeneration, resolveImageProviderCredential(selected), signal)
+    return [result.label, ...(result.details ?? [])].join(' · ')
+  }, [settings, repository])
+
+  const listImageProviderResources = useCallback(async (settingsOverride?: ImageGenerationSettings, signal?: AbortSignal) => {
+    const currentSettings = settingsOverride ?? (settings ?? await repository.getSettings()).imageGeneration
+    const adapter = createImageProviderAdapters()[currentSettings.provider]
+    if (!adapter.listResources) throw new Error(`${adapter.label} 暂不提供资源列表，请手动填写模型参数。`)
+    return adapter.listResources(currentSettings, resolveImageProviderCredential(currentSettings.provider), signal)
+  }, [settings, repository])
+
+  const saveProviderCredential = useCallback((provider: ImageGenerationProvider, value: string, remember: boolean) => {
+    setImageProviderCredential(provider, value, remember)
+  }, [])
+
+  const removeProviderCredential = useCallback((provider: ImageGenerationProvider) => {
+    clearImageProviderCredential(provider)
+  }, [])
+
+  const hasProviderCredential = useCallback((provider: ImageGenerationProvider) => Boolean(resolveImageProviderCredential(provider)), [])
+
   const presentedSessions = useMemo(() => sessions.map((session) => session.userName === currentPlayerName ? session : { ...session, userName: currentPlayerName }), [sessions, currentPlayerName])
   const activeSession = presentedSessions.find((session) => session.id === settings?.activeSessionId) ?? null
   const apiLabel = settings
@@ -429,6 +678,10 @@ export function TavernProvider({ children, repository = tavernRepository, player
     characters,
     sessions: presentedSessions,
     requestAudits,
+    imageJobs,
+    imageAssets,
+    imageReferences,
+    imageError,
     settings,
     activeSession,
     openNpcSession,
@@ -447,7 +700,22 @@ export function TavernProvider({ children, repository = tavernRepository, player
     truncateSession,
     updateVariables,
     clearRequestAudits,
-  }), [status, error, apiLabel, apiReady, apiReadinessError, lorebooks, presets, characters, presentedSessions, requestAudits, settings, activeSession, openNpcSession, sendTurn, selectSession, persistSettings, saveLorebook, deleteLorebook, savePreset, deletePreset, saveCharacter, installWorkshopPackage, saveSession, deleteSession, branchSession, truncateSession, updateVariables, clearRequestAudits])
+    generateDialogueImage,
+    prepareDialogueImagePrompt,
+    retryImageJob,
+    cancelImageJob,
+    deleteImageAsset,
+    deleteImageJob,
+    clearImageArchive,
+    addImageReference,
+    updateImageReference,
+    deleteImageReference,
+    testImageProvider,
+    listImageProviderResources,
+    saveImageProviderCredential: saveProviderCredential,
+    clearImageProviderCredential: removeProviderCredential,
+    hasImageProviderCredential: hasProviderCredential,
+  }), [status, error, apiLabel, apiReady, apiReadinessError, lorebooks, presets, characters, presentedSessions, requestAudits, imageJobs, imageAssets, imageReferences, imageError, settings, activeSession, openNpcSession, sendTurn, selectSession, persistSettings, saveLorebook, deleteLorebook, savePreset, deletePreset, saveCharacter, installWorkshopPackage, saveSession, deleteSession, branchSession, truncateSession, updateVariables, clearRequestAudits, generateDialogueImage, prepareDialogueImagePrompt, retryImageJob, cancelImageJob, deleteImageAsset, deleteImageJob, clearImageArchive, addImageReference, updateImageReference, deleteImageReference, testImageProvider, listImageProviderResources, saveProviderCredential, removeProviderCredential, hasProviderCredential])
 
   return <TavernContext.Provider value={value}>{children}</TavernContext.Provider>
 }

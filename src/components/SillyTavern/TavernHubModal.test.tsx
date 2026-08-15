@@ -20,7 +20,7 @@ afterEach(async () => {
 })
 
 describe('酒馆中枢', () => {
-  it('提供八个可键盘切换的酒馆管理标签与真实接口入口', async () => {
+  it('提供九个可键盘切换的酒馆管理标签与真实接口入口', async () => {
     const user = userEvent.setup()
     database = createTavernDatabase(`mistvale-hub-${crypto.randomUUID()}`)
     render(
@@ -32,7 +32,7 @@ describe('酒馆中枢', () => {
     )
 
     const tabs = screen.getAllByRole('tab')
-    expect(tabs).toHaveLength(8)
+    expect(tabs).toHaveLength(9)
     expect(screen.getByRole('tab', { name: '接口' })).toHaveAttribute('id', 'tavern-tab-api')
     expect(await screen.findByText('浏览器直连提醒')).toBeVisible()
     expect(screen.getByLabelText('API 密钥')).toBeVisible()
@@ -47,6 +47,11 @@ describe('酒馆中枢', () => {
     expect(await screen.findByRole('button', { name: '导入预设' })).toBeVisible()
     expect(screen.getByRole('button', { name: '导出当前预设' })).toBeVisible()
     expect(screen.getByRole('heading', { name: '预设生成参数' })).toBeVisible()
+
+    await user.click(screen.getByRole('tab', { name: '绘图' }))
+    expect(await screen.findByRole('heading', { name: '对话绘图中枢' })).toBeVisible()
+    expect(screen.getByLabelText('绘图服务')).toBeVisible()
+    expect(screen.getByRole('button', { name: /保存绘图配置/ })).toBeVisible()
 
     await user.click(screen.getByRole('tab', { name: '角色卡' }))
     await waitFor(() => expect(screen.getAllByRole('button', { name: /编辑角色卡/ })).toHaveLength(21))
@@ -92,7 +97,7 @@ describe('酒馆中枢', () => {
     })
     const file = new File([fileSource], '夏瑾 天琴座 Beta 1.0.json', { type: 'application/json' })
     Object.defineProperty(file, 'text', { value: async () => fileSource })
-    await user.upload(screen.getByLabelText('选择预设 JSON'), file)
+    await user.upload(await screen.findByLabelText('选择预设 JSON'), file)
 
     expect(await screen.findByText(/已导入“夏瑾 天琴座 Beta 1\.0”：2 个顺序项，1 个已启用/)).toBeVisible()
     expect(screen.getByText('2 个顺序项')).toBeVisible()

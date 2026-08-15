@@ -20,6 +20,7 @@ import {
   type MistvaleTavernDefaults,
   type TavernSettings,
 } from './types'
+import { createDefaultImageGenerationSettings } from './image-generation/config'
 
 export {
   CALENDAR_FESTIVALS_ID,
@@ -367,6 +368,7 @@ export function createMistvaleDefaults(): MistvaleTavernDefaults {
     thinkingDisplay: 'fold',
     globalVariables: [],
     regexScripts: [],
+    imageGeneration: createDefaultImageGenerationSettings(),
     defaultContentVersion: DEFAULT_CONTENT_VERSION,
     updatedAt: now,
   }

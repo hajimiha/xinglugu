@@ -13,6 +13,8 @@ import { parseGalgameSegments, type GalgameSegment } from '../../tavern/galgame-
 import { GameIcon } from '../icons/GameIcon'
 import { getLocationBackground } from '../stage/location-scenes'
 import { HistoryDrawer } from './HistoryDrawer'
+import { DialogueImageGallery } from './DialogueImageGallery'
+import { extractTaggedImagePrompt } from '../../sillytavern/image-generation/prompt'
 
 const openingOptions: Record<string, string[]> = {
   loran: ['询问今日委托', '聊聊村庄近况', '暂时告辞'],
@@ -73,11 +75,13 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
   const [cinemaMode, setCinemaMode] = useState(false)
   const cinemaModeRef = useRef(false)
   const [interactionOpen, setInteractionOpen] = useState(false)
+  const [interactionTab, setInteractionTab] = useState<'conversation' | 'gallery'>('conversation')
   const interactionOpenRef = useRef(false)
   const [frameIndex, setFrameIndex] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const openingRef = useRef(false)
   const autoIntentRef = useRef<string | null>(null)
+  const autoImageAttemptedRef = useRef(new Set<string>())
   const abortRef = useRef<AbortController | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const dialogueRef = useRef<HTMLElement | null>(null)
@@ -215,6 +219,18 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
   const activeFrame = frames[Math.min(frameIndex, Math.max(0, frames.length - 1))]
   const portraitSource = card ? resolvePortraitSlot(card.portraitSlots, relationship.affinity)?.source : undefined
   const sceneBackground = getLocationBackground(state.location, state.minutes)
+
+  useEffect(() => {
+    const imageSettings = tavern.settings?.imageGeneration
+    if (!session || !lastAssistant || lastAssistant.apiUsed !== 'remote' || !imageSettings?.enabled || !imageSettings.auto.enabled) return
+    if (autoImageAttemptedRef.current.has(lastAssistant.id) || tavern.imageJobs.some((job) => job.messageId === lastAssistant.id)) return
+    const remoteReplies = session.messages.filter((message) => message.role === 'assistant' && message.apiUsed === 'remote').length
+    if (remoteReplies % imageSettings.auto.everyNthAssistantMessage !== 0) return
+    if (imageSettings.auto.requireTaggedPrompt && !extractTaggedImagePrompt(lastAssistant.content, imageSettings.prompt.triggerStart, imageSettings.prompt.triggerEnd)) return
+    autoImageAttemptedRef.current.add(lastAssistant.id)
+    void tavern.generateDialogueImage({ sessionId: session.id, npcId: npc.id, messageId: lastAssistant.id, sourceText: lastAssistant.content })
+      .catch(() => undefined)
+  }, [session, lastAssistant, tavern.settings?.imageGeneration, tavern.imageJobs, tavern.generateDialogueImage, npc.id])
 
   useEffect(() => {
     if (frames.length) setFrameIndex(frames.length - 1)
@@ -375,11 +391,15 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
         data-testid="dialogue-interaction-drawer"
       >
         <header className="dialogue-interaction-header">
-          <div><span>CONVERSATION DESK</span><strong>对话与行动</strong></div>
+          <div><span>CONVERSATION DESK</span><strong>{interactionTab === 'conversation' ? '对话与行动' : '场景绘图'}</strong></div>
+          <div className="dialogue-interaction-tabs" role="tablist" aria-label="互动面板内容">
+            <button id={`dialogue-interaction-conversation-${npc.id}`} role="tab" type="button" aria-selected={interactionTab === 'conversation'} aria-controls={`dialogue-interaction-panel-${npc.id}`} onClick={() => setInteractionTab('conversation')}><GameIcon name="chat" size={15} />对话</button>
+            <button id={`dialogue-interaction-gallery-${npc.id}`} role="tab" type="button" aria-selected={interactionTab === 'gallery'} aria-controls={`dialogue-interaction-panel-${npc.id}`} onClick={() => setInteractionTab('gallery')}><GameIcon name="image" size={15} />画廊</button>
+          </div>
           <button ref={interactionCloseRef} id={`dialogue-interaction-close-${npc.id}`} className="icon-button" type="button" aria-label="关闭对话互动面板" onClick={closeInteraction}><GameIcon name="close" size={17} /></button>
         </header>
 
-        <div ref={scrollRef} className="tavern-dialogue-scroll" data-testid="tavern-dialogue-scroll" role="region" aria-label="酒馆会话记录">
+        {interactionTab === 'conversation' ? <div id={`dialogue-interaction-panel-${npc.id}`} ref={scrollRef} className="tavern-dialogue-scroll" data-testid="tavern-dialogue-scroll" role="tabpanel" aria-label="酒馆会话记录">
         <div className="tavern-context-strip">
           <div><GameIcon name="memory" size={16} /><span>她记得</span><p>{relationship.memoryTags.length ? relationship.memoryTags.join(' · ') : '今天的话会成为第一笔共同记忆。'}</p></div>
           <div><GameIcon name="book" size={16} /><span>角色卡</span><p>{card ? `${card.role} · ${card.tags.slice(1).join(' · ')}` : '正在读取人物档案'}</p></div>
@@ -413,9 +433,9 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
         </div>
 
         {displayedError && <div className="tavern-dialogue-error" role="alert"><GameIcon name="warning" size={17} /><span>{displayedError}</span><button id={`dialogue-open-api-${npc.id}`} type="button" aria-label="打开接口设置" onClick={() => dispatch({ type: 'OPEN_MODAL', modal: 'tavern' })}>打开接口设置</button></div>}
-        </div>
+        </div> : <div id={`dialogue-interaction-panel-${npc.id}`} className="dialogue-image-scroll" role="tabpanel"><DialogueImageGallery sessionId={session?.id ?? ''} npcId={npc.id} latestMessageId={lastAssistant?.id} /></div>}
 
-        <form className="dialogue-composer tavern-composer" aria-label="自由输入对话" onSubmit={submit}>
+        {interactionTab === 'conversation' && <form className="dialogue-composer tavern-composer" aria-label="自由输入对话" onSubmit={submit}>
         <label htmlFor={`dialogue-input-${npc.id}`}>自由输入</label>
         <textarea id={`dialogue-input-${npc.id}`} value={input} maxLength={220} rows={2} disabled={working || !session || !tavern.apiReady} placeholder={tavern.apiReady ? '描述你的选择、问题或此刻的心情……' : '请先完成 API 接口配置'} onChange={(event) => setInput(event.target.value)} />
         <div>
@@ -424,7 +444,7 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
             ? <button id={`dialogue-stop-${npc.id}`} className="secondary-button" type="button" onClick={() => abortRef.current?.abort()}><GameIcon name="stop" size={16} />停止生成</button>
             : <button id={`dialogue-send-${npc.id}`} className="primary-button" type="submit" disabled={!input.trim() || !session || !tavern.apiReady}><GameIcon name="send" size={16} />送出话语</button>}
         </div>
-        </form>
+        </form>}
       </aside>
 
       {historyOpen && session && <HistoryDrawer session={session} onClose={() => setHistoryOpen(false)} onBranch={branch} onTruncate={truncate} />}

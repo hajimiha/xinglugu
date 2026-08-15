@@ -3,6 +3,7 @@ import { normalizeTavernSettings } from './api-config'
 import type { MistvaleTavernDatabase } from './database'
 import { tavernDatabase } from './database'
 import type { CharacterCard, ChatMessage, ChatPreset, ChatSession, Lorebook, ParsedTags, PromptTraceSegment, TavernRequestAudit, TavernSettings } from './types'
+import { createImageGenerationRepository, type ImageGenerationRepository } from './image-generation/repository'
 import { loadRepositoryContentPack, mergeById, type TavernContentPack } from './content-pack'
 import { createDefaultPortraitSlots, legacyPortraitsToSlots, parsePortraitSlots } from './portrait-slots'
 import { parseVariableDefinitions } from './variable-definitions'
@@ -215,6 +216,7 @@ export interface TavernRepository {
   listRequestAudits(): Promise<TavernRequestAudit[]>
   saveRequestAudit(value: TavernRequestAudit): Promise<void>
   clearRequestAudits(): Promise<void>
+  getImageGenerationRepository(): ImageGenerationRepository
 }
 
 class DexieTavernRepository implements TavernRepository {
@@ -222,6 +224,10 @@ class DexieTavernRepository implements TavernRepository {
     private readonly database: MistvaleTavernDatabase,
     private readonly contentPackLoader: TavernContentPackLoader,
   ) {}
+
+  getImageGenerationRepository(): ImageGenerationRepository {
+    return createImageGenerationRepository(this.database)
+  }
 
   async initialize(): Promise<void> {
     const defaults = createMistvaleDefaults()

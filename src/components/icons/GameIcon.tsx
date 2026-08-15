@@ -46,6 +46,9 @@ import {
   Confetti,
   MapPin,
   TextAa,
+  ImageSquare,
+  MagicWand,
+  ArrowClockwise,
 } from '@phosphor-icons/react'
 
 const icons = {
@@ -96,6 +99,9 @@ const icons = {
   festival: Confetti,
   location: MapPin,
   regex: TextAa,
+  image: ImageSquare,
+  wand: MagicWand,
+  retry: ArrowClockwise,
 }
 
 export type GameIconName = keyof typeof icons
