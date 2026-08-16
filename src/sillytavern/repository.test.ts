@@ -646,4 +646,33 @@ describe('雾灯谷酒馆仓储', () => {
     })
     expect(recovered?.portraitSlots[0].source).toBe('./portraits/player-mina.png')
   })
+
+  it('把版本九的人物世界书升级为立绘人设表格，同时保留玩家改写过的档案正文', async () => {
+    database = createTavernDatabase(`mistvale-profile-migration-${crypto.randomUUID()}`)
+    const repository = createTavernRepository(database)
+    await repository.initialize()
+    const settings = await repository.getSettings()
+    const book = (await repository.getLorebook(WORLD_RULES_ID))!
+    const loran = book.entries.find((item) => item.id === 'mistvale-person-loran')!
+    const mina = book.entries.find((item) => item.id === 'mistvale-person-mina')!
+    const legacyLoranContent = loran.content.split(' 人物速写：')[0].trimEnd()
+    const customMinaContent = '玩家重写后的弥奈档案，不应被人物表格迁移覆盖。'
+
+    await database.lorebooks.put({
+      ...book,
+      entries: book.entries.map((item) => {
+        if (item.id === 'mistvale-person-loran') return { ...item, content: legacyLoranContent }
+        if (item.id === 'mistvale-person-mina') return { ...item, content: customMinaContent }
+        return item
+      }),
+    })
+    await database.settings.put({ ...settings, defaultContentVersion: 9 })
+
+    await repository.initialize()
+
+    const migrated = (await repository.getLorebook(WORLD_RULES_ID))!
+    expect(migrated.entries.find((item) => item.id === 'mistvale-person-loran')?.content).toContain('黄铜叶脉书签')
+    expect(migrated.entries.find((item) => item.id === 'mistvale-person-mina')?.content).toBe(customMinaContent)
+    expect((await repository.getSettings()).defaultContentVersion).toBe(DEFAULT_CONTENT_VERSION)
+  })
 })

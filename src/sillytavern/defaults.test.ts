@@ -29,7 +29,7 @@ describe('性撸谷酒馆默认内容', () => {
     expect(defaults.presets[0].settings).not.toHaveProperty('apiKey')
     expect(defaults.presets[0].description).toContain('模型')
     expect(defaults.presets[0].description).not.toContain('本地剧情引擎')
-    expect(DEFAULT_CONTENT_VERSION).toBe(9)
+    expect(DEFAULT_CONTENT_VERSION).toBe(10)
     expect(defaults.characters.every((card) => card.portraitSlots[0]?.source === `./assets/portraits/generated/${card.npcId}.png`)).toBe(true)
   })
 

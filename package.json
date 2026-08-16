@@ -10,7 +10,8 @@
     "test": "vitest --environment jsdom",
     "test:run": "vitest run --environment jsdom",
     "validate:scenes": "node scripts/validate-scene-variants.mjs",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "generate:character-sheets": "node --experimental-strip-types scripts/generate-character-sheets.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.7",

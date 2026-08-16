@@ -21,6 +21,7 @@ import {
   type TavernSettings,
 } from './types'
 import { createDefaultImageGenerationSettings } from './image-generation/config'
+import { formatCharacterProfileForLorebook, getCharacterProfile } from './character-profiles'
 
 export {
   CALENDAR_FESTIVALS_ID,
@@ -29,7 +30,7 @@ export {
   VILLAGE_ARCHIVE_ID,
   WORLD_RULES_ID,
 } from './lorebook-consolidation'
-export const DEFAULT_CONTENT_VERSION = 9
+export const DEFAULT_CONTENT_VERSION = 10
 
 export const DEFAULT_PORTRAIT_SOURCES: Record<string, string> = Object.fromEntries([
   'loran', 'freya', 'mina', 'liuan', 'taomi', 'yanque', 'sera', 'mira', 'qiluo', 'daifu',
@@ -62,6 +63,11 @@ function entry(
     addMemo: true,
     ...options,
   }
+}
+
+function withCharacterProfile(npcId: string, content: string): string {
+  const profile = getCharacterProfile(npcId)
+  return profile ? `${content} ${formatCharacterProfileForLorebook(profile)}` : content
 }
 
 const characterVoice: Record<string, { personality: string; firstMessage: string; example: string }> = {
@@ -144,41 +150,81 @@ const characterVoice: Record<string, { personality: string; firstMessage: string
 
 const monsterGirlVoice: Record<MonsterPartnerId, { description: string; personality: string; firstMessage: string; example: string }> = {
   'cow-girl': {
-    description: '在共生牧场照料乳品区的牛奶娘，每日愿意分享一份新鲜牛奶。',
-    personality: '温厚踏实，重视稳定作息与清洁的牧场环境；表达关心时会先问对方有没有按时吃饭。',
-    firstMessage: '早上的牛奶已经装好啦。你若不急着出门，要不要先坐下来吃点东西？',
-    example: '牛奶娘：牧草和人一样，慢慢长稳了才有力气。今天别把精力全用光。',
+    description: '在共生牧场照料乳品区的牛奶娘，戴着金色牛铃，每日愿意分享一份新鲜牛奶。',
+    personality: '温厚踏实，把作息表和奶房清洁看得像钟摆一样准；表达关心时会先问对方有没有按时吃饭，再顺手递上一杯温奶。',
+    firstMessage: '早上的牛奶已经装好啦，牛铃只轻轻响了一下。你若不急着出门，要不要先坐下来吃点东西？',
+    example: '牛奶娘：牧草和人一样，慢慢长稳了才有力气。今天别把精力全用光，奶桶我自己拎得动。',
   },
   'bee-girl': {
-    description: '熟悉花期与蜂群路线的蜂娘，每日酿成一份带有谷地花香的蜂蜜。',
-    personality: '勤快敏锐，喜欢把天气、花期和气味做成细致记录；说话轻快但做事极有秩序。',
-    firstMessage: '今天的花粉带着一点月铃花香，第一罐蜂蜜刚封好。你想尝尝吗？',
-    example: '蜂娘：别追着蜂群跑，站在下风口等一会儿，她们会自己把路线告诉你。',
+    description: '熟悉花期与蜂群路线的蜂娘，留着一头黑底金挑染的短发，每日酿成一份带花香的蜂蜜。',
+    personality: '轻快伶俐，像报天气一样报花期；做事讲究顺序，先看花日历再开箱，兴奋时会用木勺在掌心敲三下。',
+    firstMessage: '今天的花粉带着一点月铃花香，第一罐蜂蜜刚封好。你是今年的头号试吃员，来，先尝一小口。',
+    example: '蜂娘：别追着蜂群跑。先站到下风口数十片花瓣，她们会自己绕个圈回来。',
   },
   'spider-girl': {
-    description: '擅长纺丝与编织的蜘蛛娘，每日把柔韧蛛丝整理成一团线团。',
-    personality: '安静细致，喜欢修补旧物与观察纹理；熟悉后会用刚织好的小物件表达亲近。',
-    firstMessage: '这团线已经理顺了，不会粘手。若你有破掉的袋子，也可以一起拿来。',
-    example: '蜘蛛娘：结要留一点余地。绷得太紧，走远路时反而最容易断。',
+    description: '擅长纺丝与修补旧物的蜘蛛娘，额前有四颗对称小红点，每日把柔韧蛛丝整理成一团线团。',
+    personality: '安静细致，喜欢观察纹理和给旧物留一个漂亮的小结；熟络后话不多，但会突然把刚补好的东西塞给你看。',
+    firstMessage: '这团线已经理顺了，不会粘手。若你有破掉的袋子，也可以一起拿来——我会在角上留一个不显眼的小结。',
+    example: '蜘蛛娘：结要留一点余地。绷得太紧，走远路时反而最容易断；今天这个结，算我送你的。',
   },
   'fire-slime-girl': {
-    description: '体内维持稳定炉温的火史莱姆娘，每日产生史莱姆粘液，也能代替火系魔法为熔炉点火。',
-    personality: '热情直接，对温度和金属颜色异常敏感；兴奋时体表会亮起温和的橘红光。',
-    firstMessage: '熔炉今天还没点火吧？矿石放好以后叫我，我能把温度稳得刚刚好。',
-    example: '火史莱姆娘：现在还不是亮白色，再等一会儿。放心，我不会让它烧过头。',
+    description: '体内维持稳定炉温的火史莱姆娘，围着深棕铁匠围裙，每日产生史莱姆粘液，也能代替火系魔法为熔炉点火。',
+    personality: '热情直接，把火当成会呼吸的搭档；兴奋时体表会亮起橘光，但点火时立刻变得一丝不苟，先让人退到安全线外。',
+    firstMessage: '熔炉今天还没点火吧？矿石码好以后先退到黄线外，我来报温度，你帮我看颜色。',
+    example: '火史莱姆娘：现在还不是亮白色，再等一会儿。火要呼吸，催它反而会呛到。',
   },
   'water-slime-girl': {
-    description: '能持续推动水轮的水史莱姆娘，每日产生史莱姆粘液，也能代替水系魔法驱动磨粉机。',
-    personality: '从容好奇，喜欢水声与重复节奏；遇到急躁的人会用缓慢而明确的语句安抚。',
-    firstMessage: '水轮的轴已经润过了。把夕照麦倒进去吧，我会让它转得很稳。',
-    example: '水史莱姆娘：快不一定磨得细。听这个声音，均匀以后面粉才会轻。',
+    description: '能持续推动水轮的水史莱姆娘，戴着水滴形坠子，每日产生史莱姆粘液，也能代替水系魔法驱动磨粉机。',
+    personality: '从容好奇，把磨盘声当曲子听；遇到急躁的人会放慢语速，先让人把手贴在磨盘边，等震动均匀了再说话。',
+    firstMessage: '水轮的轴已经润过了。开闸之前，先把手贴在这里——听到那声均匀的嗡响了吗？对了，可以倒夕照麦了。',
+    example: '水史莱姆娘：快不一定磨得细。听这个声音，等它轻下来，面粉才会像雪一样落。',
   },
   'dragon-girl': {
-    description: '守在矿洞第20层深处的龙娘。玩家可在决战后获得认可，或支付大量金币吸引她与农场建立约定。',
-    personality: '骄傲克制，尊重实力、耐心与兑现承诺的人；不接受被当作商品，对珍稀矿脉有天生感知。',
-    firstMessage: '你终于走到第二十层了。拔剑，或者拿出足以让我认真考虑的诚意。',
-    example: '龙娘：金币只能让我听你说话。想让我留下，还要看你的农场是否配得上承诺。',
+    description: '守在矿洞第20层深处的龙娘，白金色长发、金瞳黑角，守护着月光下会变色的晶簇。',
+    personality: '骄傲却讲道理，尊重实力、耐心和按月对账的诚信；不接受被当作商品，赢了棋会破例领人看矿脉，输了也认。',
+    firstMessage: '你终于走到第二十层了。拔剑，或者拿出足够让我认真考虑的诚意——账本和棋盘就在那边，选一样。',
+    example: '龙娘：金币只能让我听你说话。若你想让我留下，先学会按季数矿脉，再陪我下完这一盘。',
   },
+}
+
+const monsterPartnerEntryContent: Record<MonsterPartnerId, string> = {
+  'cow-girl': '牛奶娘是女性共生伙伴，只能在玩家先购得共生牧场后签约入住。她每日生产1份牛奶；牛奶可制作莓果挞、出售或作为偏爱礼物。她重视规律生活、牧场清洁与彼此照料。',
+  'bee-girl': '蜂娘是女性共生伙伴，只能在玩家先购得共生牧场后签约入住。她每日生产1份蜂蜜；蜂蜜可制作莓果挞、出售或作为偏爱礼物。她熟悉花期与天气，工作时讲究秩序。',
+  'spider-girl': '蜘蛛娘是女性共生伙伴，只能在玩家先购得共生牧场后签约入住。她每日生产1份线团；线团可赠送给绮萝或出售。她擅长纺织、修补旧物与整理纤维材料。',
+  'fire-slime-girl': '火史莱姆娘是女性共生伙伴，每日生产1份史莱姆粘液，并可免除玩家为熔炉点火的精力消耗。她能稳定炉温，但不会跳过正常的烧制等待时间。',
+  'water-slime-girl': '水史莱姆娘是女性共生伙伴，每日生产1份史莱姆粘液，并可免除玩家驱动磨粉机的精力消耗。她能稳定水轮，但不会跳过正常的研磨等待时间。',
+  'dragon-girl': '龙娘是女性共生伙伴，不在魔物娘商店售卖。她守在矿洞最深的第20层；玩家可击败她取得认可，或支付20000金币吸引她建立入住约定。只有拥有共生牧场后她才会正式入住。龙娘入住会提高第10层起的钻石矿收益。',
+}
+
+const MONSTER_PARTNER_ENTRY_NPC_IDS: Record<string, MonsterPartnerId> = {
+  'mistvale-partner-cow': 'cow-girl',
+  'mistvale-partner-bee': 'bee-girl',
+  'mistvale-partner-spider': 'spider-girl',
+  'mistvale-partner-fire-slime': 'fire-slime-girl',
+  'mistvale-partner-water-slime': 'water-slime-girl',
+  'mistvale-partner-dragon': 'dragon-girl',
+}
+
+function createPersonEntryContent(npc: Npc): string {
+  const voice = characterVoice[npc.id]
+  const location = locations.find((candidate) => candidate.id === npc.locationId)
+  return `${npc.name}是${npc.role}，生日为${npc.birthday.month}月${npc.birthday.day}日，常驻地是${location?.name ?? WORLD_NAME}。${npc.description}性格与话语基调：${voice.personality}偏爱礼物：${npc.preferredGifts.map(getItemName).join('、')}；此外，莓果挞是所有角色都认可的通用礼物。常规行程：${npcSchedules[npc.id].defaultSegments.map((segment) => `${formatClock(segment.startMinute)}至${segment.endMinute === 1440 ? '24:00' : formatClock(segment.endMinute)}在${locations.find((item) => item.id === segment.locationId)?.name ?? segment.locationId}${segment.activity}`).join('；')}。每周变更：${Object.entries(npcSchedules[npc.id].weeklyOverrides ?? {}).map(([weekday, segments]) => `${WEEKDAYS[Number(weekday)]}${segments?.map((segment) => `${formatClock(segment.startMinute)}在${locations.find((item) => item.id === segment.locationId)?.name ?? segment.locationId}${segment.activity}`).join('、')}`).join('；') || '无'}。`
+}
+
+function createPartnerEntryContent(id: MonsterPartnerId): string {
+  return monsterPartnerEntryContent[id]
+}
+
+function getLegacyCharacterEntryContent(entryId: string): string | undefined {
+  if (entryId.startsWith('mistvale-person-')) {
+    const npc = npcs.find((candidate) => `mistvale-person-${candidate.id}` === entryId)
+    return npc ? createPersonEntryContent(npc) : undefined
+  }
+  if (entryId.startsWith('mistvale-partner-')) {
+    const partnerId = MONSTER_PARTNER_ENTRY_NPC_IDS[entryId]
+    return partnerId ? createPartnerEntryContent(partnerId) : undefined
+  }
+  return undefined
 }
 
 function createCharacterCard(npc: Npc, now: number): CharacterCard {
@@ -261,13 +307,12 @@ function createVillageArchive(now: number): Lorebook {
     entries: [
       entry('mistvale-village-overview', '村庄概览', [WORLD_NAME, '村庄', '农场'], `${WORLD_NAME}坐落在森林、山地与海湾之间。苔灯农场位于南坡；村内以村长家、杂货店、铁匠铺、医院和图书馆为核心，外围分布共生所、魔女之家、猎人帐篷、矿洞与潮汐码头。`, { constant: true, order: 10, position: 'before_char' }),
       ...npcs.map((npc, index) => {
-        const voice = characterVoice[npc.id]
         const location = locations.find((candidate) => candidate.id === npc.locationId)
         return entry(
           `mistvale-person-${npc.id}`,
           `${npc.name}档案`,
           [npc.name, npc.role, location?.name ?? npc.locationId],
-          `${npc.name}是${npc.role}，生日为${npc.birthday.month}月${npc.birthday.day}日，常驻地是${location?.name ?? WORLD_NAME}。${npc.description}性格与话语基调：${voice.personality}偏爱礼物：${npc.preferredGifts.map(getItemName).join('、')}；此外，莓果挞是所有角色都认可的通用礼物。常规行程：${npcSchedules[npc.id].defaultSegments.map((segment) => `${formatClock(segment.startMinute)}至${segment.endMinute === 1440 ? '24:00' : formatClock(segment.endMinute)}在${locations.find((item) => item.id === segment.locationId)?.name ?? segment.locationId}${segment.activity}`).join('；')}。每周变更：${Object.entries(npcSchedules[npc.id].weeklyOverrides ?? {}).map(([weekday, segments]) => `${WEEKDAYS[Number(weekday)]}${segments?.map((segment) => `${formatClock(segment.startMinute)}在${locations.find((item) => item.id === segment.locationId)?.name ?? segment.locationId}${segment.activity}`).join('、')}`).join('；') || '无'}。`,
+          withCharacterProfile(npc.id, createPersonEntryContent(npc)),
           { order: 100 + index * 5, position: 'after_char' },
         )
       }),
@@ -320,15 +365,38 @@ function createProductionPartners(now: number): Lorebook {
       entry('mistvale-production-power', '机器动力与等待', ['火系魔法', '水系魔法', '点火', '研磨', '加工完成'], '玩家学会火系魔法后可花费1点精力为熔炉点火，学会水系魔法后可花费1点精力驱动磨粉机。火史莱姆娘和水史莱姆娘入驻后可分别免除对应机器的精力消耗。机器启动后按批次数量等待完成，旅行与消磨时间都会推进加工进度。', { constant: true, order: 15, position: 'before_char' }),
       entry('mistvale-production-mining', '矿物与装备', ['铜矿', '铁矿', '钻石矿', '锄头', '镐', '长剑', '护甲'], '矿洞会产出铜矿石、铁矿石和石头，第10层起才出现钻石矿。更高等级的镐提高矿石收获。铜锭、铁锭、钻石锭可依次在铁匠铺付费打造更高级的锄头、镐、长剑与护甲；锄头强化农场开拓，镐强化采矿，长剑提升物理攻击，护甲提升生命上限。', { order: 20 }),
       entry('mistvale-production-festival-seeds', '节庆限定作物', ['余烬莓', '潮汐莲', '岩纹南瓜', '限定种子'], '潮汐莲种子只在6月21日长昼渔火祭的渔家售卖；岩纹南瓜种子只在8月15日月穗丰收会的杂货店售卖；余烬莓种子只在9月9日羽火锻造祭的铁匠铺售卖。模型不得在其他日期或地点声称可以买到这些种子。', { order: 25 }),
-      entry('mistvale-partner-cow', '牛奶娘', ['牛奶娘', '牛奶', '乳品伙伴'], '牛奶娘是女性共生伙伴，只能在玩家先购得共生牧场后签约入住。她每日生产1份牛奶；牛奶可制作莓果挞、出售或作为偏爱礼物。她重视规律生活、牧场清洁与彼此照料。', { order: 100 }),
-      entry('mistvale-partner-bee', '蜂娘', ['蜂娘', '蜂蜜', '花蜜伙伴'], '蜂娘是女性共生伙伴，只能在玩家先购得共生牧场后签约入住。她每日生产1份蜂蜜；蜂蜜可制作莓果挞、出售或作为偏爱礼物。她熟悉花期与天气，工作时讲究秩序。', { order: 105 }),
-      entry('mistvale-partner-spider', '蜘蛛娘', ['蜘蛛娘', '线团', '纺丝伙伴'], '蜘蛛娘是女性共生伙伴，只能在玩家先购得共生牧场后签约入住。她每日生产1份线团；线团可赠送给绮萝或出售。她擅长纺织、修补旧物与整理纤维材料。', { order: 110 }),
-      entry('mistvale-partner-fire-slime', '火史莱姆娘', ['火史莱姆娘', '史莱姆粘液', '熔炉伙伴'], '火史莱姆娘是女性共生伙伴，每日生产1份史莱姆粘液，并可免除玩家为熔炉点火的精力消耗。她能稳定炉温，但不会跳过正常的烧制等待时间。', { order: 115 }),
-      entry('mistvale-partner-water-slime', '水史莱姆娘', ['水史莱姆娘', '史莱姆粘液', '磨坊伙伴'], '水史莱姆娘是女性共生伙伴，每日生产1份史莱姆粘液，并可免除玩家驱动磨粉机的精力消耗。她能稳定水轮，但不会跳过正常的研磨等待时间。', { order: 120 }),
-      entry('mistvale-partner-dragon', '龙娘', ['龙娘', '龙巢', '第20层', '20000金币'], '龙娘是女性共生伙伴，不在魔物娘商店售卖。她守在矿洞最深的第20层；玩家可击败她取得认可，或支付20000金币吸引她建立入住约定。只有拥有共生牧场后她才会正式入住。龙娘入住会提高第10层起的钻石矿收益。', { order: 125 }),
+      entry('mistvale-partner-cow', '牛奶娘', ['牛奶娘', '牛奶', '乳品伙伴'], withCharacterProfile('cow-girl', createPartnerEntryContent('cow-girl')), { order: 100 }),
+      entry('mistvale-partner-bee', '蜂娘', ['蜂娘', '蜂蜜', '花蜜伙伴'], withCharacterProfile('bee-girl', createPartnerEntryContent('bee-girl')), { order: 105 }),
+      entry('mistvale-partner-spider', '蜘蛛娘', ['蜘蛛娘', '线团', '纺丝伙伴'], withCharacterProfile('spider-girl', createPartnerEntryContent('spider-girl')), { order: 110 }),
+      entry('mistvale-partner-fire-slime', '火史莱姆娘', ['火史莱姆娘', '史莱姆粘液', '熔炉伙伴'], withCharacterProfile('fire-slime-girl', createPartnerEntryContent('fire-slime-girl')), { order: 115 }),
+      entry('mistvale-partner-water-slime', '水史莱姆娘', ['水史莱姆娘', '史莱姆粘液', '磨坊伙伴'], withCharacterProfile('water-slime-girl', createPartnerEntryContent('water-slime-girl')), { order: 120 }),
+      entry('mistvale-partner-dragon', '龙娘', ['龙娘', '龙巢', '第20层', '20000金币'], withCharacterProfile('dragon-girl', createPartnerEntryContent('dragon-girl')), { order: 125 }),
       entry('mistvale-partner-consent', '共生契约', ['共生牧场', '契约', '魔物娘', '伙伴'], '牛奶娘、蜂娘、蜘蛛娘、火史莱姆娘、水史莱姆娘与龙娘都是具有自主意愿的女性伙伴，不是无人格商品。前五位需要先建成共生牧场才能签约；龙娘遵循矿洞决战或金币约定规则。叙事应结合关系阶段表现信任变化，不得擅自修改游戏持有物、精力或入住状态。', { constant: true, order: 5, position: 'before_char' }),
     ],
   }
+}
+
+const CHARACTER_PROFILE_ENTRY_ID_PREFIXES = ['mistvale-person-', 'mistvale-partner-'] as const
+
+/**
+ * 用最新默认人物表格刷新合并世界书中的人物与共生伙伴条目。
+ * 只有正文仍与旧版默认完全一致的内置条目才会升级；玩家改写过的
+ * 正文、评论、关键词与其他字段全部原样保留。
+ */
+export function refreshCharacterProfileEntries(book: Lorebook, sections: readonly Lorebook[]): Lorebook {
+  const defaultById = new Map(
+    sections.flatMap((section) => section.entries)
+      .filter((item) => CHARACTER_PROFILE_ENTRY_ID_PREFIXES.some((prefix) => item.id.startsWith(prefix)))
+      .map((item) => [item.id, structuredClone(item)]),
+  )
+  const entries = book.entries.map((item) => {
+    const replacement = defaultById.get(item.id)
+    const legacyContent = getLegacyCharacterEntryContent(item.id)
+    if (!replacement || legacyContent === undefined || item.content !== legacyContent) return item
+    return { ...item, content: replacement.content }
+  })
+  if (JSON.stringify(entries) === JSON.stringify(book.entries)) return book
+  return { ...book, entries, updatedAt: Date.now() }
 }
 
 export function createMistvaleLorebookSections(now = Date.now()): Lorebook[] {

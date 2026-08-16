@@ -1,4 +1,4 @@
-import { createMistvaleDefaults, createMistvaleLorebookSections, DEFAULT_CONTENT_VERSION, DEFAULT_PRESET_ID, MONSTER_GIRL_CARD_IDS } from './defaults'
+import { createMistvaleDefaults, createMistvaleLorebookSections, DEFAULT_CONTENT_VERSION, DEFAULT_PRESET_ID, MONSTER_GIRL_CARD_IDS, refreshCharacterProfileEntries } from './defaults'
 import { normalizeTavernSettings } from './api-config'
 import type { MistvaleTavernDatabase } from './database'
 import { tavernDatabase } from './database'
@@ -252,6 +252,7 @@ class DexieTavernRepository implements TavernRepository {
         const shouldConsolidateLorebooks = storedContentVersion < 7
         const shouldMigrateBranding = storedContentVersion < 8
         const shouldMigrateGeneratedPortraits = storedContentVersion < 9
+        const shouldMigrateCharacterProfiles = storedContentVersion < 10
         const shouldMigrateDefaults = storedContentVersion < DEFAULT_CONTENT_VERSION
         const migrationLorebookIds = [
           ...(shouldMigrateCalendar ? [CALENDAR_FESTIVALS_ID] : []),
@@ -298,6 +299,10 @@ class DexieTavernRepository implements TavernRepository {
         if (shouldMigrateBranding) {
           const systemBook = await this.database.lorebooks.get(WORLD_RULES_ID)
           if (systemBook) await this.database.lorebooks.put(migrateSystemBranding(systemBook))
+        }
+        if (shouldMigrateCharacterProfiles) {
+          const systemBook = await this.database.lorebooks.get(WORLD_RULES_ID)
+          if (systemBook) await this.database.lorebooks.put(refreshCharacterProfileEntries(systemBook, defaultLorebookSections))
         }
         if ((await this.database.presets.count()) === 0) {
           await this.database.presets.bulkAdd(mergeById(defaults.presets, contentPack?.presets ?? []))
