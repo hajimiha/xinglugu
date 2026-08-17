@@ -26,6 +26,7 @@
 ## 2026-08-09 · Phase 16 严格酒馆核心重构
 - 用户实测认为导入预设未进入模型请求；本轮验收边界必须是捕获真实 `fetch` 请求体并逐条证明预设提示词、角色、顺序、采样参数和变量替换结果，而不是只验证编辑器中可见。
 - `ariespo/tavernlike` skill 已安装于 `C:/Users/qixin/.codex/skills/tavernlike`，其 React 工作流明确要求活动预设参与 `assemblePrompt`，装配后的 `promptMessages` 直接作为 API `messages`，并应用预设采样参数。
+- 用户要求的预设中正则、变量管理与 AI 思维内容；将只呈现模型供应商实际返回的 `reasoning_content`/等价字段或正文中的 `<thinking>/<think>`，不宣称能够读取服务端未返回的隐藏思维链。
 - 用户此前明确授权前端设计无需再询问、按推荐方案执行；本轮据此选择“单一可审计提示词编译器 + 四个管理中心 + 出站请求检查器”的推荐方案并直接执行。
 - 当前持久计划的 Phase 15 状态落后于已推送提交 `ee9dee0`；已依据 48 文件/230 测试、生产构建和浏览器验收记录将其纠正为完成。
 - 当前真实链路为 `TavernContext.sendTurn → createRemoteTurn → assemblePrompt → api.prepare → buildProviderRequest`；装配结果确实被交给供应商请求构造器，但系统没有保存或展示最终编译产物，用户无法判断哪一条预设实际发送。
