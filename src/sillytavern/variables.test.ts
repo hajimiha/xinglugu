@@ -19,10 +19,14 @@ describe('variables aggregator', () => {
         { id: 'user', role: 'user', content: '开始', timestamp: 1, variables: { hp: 10 } },
         { id: 'assistant', role: 'assistant', content: '回应', timestamp: 2, variablesAfter: { hp: 8 } },
       ],
+      npcId: 'loran', participantNpcIds: ['loran', 'freya'],
       characterName: '角色', userName: '玩家', presetId: null, lorebookIds: [], variables: { hp: 8 }, createdAt: 1, updatedAt: 2,
     };
 
-    expect(branchChat(source, 1, { name: '分支', presetId: null, lorebookIds: [] }).variables).toEqual({ hp: 8 });
+    const branch = branchChat(source, 1, { name: '分支', presetId: null, lorebookIds: [] });
+    expect(branch.variables).toEqual({ hp: 8 });
+    expect(branch.participantNpcIds).toEqual(['loran', 'freya']);
+    expect(branch.participantNpcIds).not.toBe(source.participantNpcIds);
     expect(truncateChatAt(source, 2).variables).toEqual({ hp: 8 });
   });
 

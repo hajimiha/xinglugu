@@ -250,6 +250,7 @@ export interface ChatSession {
   messages: ChatMessage[]
   characterId?: string
   npcId?: string
+  participantNpcIds?: string[]
   branchFromSessionId?: string
   characterName: string
   userName: string

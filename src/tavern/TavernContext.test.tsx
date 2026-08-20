@@ -47,6 +47,80 @@ async function openProvider(repository = createTavernRepository(database!)) {
 }
 
 describe('酒馆会话持久化边界', () => {
+  it('initializes a new NPC session with the primary participant', async () => {
+    database = createTavernDatabase(`mistvale-context-participant-${crypto.randomUUID()}`)
+
+    const { repository, session } = await openProvider()
+
+    expect(session.participantNpcIds).toEqual(['loran'])
+    expect((await repository.getSession(session.id))?.participantNpcIds).toEqual(['loran'])
+  })
+
+  it('feeds saved group participants, runtime identity and participant lorebooks into one turn', async () => {
+    database = createTavernDatabase(`mistvale-context-group-${crypto.randomUUID()}`)
+    const repository = createTavernRepository(database)
+    await repository.initialize()
+    const characters = await repository.listCharacters()
+    const loran = characters.find((candidate) => candidate.npcId === 'loran')!
+    const freya = characters.find((candidate) => candidate.npcId === 'freya')!
+    const baseBook = (await repository.listLorebooks())[0]
+    const groupBook = {
+      ...structuredClone(baseBook),
+      id: 'group-participant-lorebook',
+      name: '受邀角色专属设定',
+      entries: [{
+        ...structuredClone(baseBook.entries[0]),
+        id: 'group-participant-entry',
+        content: 'GROUP-PARTICIPANT-LORE-SENTINEL',
+        keys: [],
+        secondaryKeys: [],
+        constant: true,
+        disabled: false,
+        excluded: false,
+      }],
+      createdAt: 1,
+      updatedAt: 1,
+    }
+    await repository.saveLorebook(groupBook)
+    await repository.saveCharacter({
+      ...freya,
+      description: 'GROUP-FREYA-PROFILE-SENTINEL',
+      lorebookIds: [groupBook.id],
+    })
+    await repository.saveSession({
+      id: 'group-session',
+      name: '多人会话',
+      npcId: 'loran',
+      participantNpcIds: ['loran', 'freya'],
+      characterId: loran.id,
+      characterName: loran.name,
+      userName: '云岚',
+      presetId: null,
+      presetBinding: { mode: 'follow-active' },
+      lorebookIds: [...loran.lorebookIds],
+      variables: {},
+      messages: [{ id: 'opening', role: 'assistant', content: loran.firstMessage, timestamp: 1 }],
+      createdAt: 1,
+      updatedAt: Date.now() + 100,
+    })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response('多人回应')))
+
+    const { session, tavern } = await openProvider(repository)
+    const next = await tavern.sendTurn({ sessionId: session.id, npcId: 'loran', playerText: '一起讨论药草园。' })
+
+    const audit = (await repository.listRequestAudits())[0]
+    const preparedText = audit.preparedRequest.messages.map((message) => message.content).join('\n')
+    expect(preparedText).toContain('GROUP-FREYA-PROFILE-SENTINEL')
+    expect(preparedText).toContain('GROUP-PARTICIPANT-LORE-SENTINEL')
+    expect(preparedText).toContain('允许发言的 NPC 姓名')
+    expect(audit.characterName).toBe('洛岚、芙蕾雅')
+    expect(next.messages.at(-2)?.variables).toMatchObject({
+      dialogueMode: 'multi-character',
+      dialogueParticipantNames: '洛岚、芙蕾雅',
+      dialogueParticipantCount: 2,
+    })
+  })
+
   it('persists merged variables for an existing opening and retains them after reload', async () => {
     database = createTavernDatabase(`mistvale-context-opening-${crypto.randomUUID()}`)
     const repository = createTavernRepository(database)

@@ -78,6 +78,89 @@ describe('远程酒馆剧情引擎', () => {
     expect(preparedText).toContain('<scene speaker="narrator">')
     expect(preparedText).toContain('<scene speaker="npc" name="洛岚">')
     expect(preparedText).toContain('<scene speaker="player" name="云岚">')
+    expect(preparedText).not.toContain('允许发言的 NPC 姓名')
+  })
+
+  it('多人会话注入每名角色资料、精确姓名白名单和对应分镜示例', async () => {
+    const defaults = createMistvaleDefaults()
+    const loran = defaults.characters.find((item) => item.npcId === 'loran')!
+    const freya = defaults.characters.find((item) => item.npcId === 'freya')!
+    const participants = [
+      {
+        ...loran,
+        role: '主角色身份',
+        description: '主角色背景资料',
+        personality: '主角色性格资料',
+        scenario: '主角色场景资料',
+        exampleDialogue: '主角色示例对话',
+      },
+      {
+        ...freya,
+        role: '受邀角色身份',
+        description: '受邀角色背景资料',
+        personality: '受邀角色性格资料',
+        scenario: '受邀角色场景资料',
+        exampleDialogue: '受邀角色示例对话',
+      },
+    ]
+    const { adapter, prepare } = createAdapter('<maintext><scene speaker="npc" name="芙蕾雅">我带来了药草。</scene></maintext><vars>{}</vars>')
+
+    await createRemoteTurn({
+      api: adapter,
+      playerText: '邀请芙蕾雅一起商量。',
+      history: [],
+      preset: defaults.presets[0],
+      lorebooks: defaults.lorebooks,
+      character: participants[0],
+      participants,
+      userName: '云岚',
+      variables: {},
+      formatPrompt: defaults.settings.formatPromptTemplate,
+    })
+
+    const preparedText = prepare.mock.calls[0]?.[0].messages.map((message: { content: string }) => message.content).join('\n') ?? ''
+    expect(preparedText).toContain('允许发言的 NPC 姓名')
+    expect(preparedText).toContain('洛岚、芙蕾雅')
+    expect(preparedText).toContain('<scene speaker="npc" name="洛岚">')
+    expect(preparedText).toContain('<scene speaker="npc" name="芙蕾雅">')
+    expect(preparedText).toContain('主角色身份')
+    expect(preparedText).toContain('主角色背景资料')
+    expect(preparedText).toContain('主角色性格资料')
+    expect(preparedText).toContain('主角色场景资料')
+    expect(preparedText).toContain('主角色示例对话')
+    expect(preparedText).toContain('受邀角色身份')
+    expect(preparedText).toContain('受邀角色背景资料')
+    expect(preparedText).toContain('受邀角色性格资料')
+    expect(preparedText).toContain('受邀角色场景资料')
+    expect(preparedText).toContain('受邀角色示例对话')
+  })
+
+  it('多人分镜示例会转义可导入角色名中的 XML 特殊字符', async () => {
+    const defaults = createMistvaleDefaults()
+    const primary = defaults.characters.find((item) => item.npcId === 'loran')!
+    const invited = {
+      ...defaults.characters.find((item) => item.npcId === 'freya')!,
+      name: '芙<蕾&"雅',
+    }
+    const { adapter, prepare } = createAdapter('<maintext><scene speaker="narrator">夜色渐深。</scene></maintext><vars>{}</vars>')
+
+    await createRemoteTurn({
+      api: adapter,
+      playerText: '继续交谈。',
+      history: [],
+      preset: defaults.presets[0],
+      lorebooks: defaults.lorebooks,
+      character: primary,
+      participants: [primary, invited],
+      userName: '云岚',
+      variables: {},
+      formatPrompt: defaults.settings.formatPromptTemplate,
+    })
+
+    const preparedText = prepare.mock.calls[0]?.[0].messages.map((message: { content: string }) => message.content).join('\n') ?? ''
+    expect(preparedText).toContain('name="芙&lt;蕾&amp;&quot;雅"')
+    expect(preparedText).toContain('>芙&lt;蕾&amp;&quot;雅符合自身设定的台词</scene>')
+    expect(preparedText).not.toContain('>芙<蕾&"雅符合自身设定的台词</scene>')
   })
 
   it('模型未输出标签时仍将原始文字作为正文', async () => {

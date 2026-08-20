@@ -8,6 +8,7 @@ import { loadRepositoryContentPack, mergeById, type TavernContentPack } from './
 import { createDefaultPortraitSlots, legacyPortraitsToSlots, parsePortraitSlots } from './portrait-slots'
 import { parseVariableDefinitions } from './variable-definitions'
 import { migrateSystemBranding } from './branding-migration'
+import { normalizeSessionParticipantIds } from './session-participants'
 import {
   CALENDAR_FESTIVALS_ID,
   consolidateMistvaleLorebooks,
@@ -158,6 +159,10 @@ export function normalizeStoredSession(value: ChatSession): ChatSession {
     messages,
     ...(typeof raw.characterId === 'string' ? { characterId: raw.characterId } : { characterId: undefined }),
     ...(typeof raw.npcId === 'string' ? { npcId: raw.npcId } : { npcId: undefined }),
+    participantNpcIds: normalizeSessionParticipantIds(
+      typeof raw.npcId === 'string' ? raw.npcId : undefined,
+      raw.participantNpcIds,
+    ),
     ...(typeof raw.branchFromSessionId === 'string' ? { branchFromSessionId: raw.branchFromSessionId } : { branchFromSessionId: undefined }),
     characterName: typeof raw.characterName === 'string' ? raw.characterName : '未知角色',
     userName: typeof raw.userName === 'string' ? raw.userName : '旅行者',

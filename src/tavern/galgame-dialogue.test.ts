@@ -36,4 +36,26 @@ describe('Galgame 对话分镜解析', () => {
       { speaker: 'player', name: '云岚', text: '我把礼物递给她。' },
     ])
   })
+
+  it('保留白名单内的受邀 NPC 结构化署名，并把未知姓名安全回退为主角色', () => {
+    expect(parseGalgameSegments([
+      '<scene speaker="npc" name="芙蕾雅">药草园需要帮手。</scene>',
+      '<scene speaker="npc" name="陌生人">我不应出现在舞台上。</scene>',
+    ].join('\n'), {
+      npcName: '洛岚', npcNames: ['洛岚', '芙蕾雅'], playerName: '云岚',
+    })).toEqual([
+      { speaker: 'npc', name: '芙蕾雅', text: '药草园需要帮手。' },
+      { speaker: 'npc', name: '洛岚', text: '我不应出现在舞台上。' },
+    ])
+  })
+
+  it('识别受邀 NPC 的中文署名，同时继续规范化玩家和旁白', () => {
+    expect(parseGalgameSegments('芙蕾雅：我带来了药草。\n云岚：辛苦了。\n旁白：门外的风铃轻响。', {
+      npcName: '洛岚', npcNames: ['洛岚', '芙蕾雅'], playerName: '云岚',
+    })).toEqual([
+      { speaker: 'npc', name: '芙蕾雅', text: '我带来了药草。' },
+      { speaker: 'player', name: '云岚', text: '辛苦了。' },
+      { speaker: 'narrator', name: '旁白', text: '门外的风铃轻响。' },
+    ])
+  })
 })

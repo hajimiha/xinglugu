@@ -49,6 +49,7 @@ import {
   ImageSquare,
   MagicWand,
   ArrowClockwise,
+  UserPlus,
 } from '@phosphor-icons/react'
 
 const icons = {
@@ -102,6 +103,7 @@ const icons = {
   image: ImageSquare,
   wand: MagicWand,
   retry: ArrowClockwise,
+  invite: UserPlus,
 }
 
 export type GameIconName = keyof typeof icons

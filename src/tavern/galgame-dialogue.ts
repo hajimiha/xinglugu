@@ -8,6 +8,7 @@ export interface GalgameSegment {
 
 interface GalgameParseContext {
   npcName: string
+  npcNames?: string[]
   playerName: string
 }
 
@@ -33,6 +34,9 @@ function stripMarkup(text: string): string {
 }
 
 export function parseGalgameSegments(text: string, context: GalgameParseContext): GalgameSegment[] {
+  const allowedNpcNames = new Set([context.npcName, ...(context.npcNames ?? [])]
+    .map((name) => name.trim())
+    .filter(Boolean))
   const structured: GalgameSegment[] = []
   let match: RegExpExecArray | null
   speakerPattern.lastIndex = 0
@@ -41,7 +45,11 @@ export function parseGalgameSegments(text: string, context: GalgameParseContext)
     const speaker = normalizeSpeaker(attributes.speaker ?? attributes.role)
     const body = stripMarkup(match[2])
     if (!speaker || !body) continue
-    structured.push({ speaker, name: defaultName(speaker, context), text: body })
+    const proposedName = attributes.name?.trim()
+    const name = speaker === 'npc' && proposedName && allowedNpcNames.has(proposedName)
+      ? proposedName
+      : defaultName(speaker, context)
+    structured.push({ speaker, name, text: body })
   }
   if (structured.length) return structured
 
@@ -57,10 +65,14 @@ export function parseGalgameSegments(text: string, context: GalgameParseContext)
       ? 'narrator'
       : name === context.playerName || /^(玩家|你|主角)$/.test(name)
         ? 'player'
-        : name === context.npcName
+        : allowedNpcNames.has(name)
           ? 'npc'
           : 'narrator'
-    return [{ speaker, name: defaultName(speaker, context), text: body }]
+    return [{
+      speaker,
+      name: speaker === 'npc' && allowedNpcNames.has(name) ? name : defaultName(speaker, context),
+      text: body,
+    }]
   })
   if (labelled.length) return labelled
 

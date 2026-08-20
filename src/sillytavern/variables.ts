@@ -5,6 +5,7 @@
 import type { ChatMessage, ChatSession, ParsedTags, PresetBinding } from './types';
 import type { ParserEvent } from './stream-parser';
 import { parseVarsBlock, applyVarsPatch } from './vars-merger';
+import { normalizeSessionParticipantIds } from './session-participants';
 
 export function extractVariables(text: string): { cleanedText: string; updates: Record<string, string | number> } {
   const updates: Record<string, string | number> = {};
@@ -68,6 +69,7 @@ export function branchChat(
     messages: source.messages.slice(0, index + 1).map(m => ({ ...m })),
     characterId: source.characterId,
     npcId: source.npcId,
+    participantNpcIds: [...normalizeSessionParticipantIds(source.npcId, source.participantNpcIds)],
     branchFromSessionId: source.id,
     characterName: source.characterName,
     userName: source.userName,

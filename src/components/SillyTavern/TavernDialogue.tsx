@@ -2,7 +2,7 @@ import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useGame } from '../../game/GameContext'
 import { formatClock, formatGameDate, getCalendarDate, getFestivalOnDay, getNpcPresence } from '../../game/calendar'
-import { locations } from '../../game/data'
+import { locations, npcs } from '../../game/data'
 import type { GameState, Npc } from '../../game/types'
 import type { ChatSession } from '../../sillytavern/types'
 import { resolveSessionResources } from '../../sillytavern/prompt-compiler'
@@ -15,6 +15,8 @@ import { getLocationBackground } from '../stage/location-scenes'
 import { HistoryDrawer } from './HistoryDrawer'
 import { DialogueImageGallery } from './DialogueImageGallery'
 import { extractTaggedImagePrompt } from '../../sillytavern/image-generation/prompt'
+import { MAX_CHAT_PARTICIPANTS, normalizeSessionParticipantIds } from '../../sillytavern/session-participants'
+import { getEligibleGalgameInvitees } from '../../tavern/galgame-participants'
 
 const openingOptions: Record<string, string[]> = {
   loran: ['询问今日委托', '聊聊村庄近况', '暂时告辞'],
@@ -75,7 +77,9 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
   const [cinemaMode, setCinemaMode] = useState(false)
   const cinemaModeRef = useRef(false)
   const [interactionOpen, setInteractionOpen] = useState(false)
-  const [interactionTab, setInteractionTab] = useState<'conversation' | 'gallery'>('conversation')
+  const [interactionTab, setInteractionTab] = useState<'conversation' | 'invite' | 'gallery'>('conversation')
+  const [invitingNpcId, setInvitingNpcId] = useState<string | null>(null)
+  const [inviteStatus, setInviteStatus] = useState<string | null>(null)
   const interactionOpenRef = useRef(false)
   const [frameIndex, setFrameIndex] = useState(0)
   const [error, setError] = useState<string | null>(null)
@@ -86,7 +90,9 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const dialogueRef = useRef<HTMLElement | null>(null)
   const interactionToggleRef = useRef<HTMLButtonElement | null>(null)
+  const inviteEntryRef = useRef<HTMLButtonElement | null>(null)
   const interactionCloseRef = useRef<HTMLButtonElement | null>(null)
+  const interactionReturnFocusRef = useRef<'interaction' | 'invite'>('interaction')
   const focusBeforeCinemaRef = useRef<HTMLElement | null>(null)
   const dialogueVariables = useMemo(
     () => createDialogueVariables(state, npc, relationship.affinity),
@@ -109,13 +115,25 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
   const closeInteraction = () => {
     interactionOpenRef.current = false
     setInteractionOpen(false)
-    requestAnimationFrame(() => interactionToggleRef.current?.focus())
+    requestAnimationFrame(() => {
+      const target = interactionReturnFocusRef.current === 'invite' ? inviteEntryRef : interactionToggleRef
+      target.current?.focus()
+    })
   }
 
   const toggleInteraction = () => {
     const next = !interactionOpenRef.current
+    if (next) interactionReturnFocusRef.current = 'interaction'
     interactionOpenRef.current = next
     setInteractionOpen(next)
+  }
+
+  const openInvitation = () => {
+    interactionReturnFocusRef.current = 'invite'
+    interactionOpenRef.current = true
+    setInteractionTab('invite')
+    setInteractionOpen(true)
+    setInviteStatus(null)
   }
 
   useEffect(() => {
@@ -177,9 +195,77 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
   }, [cinemaMode])
 
   const session = tavern.sessions.find((candidate) => candidate.id === sessionId) ?? sessionSnapshot
+  const participantNpcIds = useMemo(
+    () => normalizeSessionParticipantIds(npc.id, session?.participantNpcIds),
+    [npc.id, session?.participantNpcIds],
+  )
+  const participants = useMemo(() => participantNpcIds.flatMap((participantId) => {
+    const resident = participantId === npc.id ? npc : npcs.find((candidate) => candidate.id === participantId)
+    const participantRelationship = state.relationships[participantId]
+    if (!resident || !participantRelationship) return []
+    const participantCard = tavern.characters.find((candidate) => candidate.npcId === participantId)
+    return [{
+      npc: resident,
+      relationship: participantRelationship,
+      card: participantCard,
+      portraitSource: participantCard
+        ? resolvePortraitSlot(participantCard.portraitSlots, participantRelationship.affinity)?.source
+        : undefined,
+    }]
+  }), [participantNpcIds, npc, state.relationships, tavern.characters])
+  const eligibleInvitees = useMemo(() => getEligibleGalgameInvitees(
+    npcs,
+    state.relationships,
+    participantNpcIds,
+  ).filter((candidate) => tavern.characters.some((card) => card.npcId === candidate.id)), [state.relationships, participantNpcIds, tavern.characters])
+  const participantNames = useMemo(() => participants.map((participant) => participant.npc.name), [participants])
+  const effectiveDialogueVariables = useMemo(() => participants.length > 1 ? {
+    ...dialogueVariables,
+    dialogueMode: 'multi-character',
+    dialogueParticipantNames: participantNames.join('、'),
+    dialogueParticipantCount: participants.length,
+  } : dialogueVariables, [dialogueVariables, participantNames, participants.length])
+
+  const inviteParticipant = async (invitee: Npc) => {
+    if (!session || working || invitingNpcId) return
+    const currentIds = normalizeSessionParticipantIds(npc.id, session.participantNpcIds)
+    const stillEligible = getEligibleGalgameInvitees(npcs, state.relationships, currentIds)
+      .some((candidate) => candidate.id === invitee.id)
+    const inviteeCard = tavern.characters.find((candidate) => candidate.npcId === invitee.id)
+    if (!stillEligible || !inviteeCard) {
+      setInviteStatus(null)
+      setError('该角色当前不满足邀约条件，可能是好感变化或席位已满。')
+      return
+    }
+    const nextParticipantIds = normalizeSessionParticipantIds(npc.id, [...currentIds, invitee.id])
+    if (nextParticipantIds.length === currentIds.length) {
+      setInviteStatus(null)
+      setError('该角色已经在当前对话中，或五个席位已经坐满。')
+      return
+    }
+
+    setInvitingNpcId(invitee.id)
+    setInviteStatus(null)
+    setError(null)
+    const nextSession = {
+      ...session,
+      participantNpcIds: nextParticipantIds,
+      lorebookIds: [...new Set([...session.lorebookIds, ...inviteeCard.lorebookIds])],
+      updatedAt: Date.now(),
+    }
+    try {
+      await tavern.saveSession(nextSession)
+      setSessionSnapshot(nextSession)
+      setInviteStatus(`${invitee.name}已加入对话，接下来的回复会把她纳入同一场景。`)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : '邀约保存失败，请稍后重试。')
+    } finally {
+      setInvitingNpcId(null)
+    }
+  }
   const lastAssistant = [...(session?.messages ?? [])].reverse().find((message) => message.role === 'assistant')
   const options = lastAssistant?.parsed?.options.length ? lastAssistant.parsed.options : (openingOptions[npc.id] ?? ['继续交谈', '询问她的近况', '暂时告辞'])
-  const card = tavern.characters.find((candidate) => candidate.npcId === npc.id)
+  const card = participants.find((participant) => participant.npc.id === npc.id)?.card
   const activeResources = useMemo(() => {
     if (!session || !tavern.settings || tavern.presets.length === 0) return null
     return resolveSessionResources(session, tavern.settings, tavern.presets, tavern.lorebooks)
@@ -201,23 +287,27 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
         lastUserMessage: [...messages.slice(0, index)].reverse().find((item) => item.role === 'user')?.content ?? '',
         lastCharacterMessage: [...messages.slice(0, index)].reverse().find((item) => item.role === 'assistant')?.content ?? '',
       },
-      variables: { ...(session?.variables ?? {}), ...dialogueVariables },
+      variables: { ...(session?.variables ?? {}), ...effectiveDialogueVariables },
     }).text,
-  })), [session?.messages, session?.userName, session?.variables, displayScripts, card?.name, npc.name, dialogueVariables])
+  })), [session?.messages, session?.userName, session?.variables, displayScripts, card?.name, npc.name, effectiveDialogueVariables])
   const dialogueFrames = useMemo<DialogueFrame[]>(() => displayedMessages.flatMap((message) => {
     const segments = message.role === 'user'
       ? [{ speaker: 'player' as const, name: state.playerProfile.name, text: message.displayContent.trim() }]
-      : parseGalgameSegments(message.displayContent, { npcName: npc.name, playerName: state.playerProfile.name })
+      : parseGalgameSegments(message.displayContent, { npcName: npc.name, npcNames: participantNames, playerName: state.playerProfile.name })
     return segments.filter((segment) => segment.text).map((segment, index) => ({ ...segment, id: `${message.id}-${index}` }))
-  }), [displayedMessages, npc.name, state.playerProfile.name])
+  }), [displayedMessages, npc.name, participantNames, state.playerProfile.name])
   const streamingFrames = useMemo<DialogueFrame[]>(() => {
     if (!working || !streamingText.trim()) return []
-    return parseGalgameSegments(streamingText, { npcName: npc.name, playerName: state.playerProfile.name })
+    return parseGalgameSegments(streamingText, { npcName: npc.name, npcNames: participantNames, playerName: state.playerProfile.name })
       .map((segment, index) => ({ ...segment, id: `streaming-${index}` }))
-  }, [working, streamingText, npc.name, state.playerProfile.name])
+  }, [working, streamingText, npc.name, participantNames, state.playerProfile.name])
   const frames = streamingFrames.length ? [...dialogueFrames, ...streamingFrames] : dialogueFrames
   const activeFrame = frames[Math.min(frameIndex, Math.max(0, frames.length - 1))]
-  const portraitSource = card ? resolvePortraitSlot(card.portraitSlots, relationship.affinity)?.source : undefined
+  const activeParticipant = activeFrame?.speaker === 'npc'
+    ? participants.find((participant) => participant.npc.name === activeFrame.name)
+    : undefined
+  const portraitSource = participants.find((participant) => participant.npc.id === npc.id)?.portraitSource
+  const textboxPortrait = activeParticipant?.portraitSource ?? (participants.length === 1 ? portraitSource : undefined)
   const sceneBackground = getLocationBackground(state.location, state.minutes)
 
   useEffect(() => {
@@ -261,7 +351,7 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
         sessionId: session.id,
         npcId: npc.id,
         playerText: message,
-        variables: dialogueVariables,
+        variables: effectiveDialogueVariables,
         affinity: relationship.affinity,
         memoryTags: relationship.memoryTags,
         signal: controller.signal,
@@ -335,6 +425,7 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
           <h2 id={`tavern-dialogue-title-${npc.id}`}>与{npc.name}的酒馆会话</h2>
         </div>
         <div className="tavern-dialogue-header-actions">
+          <button ref={inviteEntryRef} id={`dialogue-invite-open-${npc.id}`} className="dialogue-invite-button" type="button" aria-label={`邀约角色加入对话，当前 ${participantNpcIds.length}/${MAX_CHAT_PARTICIPANTS}`} disabled={working || invitingNpcId !== null} onClick={openInvitation}><GameIcon name="invite" size={18} /><span>邀约 {participantNpcIds.length}/{MAX_CHAT_PARTICIPANTS}</span></button>
           <button id={`dialogue-cinema-${npc.id}`} className="icon-button" type="button" aria-label={cinemaMode ? '退出对话全屏' : '对话全屏显示'} aria-pressed={cinemaMode} onClick={() => { if (!cinemaMode) focusBeforeCinemaRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; const next = !cinemaModeRef.current; cinemaModeRef.current = next; setCinemaMode(next) }}><GameIcon name={cinemaMode ? 'fullscreenExit' : 'fullscreen'} size={18} /></button>
           <button id={`tavern-history-open-${npc.id}`} className="icon-button" type="button" aria-label="查看会话历史" disabled={!session} onClick={() => setHistoryOpen(true)}><GameIcon name="history" size={18} /></button>
           <button id={`dialogue-close-${npc.id}`} className="icon-button" type="button" aria-label={`关闭与${npc.name}的对话`} onClick={() => dispatch({ type: 'CLOSE_MODAL' })}><GameIcon name="close" size={17} /></button>
@@ -349,13 +440,26 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
 
       <div className={`galgame-scene ${activeFrame?.speaker === 'npc' ? 'is-npc-speaking' : 'is-npc-dimmed'}`} style={{ backgroundImage: `url(${sceneBackground})` }} data-testid="galgame-scene">
         <div className="galgame-scene-shade" aria-hidden="true" />
-        {portraitSource
-          ? <img className="galgame-character" src={portraitSource} alt={`${npc.name}立绘`} />
-          : <div className="galgame-character-fallback" aria-hidden="true"><span>{npc.name.slice(0, 1)}</span></div>}
+        <div
+          className="galgame-character-stage"
+          data-participant-count={participants.length}
+          role="group"
+          aria-label={`同场角色，共 ${participants.length} 人`}
+        >
+          {participants.map((participant) => {
+            const isSpeaking = activeParticipant?.npc.id === participant.npc.id
+            return <figure key={participant.npc.id} className={`galgame-participant ${isSpeaking ? 'is-speaking' : 'is-dimmed'}`} data-testid={`galgame-participant-${participant.npc.id}`} aria-label={isSpeaking ? `${participant.npc.name}，发言中` : `${participant.npc.name}，未发言`}>
+              {participant.portraitSource
+                ? <img className="galgame-character" src={participant.portraitSource} alt={`${participant.npc.name}立绘`} />
+                : <div className="galgame-character-fallback" aria-hidden="true"><span>{participant.npc.name.slice(0, 1)}</span></div>}
+              <figcaption className="galgame-participant-label"><span>{participant.npc.name}</span>{isSpeaking && <em>发言中</em>}</figcaption>
+            </figure>
+          })}
+        </div>
         <div className="galgame-textbox" aria-live="polite">
           <div className="galgame-speaker-row">
-            {portraitSource && <img className="galgame-avatar" src={portraitSource} alt="" aria-hidden="true" />}
-            <div><small>{activeFrame?.speaker === 'narrator' ? 'SCENE NARRATION' : activeFrame?.speaker === 'player' ? 'PLAYER VOICE' : npc.role}</small><strong>{activeFrame?.name ?? npc.name}</strong></div>
+            {textboxPortrait && <img className="galgame-avatar" src={textboxPortrait} alt="" aria-hidden="true" />}
+            <div><small>{activeFrame?.speaker === 'narrator' ? 'SCENE NARRATION' : activeFrame?.speaker === 'player' ? 'PLAYER VOICE' : activeParticipant?.npc.role ?? npc.role}</small><strong data-testid="galgame-speaker-name">{activeFrame?.name ?? npc.name}</strong></div>
             <span>{frames.length ? `${Math.min(frameIndex + 1, frames.length)} / ${frames.length}` : '—'}</span>
           </div>
           <p>{activeFrame?.text ?? (working ? '模型正在组织下一幕……' : '正在读取角色记忆与当前场景。')}</p>
@@ -391,9 +495,10 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
         data-testid="dialogue-interaction-drawer"
       >
         <header className="dialogue-interaction-header">
-          <div><span>CONVERSATION DESK</span><strong>{interactionTab === 'conversation' ? '对话与行动' : '场景绘图'}</strong></div>
+          <div><span>CONVERSATION DESK</span><strong>{interactionTab === 'conversation' ? '对话与行动' : interactionTab === 'invite' ? '邀约同场角色' : '场景绘图'}</strong></div>
           <div className="dialogue-interaction-tabs" role="tablist" aria-label="互动面板内容">
             <button id={`dialogue-interaction-conversation-${npc.id}`} role="tab" type="button" aria-selected={interactionTab === 'conversation'} aria-controls={`dialogue-interaction-panel-${npc.id}`} onClick={() => setInteractionTab('conversation')}><GameIcon name="chat" size={15} />对话</button>
+            <button id={`dialogue-interaction-invite-${npc.id}`} role="tab" type="button" aria-selected={interactionTab === 'invite'} aria-controls={`dialogue-interaction-panel-${npc.id}`} onClick={() => setInteractionTab('invite')}><GameIcon name="invite" size={15} />邀约</button>
             <button id={`dialogue-interaction-gallery-${npc.id}`} role="tab" type="button" aria-selected={interactionTab === 'gallery'} aria-controls={`dialogue-interaction-panel-${npc.id}`} onClick={() => setInteractionTab('gallery')}><GameIcon name="image" size={15} />画廊</button>
           </div>
           <button ref={interactionCloseRef} id={`dialogue-interaction-close-${npc.id}`} className="icon-button" type="button" aria-label="关闭对话互动面板" onClick={closeInteraction}><GameIcon name="close" size={17} /></button>
@@ -415,7 +520,7 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
               {message.role === 'assistant' && renderReasoning('模型自行输出的思考标签', message.parsed?.thinking, 'authored')}
               {message.role === 'user'
                 ? <p>{message.displayContent}</p>
-                : parseGalgameSegments(message.displayContent, { npcName: npc.name, playerName: state.playerProfile.name }).map((segment, index) => <p key={`${message.id}-display-${index}`} className={`dialogue-segment is-${segment.speaker}`}><b>{segment.name}</b>{segment.text}</p>)}
+                : parseGalgameSegments(message.displayContent, { npcName: npc.name, npcNames: participantNames, playerName: state.playerProfile.name }).map((segment, index) => <p key={`${message.id}-display-${index}`} className={`dialogue-segment is-${segment.speaker}`}><b>{segment.name}</b>{segment.text}</p>)}
               {message.parsed?.sum && <small className="dialogue-summary">楼层摘要 · {message.parsed.sum}</small>}
             </article>
           ))}
@@ -433,6 +538,25 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
         </div>
 
         {displayedError && <div className="tavern-dialogue-error" role="alert"><GameIcon name="warning" size={17} /><span>{displayedError}</span><button id={`dialogue-open-api-${npc.id}`} type="button" aria-label="打开接口设置" onClick={() => dispatch({ type: 'OPEN_MODAL', modal: 'tavern' })}>打开接口设置</button></div>}
+        </div> : interactionTab === 'invite' ? <div id={`dialogue-interaction-panel-${npc.id}`} className="galgame-invite-panel" role="tabpanel" aria-label="可邀约角色">
+          <div className="galgame-invite-summary">
+            <div><strong>当前同场</strong><span>{participantNpcIds.length} / {MAX_CHAT_PARTICIPANTS}</span></div>
+            <p>{participants.map((participant) => participant.npc.name).join(' · ')}</p>
+          </div>
+          {inviteStatus && <p className="galgame-invite-status" role="status"><GameIcon name="success" size={16} />{inviteStatus}</p>}
+          {error && <p className="tavern-dialogue-error" role="alert"><GameIcon name="warning" size={16} />{error}</p>}
+          {eligibleInvitees.length ? <ul className="galgame-invite-list">
+            {eligibleInvitees.map((invitee) => {
+              const inviteeRelationship = state.relationships[invitee.id]
+              const inviteeCard = tavern.characters.find((candidate) => candidate.npcId === invitee.id)
+              const inviteePortrait = inviteeCard ? resolvePortraitSlot(inviteeCard.portraitSlots, inviteeRelationship.affinity)?.source : undefined
+              return <li key={invitee.id}>
+                <div className="galgame-invite-portrait">{inviteePortrait ? <img src={inviteePortrait} alt="" aria-hidden="true" /> : <span aria-hidden="true">{invitee.name.slice(0, 1)}</span>}</div>
+                <div><strong>{invitee.name}</strong><span>{invitee.role} · 好感 {inviteeRelationship.affinity}</span></div>
+                <button type="button" aria-label={`邀请${invitee.name}加入对话`} disabled={!session || working || invitingNpcId !== null} onClick={() => void inviteParticipant(invitee)}>{invitingNpcId === invitee.id ? '正在邀约…' : '邀请'}</button>
+              </li>
+            })}
+          </ul> : <div className="galgame-invite-empty"><GameIcon name="invite" size={28} /><strong>{participantNpcIds.length >= MAX_CHAT_PARTICIPANTS ? '五个席位已经坐满' : '暂无可邀约角色'}</strong><p>{participantNpcIds.length >= MAX_CHAT_PARTICIPANTS ? '当前会话已达到五名角色上限。' : '其他居民需要好感严格大于 70，且拥有可用角色卡。'}</p></div>}
         </div> : <div id={`dialogue-interaction-panel-${npc.id}`} className="dialogue-image-scroll" role="tabpanel"><DialogueImageGallery sessionId={session?.id ?? ''} npcId={npc.id} latestMessageId={lastAssistant?.id} /></div>}
 
         {interactionTab === 'conversation' && <form className="dialogue-composer tavern-composer" aria-label="自由输入对话" onSubmit={submit}>

@@ -557,6 +557,7 @@ describe('雾灯谷酒馆仓储', () => {
       id: 'broken-loran-session',
       name: '损坏的洛岚会话',
       npcId: 'loran',
+      participantNpcIds: ['freya', 'loran', 'freya', '', 4, 'mina', 'liuan', 'taomi', 'yanque'],
       characterName: '洛岚',
       userName: '旅人',
       presetId: null,
@@ -575,6 +576,7 @@ describe('雾灯谷酒馆仓储', () => {
 
     expect(session).toMatchObject({
       id: 'broken-loran-session',
+      participantNpcIds: ['loran', 'freya', 'mina', 'liuan', 'taomi'],
       lorebookIds: [],
       variables: {},
       messages: [{

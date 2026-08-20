@@ -35,6 +35,108 @@ afterEach(async () => {
 })
 
 describe('NPC 酒馆会话', () => {
+  it('only offers affinity-above-70 residents, persists the invite and restores title-button focus', async () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: true }))
+    const user = userEvent.setup()
+    database = createTavernDatabase(`mistvale-dialogue-invite-${crypto.randomUUID()}`)
+    const repository = createTavernRepository(database)
+    const loran = npcs.find((npc) => npc.id === 'loran')!
+    const relationships = {
+      ...initialGameState.relationships,
+      freya: { ...initialGameState.relationships.freya, affinity: 71 },
+      mina: { ...initialGameState.relationships.mina, affinity: 70 },
+    }
+
+    render(
+      <GameProvider initialState={{ ...initialGameState, location: 'mayor-home', relationships }}>
+        <TavernProvider repository={repository}>
+          <TavernDialogue npc={loran} />
+        </TavernProvider>
+      </GameProvider>,
+    )
+
+    const inviteEntry = await screen.findByRole('button', { name: /邀约角色加入对话.*1\/5/ })
+    await user.click(inviteEntry)
+    await waitFor(() => expect(screen.getByRole('button', { name: '关闭对话互动面板' })).toHaveFocus())
+    const inviteFreya = await screen.findByRole('button', { name: '邀请芙蕾雅加入对话' }, { timeout: 3_000 })
+    await waitFor(() => expect(inviteFreya).toBeEnabled())
+    expect(screen.queryByRole('button', { name: '邀请弥奈加入对话' })).not.toBeInTheDocument()
+
+    await user.click(inviteFreya)
+
+    expect(await screen.findByRole('img', { name: '芙蕾雅立绘' })).toBeVisible()
+    expect(screen.getByRole('img', { name: '洛岚立绘' })).toBeVisible()
+    await waitFor(async () => expect((await repository.listSessions())[0]?.participantNpcIds).toEqual(['loran', 'freya']))
+    expect(screen.getByRole('status')).toHaveTextContent('芙蕾雅已加入对话')
+
+    await user.click(screen.getByRole('button', { name: '关闭对话互动面板' }))
+    await waitFor(() => expect(inviteEntry).toHaveFocus())
+  })
+
+  it('sends one group request and highlights the invited NPC named by the active scene', async () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: true }))
+    const response = [
+      '<maintext>',
+      '<scene speaker="narrator">晚风掠过药草园。</scene>',
+      '<scene speaker="npc" name="洛岚">先听听芙蕾雅的意见。</scene>',
+      '<scene speaker="npc" name="芙蕾雅">药草园今晚适合移栽。</scene>',
+      '</maintext>',
+      '<option>继续商量</option><sum>三人商量药草园。</sum><vars>{}</vars>',
+    ].join('')
+    const fetchMock = vi.fn().mockResolvedValue(new Response(
+      `data: ${JSON.stringify({ choices: [{ delta: { content: response } }] })}\n\ndata: [DONE]\n\n`,
+      { headers: { 'content-type': 'text/event-stream' } },
+    ))
+    vi.stubGlobal('fetch', fetchMock)
+    setSessionApiKey('session-secret')
+    database = createTavernDatabase(`mistvale-dialogue-speaker-${crypto.randomUUID()}`)
+    const repository = createTavernRepository(database)
+    const loran = npcs.find((npc) => npc.id === 'loran')!
+    const relationships = {
+      ...initialGameState.relationships,
+      freya: { ...initialGameState.relationships.freya, affinity: 71 },
+    }
+    const user = userEvent.setup()
+
+    render(
+      <GameProvider initialState={{ ...initialGameState, location: 'mayor-home', relationships }}>
+        <TavernProvider repository={repository}>
+          <TavernDialogue npc={loran} />
+        </TavernProvider>
+      </GameProvider>,
+    )
+
+    await user.click(await screen.findByRole('button', { name: /邀约角色加入对话.*1\/5/ }))
+    const inviteFreya = await screen.findByRole('button', { name: '邀请芙蕾雅加入对话' })
+    await waitFor(() => expect(inviteFreya).toBeEnabled())
+    await user.click(inviteFreya)
+    expect(await screen.findByRole('img', { name: '芙蕾雅立绘' })).toBeVisible()
+    await user.click(screen.getByRole('tab', { name: '对话' }))
+    const action = await screen.findByRole('button', { name: /选择行动：询问今日委托/ })
+    await waitFor(() => expect(action).toBeEnabled())
+    await user.click(action)
+
+    expect(await screen.findByText('药草园今晚适合移栽。')).toBeVisible()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const requestBody = String(fetchMock.mock.calls[0]?.[1]?.body)
+    expect(requestBody).toContain('允许发言的 NPC 姓名')
+    expect(requestBody).toContain('洛岚、芙蕾雅')
+    expect(screen.getByRole('group', { name: '同场角色，共 2 人' })).toHaveAttribute('data-participant-count', '2')
+    expect(screen.getByTestId('galgame-participant-freya')).toHaveClass('is-speaking')
+    expect(screen.getByTestId('galgame-participant-loran')).toHaveClass('is-dimmed')
+    expect(screen.getByTestId('galgame-speaker-name')).toHaveTextContent('芙蕾雅')
+    expect(screen.getByText('发言中')).toBeVisible()
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /邀约角色加入对话.*2\/5/ })).toBeEnabled())
+    await user.click(screen.getByRole('button', { name: '上一段对话' }))
+    await waitFor(() => expect(screen.getByTestId('galgame-speaker-name')).toHaveTextContent('洛岚'))
+    await user.click(screen.getByRole('button', { name: '上一段对话' }))
+    await waitFor(() => expect(screen.getByTestId('galgame-speaker-name')).toHaveTextContent('旁白'))
+    expect(screen.getAllByTestId(/galgame-participant-/).every((element) => (
+      element.classList.contains('is-dimmed') && !element.classList.contains('is-speaking')
+    ))).toBe(true)
+  })
+
   it('缺少 API 密钥时预先禁用生成并引导玩家打开接口设置', async () => {
     vi.stubGlobal('matchMedia', () => ({ matches: true }))
     const user = userEvent.setup()

@@ -17,6 +17,7 @@ import type {
 } from '../sillytavern/types'
 import { applyDefinedVariablePatch, variableDefinitionsToRecord } from '../sillytavern/variable-definitions'
 import { branchChat, truncateChatAt } from '../sillytavern/variables'
+import { normalizeSessionParticipantIds } from '../sillytavern/session-participants'
 import { createRemoteTurn, type RemoteTurnInspection, type RemoteTurnResult } from './remote-story-engine'
 import { DEFAULT_PLAYER_NAME, normalizePlayerName } from '../game/player-profile'
 import { installWorkshopPackage as installPackage, type WorkshopInstallResult } from '../workshop/install-package'
@@ -216,6 +217,7 @@ export function TavernProvider({ children, repository = tavernRepository, player
       name: `${card.name} · 初次会话`,
       characterId: card.id,
       npcId,
+      participantNpcIds: [npcId],
       characterName: card.name,
       userName: currentPlayerName,
       presetId: null,
@@ -251,19 +253,41 @@ export function TavernProvider({ children, repository = tavernRepository, player
     if (!session) throw new Error('找不到当前酒馆会话')
     const startedAt = performance.now()
     const currentSettings = settings ?? await repository.getSettings()
+    const availableCharacters = characters.length ? characters : await repository.listCharacters()
+    const character = availableCharacters.find((candidate) => candidate.npcId === input.npcId)
+    if (!character) throw new Error(`找不到 NPC 角色卡：${input.npcId}`)
+    const participantIds = normalizeSessionParticipantIds(input.npcId, session.participantNpcIds)
+    const participantCards = participantIds
+      .map((id) => availableCharacters.find((card) => card.npcId === id))
+      .filter((card): card is CharacterCard => Boolean(card))
+    const groupVariables = participantCards.length > 1
+      ? {
+          dialogueMode: 'multi-character',
+          dialogueParticipantNames: participantCards.map((card) => card.name).join('、'),
+          dialogueParticipantCount: participantCards.length,
+        }
+      : {}
     const variables = {
       ...variableDefinitionsToRecord(currentSettings.globalVariables ?? []),
       ...variableDefinitionsToRecord(session.variableDefinitions ?? []),
       ...session.variables,
       ...input.variables,
+      ...groupVariables,
       playerName: currentPlayerName,
       userName: currentPlayerName,
     }
-    const character = characters.find((candidate) => candidate.npcId === input.npcId)
-      ?? (await repository.listCharacters()).find((candidate) => candidate.npcId === input.npcId)
-    if (!character) throw new Error(`找不到 NPC 角色卡：${input.npcId}`)
     const availablePresets = presets.length ? presets : await repository.listPresets()
-    const resources = resolveSessionResources(session, currentSettings, availablePresets, lorebooks)
+    const baseLorebookIds = session.lorebookIds.length
+      ? session.lorebookIds
+      : currentSettings.activeLorebookIds
+    const effectiveSession = {
+      ...session,
+      lorebookIds: [...new Set([
+        ...baseLorebookIds,
+        ...participantCards.flatMap((card) => card.lorebookIds),
+      ])],
+    }
+    const resources = resolveSessionResources(effectiveSession, currentSettings, availablePresets, lorebooks)
     const preset = resources.preset
     const activeLorebooks = resources.lorebooks
     const effectiveApiConfig = applyPresetGenerationSettings(currentSettings.api, preset.settings)
@@ -275,7 +299,7 @@ export function TavernProvider({ children, repository = tavernRepository, player
       createdAt: inspection.preparedRequest.createdAt,
       status,
       sessionId: session.id,
-      characterName: character.name,
+      characterName: participantCards.map((card) => card.name).join('、') || character.name,
       presetId: preset.id,
       presetName: preset.name,
       presetBinding: session.presetBinding?.mode ?? 'follow-active',
@@ -296,6 +320,7 @@ export function TavernProvider({ children, repository = tavernRepository, player
         preset,
         lorebooks: activeLorebooks,
         character,
+        participants: participantCards,
         userName: currentPlayerName,
         variables,
         formatPrompt: currentSettings.formatPromptTemplate,
@@ -329,7 +354,7 @@ export function TavernProvider({ children, repository = tavernRepository, player
       patch: turn.variablePatch,
       globalDefinitions: currentSettings.globalVariables ?? [],
       sessionDefinitions: session.variableDefinitions ?? [],
-      readOnlyKeys: [...Object.keys(input.variables ?? {}), 'playerName', 'userName'],
+      readOnlyKeys: [...Object.keys(input.variables ?? {}), ...Object.keys(groupVariables), 'playerName', 'userName'],
     })
     const committedSettings = JSON.stringify(variableTransaction.globalDefinitions) === JSON.stringify(currentSettings.globalVariables ?? [])
       ? undefined
