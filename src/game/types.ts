@@ -38,6 +38,7 @@ export interface GameRuleSettings {
 export interface PlayerProfile {
   name: string
   hasConfirmedName: boolean
+  hasCompletedVillageIntro: boolean
 }
 
 export interface SkillProgress {
@@ -282,6 +283,7 @@ export interface GameState {
 
 export type GameAction =
   | { type: 'SET_PLAYER_NAME'; name: string }
+  | { type: 'COMPLETE_VILLAGE_INTRO' }
   | { type: 'SPEND_ENERGY'; amount: number; reason: string }
   | { type: 'ADD_TOAST'; toast: Omit<ToastMessage, 'id'> }
   | { type: 'DISMISS_TOAST'; id: string }

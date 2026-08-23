@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { MAX_GAME_YEAR } from './calendar'
 import { initialGameState } from './reducer'
 import {
+  GAME_SAVE_SCHEMA_VERSION,
   GAME_SAVE_STORAGE_KEY,
   clearGameSave,
   loadGameSave,
@@ -26,7 +27,7 @@ describe('版本化游戏自动存档', () => {
     }, localStorage, 123456)
 
     const loaded = loadGameSave(localStorage)
-    expect(loaded).toMatchObject({ schemaVersion: 2, savedAt: 123456 })
+    expect(loaded).toMatchObject({ schemaVersion: 3, savedAt: 123456 })
     expect(loaded?.state).toMatchObject({ day: 4, location: 'mine', money: 2345, activeModal: null, toasts: [] })
     expect(loaded?.state.selectedNpcId).toBeUndefined()
   })
@@ -38,21 +39,38 @@ describe('版本化游戏自动存档', () => {
     expect(parseGameSave(JSON.stringify({ schemaVersion: 99, state: {} }))).toBeNull()
   })
 
-  it('把 v1 存档迁移为 v2 并要求玩家首次确认姓名', () => {
+  it('把 v1 存档迁移为 v3 并要求玩家首次确认姓名', () => {
     const legacy = parseGameSave(JSON.stringify({
       schemaVersion: 1,
       savedAt: 456,
       state: { ...initialGameState, playerProfile: undefined, money: 3456 },
     }))
     expect(legacy).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 3,
       savedAt: 456,
-      state: { money: 3456, playerProfile: { name: '旅行者', hasConfirmedName: false } },
+      state: { money: 3456, playerProfile: { name: '旅行者', hasConfirmedName: false, hasCompletedVillageIntro: false } },
     })
   })
 
+  it('把 v2 已命名旧档视为已经看过开场，未命名旧档仍需播放', () => {
+    expect(GAME_SAVE_SCHEMA_VERSION).toBe(3)
+    const named = parseGameSave(JSON.stringify({
+      schemaVersion: 2,
+      savedAt: 456,
+      state: { ...initialGameState, playerProfile: { name: '旧玩家', hasConfirmedName: true } },
+    }))
+    const unnamed = parseGameSave(JSON.stringify({
+      schemaVersion: 2,
+      savedAt: 457,
+      state: { ...initialGameState, playerProfile: { name: '旅行者', hasConfirmedName: false } },
+    }))
+
+    expect(named?.state.playerProfile).toEqual({ name: '旧玩家', hasConfirmedName: true, hasCompletedVillageIntro: true })
+    expect(unnamed?.state.playerProfile).toEqual({ name: '旅行者', hasConfirmedName: false, hasCompletedVillageIntro: false })
+  })
+
   it('保存并恢复已经确认的玩家姓名', () => {
-    const named = { ...initialGameState, playerProfile: { name: '云岚', hasConfirmedName: true } }
+    const named = { ...initialGameState, playerProfile: { name: '云岚', hasConfirmedName: true, hasCompletedVillageIntro: false } }
     expect(parseGameSave(serializeGameSave(named))?.state.playerProfile).toEqual(named.playerProfile)
   })
 

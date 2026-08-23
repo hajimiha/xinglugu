@@ -14,8 +14,14 @@ describe('玩家姓名', () => {
   })
 
   it('净化旧存档并让缺少档案的玩家完成首次登记', () => {
-    expect(sanitizePlayerProfile(undefined)).toEqual({ name: '旅行者', hasConfirmedName: false })
-    expect(sanitizePlayerProfile({ name: '  云岚 ', hasConfirmedName: true })).toEqual({ name: '云岚', hasConfirmedName: true })
-    expect(sanitizePlayerProfile({ name: '   ', hasConfirmedName: true })).toEqual({ name: '旅行者', hasConfirmedName: false })
+    expect(sanitizePlayerProfile(undefined)).toEqual({ name: '旅行者', hasConfirmedName: false, hasCompletedVillageIntro: false })
+    expect(sanitizePlayerProfile({ name: '  云岚 ', hasConfirmedName: true })).toEqual({ name: '云岚', hasConfirmedName: true, hasCompletedVillageIntro: true })
+    expect(sanitizePlayerProfile({ name: '   ', hasConfirmedName: true })).toEqual({ name: '旅行者', hasConfirmedName: false, hasCompletedVillageIntro: false })
+  })
+
+  it('保留新存档显式的开场完成状态并拒绝畸形真值', () => {
+    expect(sanitizePlayerProfile({ name: '云岚', hasConfirmedName: true, hasCompletedVillageIntro: false })).toEqual({ name: '云岚', hasConfirmedName: true, hasCompletedVillageIntro: false })
+    expect(sanitizePlayerProfile({ name: '云岚', hasConfirmedName: true, hasCompletedVillageIntro: true })).toEqual({ name: '云岚', hasConfirmedName: true, hasCompletedVillageIntro: true })
+    expect(sanitizePlayerProfile({ name: '云岚', hasConfirmedName: true, hasCompletedVillageIntro: 'false' })).toEqual({ name: '云岚', hasConfirmedName: true, hasCompletedVillageIntro: true })
   })
 })

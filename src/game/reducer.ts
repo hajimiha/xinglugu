@@ -61,7 +61,7 @@ function advanceRanchProducts(state: GameState, crossedDays: number): GameState[
 }
 
 export const initialGameState: GameState = {
-  playerProfile: { name: '旅行者', hasConfirmedName: false },
+  playerProfile: { name: '旅行者', hasConfirmedName: false, hasCompletedVillageIntro: false },
   worldSeed: 840517,
   year: 1,
   day: 1,
@@ -187,8 +187,11 @@ function reduceGameState(state: GameState, action: GameAction): GameState {
     case 'SET_PLAYER_NAME': {
       const name = normalizePlayerName(action.name)
       if (!name) return state
-      return { ...state, playerProfile: { name, hasConfirmedName: true } }
+      return { ...state, playerProfile: { name, hasConfirmedName: true, hasCompletedVillageIntro: false } }
     }
+    case 'COMPLETE_VILLAGE_INTRO':
+      if (state.playerProfile.hasCompletedVillageIntro) return state
+      return { ...state, playerProfile: { ...state.playerProfile, hasCompletedVillageIntro: true } }
     case 'UPDATE_GAME_RULES':
       return { ...state, rules: normalizeGameRules({ ...state.rules, ...action.rules }) }
     case 'RESET_GAME_RULES':

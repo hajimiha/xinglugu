@@ -8,7 +8,7 @@ import type { AffinityStage, FarmMachineState, GameState, LocationId, MachineId,
 
 export const GAME_SAVE_STORAGE_KEY = 'mistvale-game-save-v2'
 export const LEGACY_GAME_SAVE_STORAGE_KEY = 'mistvale-game-save-v1'
-export const GAME_SAVE_SCHEMA_VERSION = 2 as const
+export const GAME_SAVE_SCHEMA_VERSION = 3 as const
 
 export interface GameSaveEnvelope {
   schemaVersion: typeof GAME_SAVE_SCHEMA_VERSION
@@ -263,7 +263,7 @@ export function serializeGameSave(state: GameState, savedAt = Date.now()): strin
 export function parseGameSave(raw: string): GameSaveEnvelope | null {
   try {
     const candidate = JSON.parse(raw) as unknown
-    if (!isObject(candidate) || (candidate.schemaVersion !== 1 && candidate.schemaVersion !== GAME_SAVE_SCHEMA_VERSION) || !isObject(candidate.state)) return null
+    if (!isObject(candidate) || (candidate.schemaVersion !== 1 && candidate.schemaVersion !== 2 && candidate.schemaVersion !== GAME_SAVE_SCHEMA_VERSION) || !isObject(candidate.state)) return null
     const savedAt = typeof candidate.savedAt === 'number' && Number.isFinite(candidate.savedAt) ? candidate.savedAt : Date.now()
     return { schemaVersion: GAME_SAVE_SCHEMA_VERSION, savedAt, state: sanitizeGameState(candidate.state as Partial<GameState>) }
   } catch {

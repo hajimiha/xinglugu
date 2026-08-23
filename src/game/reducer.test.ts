@@ -19,8 +19,16 @@ describe('游戏状态变更', () => {
 
   it('以单一动作保存已经净化的玩家姓名', () => {
     const named = gameReducer(initialGameState, { type: 'SET_PLAYER_NAME', name: '  云岚  ' })
-    expect(named.playerProfile).toEqual({ name: '云岚', hasConfirmedName: true })
+    expect(named.playerProfile).toEqual({ name: '云岚', hasConfirmedName: true, hasCompletedVillageIntro: false })
     expect(gameReducer(named, { type: 'SET_PLAYER_NAME', name: '   ' })).toBe(named)
+  })
+
+  it('以幂等动作完成村庄开场且不修改其他状态', () => {
+    const named = gameReducer(initialGameState, { type: 'SET_PLAYER_NAME', name: '云岚' })
+    const completed = gameReducer(named, { type: 'COMPLETE_VILLAGE_INTRO' })
+
+    expect(completed).toEqual({ ...named, playerProfile: { ...named.playerProfile, hasCompletedVillageIntro: true } })
+    expect(gameReducer(completed, { type: 'COMPLETE_VILLAGE_INTRO' })).toBe(completed)
   })
 
   it('以刚抵达小镇的新手数据开始游戏', () => {

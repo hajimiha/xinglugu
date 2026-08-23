@@ -157,7 +157,7 @@ describe('NPC 关系与灵犀对话', () => {
         ...initialGameState,
         location: 'mayor-home',
         minutes: 8 * 60,
-        playerProfile: { name: '云岚', hasConfirmedName: true },
+        playerProfile: { name: '云岚', hasConfirmedName: true, hasCompletedVillageIntro: true },
         inventory: { ...initialGameState.inventory, moonflower: 1 },
       }}>
         <TavernProvider repository={createTavernRepository(database)} playerName="云岚">
@@ -192,7 +192,7 @@ describe('NPC 关系与灵犀对话', () => {
         ...initialGameState,
         location: 'mayor-home',
         minutes: 8 * 60,
-        playerProfile: { name: '云岚', hasConfirmedName: true },
+        playerProfile: { name: '云岚', hasConfirmedName: true, hasCompletedVillageIntro: true },
         inventory: { ...initialGameState.inventory, 'mist-bean': quest.requiredAmount },
         quests: [quest],
       }}>

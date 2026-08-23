@@ -14,12 +14,16 @@ export function normalizePlayerName(value: unknown): string | null {
 
 export function sanitizePlayerProfile(value: unknown): PlayerProfile {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return { name: DEFAULT_PLAYER_NAME, hasConfirmedName: false }
+    return { name: DEFAULT_PLAYER_NAME, hasConfirmedName: false, hasCompletedVillageIntro: false }
   }
   const candidate = value as Record<string, unknown>
   const name = normalizePlayerName(candidate.name)
   if (!name || candidate.hasConfirmedName !== true) {
-    return { name: name ?? DEFAULT_PLAYER_NAME, hasConfirmedName: false }
+    return { name: name ?? DEFAULT_PLAYER_NAME, hasConfirmedName: false, hasCompletedVillageIntro: false }
   }
-  return { name, hasConfirmedName: true }
+  return {
+    name,
+    hasConfirmedName: true,
+    hasCompletedVillageIntro: candidate.hasCompletedVillageIntro !== false,
+  }
 }

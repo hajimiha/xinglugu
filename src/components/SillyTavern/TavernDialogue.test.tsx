@@ -419,7 +419,7 @@ describe('NPC 酒馆会话', () => {
     const loran = npcs.find((npc) => npc.id === 'loran')!
 
     render(
-      <GameProvider initialState={{ ...initialGameState, location: 'mayor-home', playerProfile: { name: '云岚', hasConfirmedName: true } }}>
+      <GameProvider initialState={{ ...initialGameState, location: 'mayor-home', playerProfile: { name: '云岚', hasConfirmedName: true, hasCompletedVillageIntro: true } }}>
         <TavernProvider repository={repository} playerName="云岚"><TavernDialogue npc={loran} /></TavernProvider>
       </GameProvider>,
     )

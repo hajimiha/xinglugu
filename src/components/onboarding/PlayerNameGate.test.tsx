@@ -14,7 +14,7 @@ function ProfileObserver() {
 describe('首次玩家姓名登记', () => {
   it('要求有效姓名并在确认后关闭登记层', async () => {
     const user = userEvent.setup()
-    render(<GameProvider initialState={{ ...initialGameState, playerProfile: { name: '旅行者', hasConfirmedName: false } }}><PlayerNameGate /><ProfileObserver /></GameProvider>)
+    render(<GameProvider initialState={{ ...initialGameState, playerProfile: { name: '旅行者', hasConfirmedName: false, hasCompletedVillageIntro: false } }}><PlayerNameGate /><ProfileObserver /></GameProvider>)
 
     const dialog = screen.getByRole('dialog', { name: '登记旅人名' })
     expect(dialog).toBeVisible()
