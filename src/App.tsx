@@ -7,14 +7,14 @@ import { ToastRegion } from './components/feedback/ToastRegion'
 import { GameStage } from './components/stage/GameStage'
 import { ModalHost } from './components/modals/ModalHost'
 import { TavernProvider } from './tavern/TavernContext'
-import { PlayerNameGate } from './components/onboarding/PlayerNameGate'
+import { OnboardingFlow } from './components/onboarding/OnboardingFlow'
 import { AudioProvider } from './audio/AudioContext'
 import { StartLayer } from './start/StartLayer'
 import { UiThemeProvider } from './visual/UiThemeContext'
 
 function AppContent({ onReturnToTitle }: { onReturnToTitle(): void }) {
   return (
-    <div className="game-shell">
+    <OnboardingFlow><div className="game-shell">
       <a className="skip-link" href="#main-game-content">跳到游戏场景</a>
       <TopHud />
       <div className="game-layout">
@@ -27,8 +27,7 @@ function AppContent({ onReturnToTitle }: { onReturnToTitle(): void }) {
       </div>
       <ModalHost onReturnToTitle={onReturnToTitle} />
       <ToastRegion />
-      <PlayerNameGate />
-    </div>
+    </div></OnboardingFlow>
   )
 }
 
