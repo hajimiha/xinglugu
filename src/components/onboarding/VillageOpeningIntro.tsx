@@ -10,6 +10,8 @@ import {
 import villageMapDay from '../../assets/pixel/village-map-day.webp'
 import { locations } from '../../game/data'
 import { useGame } from '../../game/GameContext'
+import { resolvePortraitSlot } from '../../sillytavern/portrait-slots'
+import { useOptionalTavern } from '../../tavern/TavernContext'
 import { GameIcon } from '../icons/GameIcon'
 import { calculateOpeningCamera } from './opening-camera'
 import { VILLAGE_OPENING_BEATS, formatVillageOpeningText } from './village-opening-story'
@@ -36,9 +38,10 @@ function isInteractiveTarget(target: EventTarget | null): boolean {
 
 export function VillageOpeningIntro() {
   const { state, dispatch } = useGame()
+  const tavern = useOptionalTavern()
   const [beatIndex, setBeatIndex] = useState(0)
   const [confirmingSkip, setConfirmingSkip] = useState(false)
-  const [portraitFailed, setPortraitFailed] = useState(false)
+  const [failedPortraitSources, setFailedPortraitSources] = useState<readonly string[]>([])
   const [viewport, setViewport] = useState(currentViewport)
   const completedRef = useRef(false)
   const skipButtonRef = useRef<HTMLButtonElement>(null)
@@ -60,6 +63,14 @@ export function VillageOpeningIntro() {
     '--village-intro-camera-y': `${camera.y}px`,
     '--village-intro-camera-scale': String(camera.scale),
   }
+  const loranCard = tavern?.characters.find((candidate) => candidate.npcId === 'loran')
+  const customPortraitSource = loranCard
+    ? resolvePortraitSlot(loranCard.portraitSlots, state.relationships.loran?.affinity ?? 0)?.source
+    : undefined
+  const portraitCandidates = customPortraitSource && customPortraitSource !== LORAN_PORTRAIT
+    ? [customPortraitSource, LORAN_PORTRAIT]
+    : [LORAN_PORTRAIT]
+  const portraitSource = portraitCandidates.find((source) => !failedPortraitSources.includes(source))
 
   const complete = useCallback(() => {
     if (completedRef.current) return
@@ -116,7 +127,7 @@ export function VillageOpeningIntro() {
           }
           return
         }
-        if (event.key === 'Enter' || event.key === ' ' || event.key === 'ArrowRight') event.preventDefault()
+        if (event.key === 'ArrowRight') event.preventDefault()
         return
       }
       if (event.repeat || event.altKey || event.ctrlKey || event.metaKey || isInteractiveTarget(event.target)) return
@@ -185,9 +196,17 @@ export function VillageOpeningIntro() {
       </span>
 
       <figure className="village-intro__character">
-        {portraitFailed
-          ? <div className="village-intro__portrait-fallback" role="img" aria-label="村长洛岚立绘加载失败"><span>洛岚</span></div>
-          : <img src={LORAN_PORTRAIT} alt="村长洛岚立绘" onError={() => setPortraitFailed(true)} draggable="false" />}
+        {portraitSource
+          ? <img
+              key={portraitSource}
+              src={portraitSource}
+              alt="村长洛岚立绘"
+              onError={() => setFailedPortraitSources((current) => (
+                current.includes(portraitSource) ? current : [...current, portraitSource]
+              ))}
+              draggable="false"
+            />
+          : <div className="village-intro__portrait-fallback" role="img" aria-label="村长洛岚立绘加载失败"><span>洛岚</span></div>}
       </figure>
 
       <article className="village-intro__dialogue" onClick={handleDialogueClick}>

@@ -31,6 +31,19 @@ describe('游戏状态变更', () => {
     expect(gameReducer(completed, { type: 'COMPLETE_VILLAGE_INTRO' })).toBe(completed)
   })
 
+  it('已经完成开场的玩家改名时保留完成状态', () => {
+    const completed = gameReducer(
+      gameReducer(initialGameState, { type: 'SET_PLAYER_NAME', name: '云岚' }),
+      { type: 'COMPLETE_VILLAGE_INTRO' },
+    )
+
+    expect(gameReducer(completed, { type: 'SET_PLAYER_NAME', name: '星野' }).playerProfile).toEqual({
+      name: '星野',
+      hasConfirmedName: true,
+      hasCompletedVillageIntro: true,
+    })
+  })
+
   it('以刚抵达小镇的新手数据开始游戏', () => {
     expect(initialGameState).toMatchObject({
       year: 1,

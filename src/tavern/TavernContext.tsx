@@ -750,3 +750,7 @@ export function useTavern() {
   if (!value) throw new Error('useTavern 必须在 TavernProvider 内使用')
   return value
 }
+
+export function useOptionalTavern() {
+  return useContext(TavernContext)
+}

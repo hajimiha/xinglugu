@@ -187,7 +187,14 @@ function reduceGameState(state: GameState, action: GameAction): GameState {
     case 'SET_PLAYER_NAME': {
       const name = normalizePlayerName(action.name)
       if (!name) return state
-      return { ...state, playerProfile: { name, hasConfirmedName: true, hasCompletedVillageIntro: false } }
+      return {
+        ...state,
+        playerProfile: {
+          name,
+          hasConfirmedName: true,
+          hasCompletedVillageIntro: state.playerProfile.hasCompletedVillageIntro,
+        },
+      }
     }
     case 'COMPLETE_VILLAGE_INTRO':
       if (state.playerProfile.hasCompletedVillageIntro) return state

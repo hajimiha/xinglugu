@@ -1,11 +1,22 @@
 import '../../test/setup'
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { GameProvider, useGame } from '../../game/GameContext'
 import { initialGameState } from '../../game/reducer'
 import { VILLAGE_OPENING_BEATS } from './village-opening-story'
 import { VillageOpeningIntro } from './VillageOpeningIntro'
+
+const tavernState = vi.hoisted(() => ({
+  characters: [] as Array<{
+    npcId: string
+    portraitSlots: Array<{ id: string; minAffinity: number; maxAffinity: number; source: string }>
+  }>,
+}))
+
+vi.mock('../../tavern/TavernContext', () => ({
+  useOptionalTavern: () => tavernState,
+}))
 
 function IntroStateObserver() {
   const { state } = useGame()
@@ -25,6 +36,10 @@ function renderIntro() {
 }
 
 describe('全屏村庄 GAL 开场', () => {
+  beforeEach(() => {
+    tavernState.characters = []
+  })
+
   it('从全景旁白进入洛岚欢迎并聚焦第一处农场', async () => {
     const user = userEvent.setup()
     renderIntro()
@@ -68,7 +83,14 @@ describe('全屏村庄 GAL 开场', () => {
     expect(skip).toHaveFocus()
 
     await user.click(skip)
-    await user.click(screen.getByRole('button', { name: '确认跳过' }))
+    await user.keyboard('{Enter}')
+    expect(screen.queryByRole('dialog', { name: '跳过村庄介绍' })).not.toBeInTheDocument()
+    expect(screen.getByLabelText('开场完成状态')).toHaveTextContent('false')
+
+    await user.click(skip)
+    await user.tab()
+    expect(screen.getByRole('button', { name: '确认跳过' })).toHaveFocus()
+    await user.keyboard(' ')
     expect(screen.getByLabelText('开场完成状态')).toHaveTextContent('true')
   })
 
@@ -95,5 +117,22 @@ describe('全屏村庄 GAL 开场', () => {
       await user.click(screen.getByTestId('village-opening-advance'))
     }
     expect(screen.getByLabelText('开场完成状态')).toHaveTextContent('true')
+  })
+
+  it('优先使用洛岚角色卡立绘，并按自定义、内置、文字顺序回退', () => {
+    tavernState.characters = [{
+      npcId: 'loran',
+      portraitSlots: [{ id: 'custom-loran', minAffinity: 0, maxAffinity: 100, source: 'data:image/png;base64,bG9yYW4=' }],
+    }]
+    renderIntro()
+
+    const customPortrait = screen.getByRole('img', { name: '村长洛岚立绘' })
+    expect(customPortrait).toHaveAttribute('src', 'data:image/png;base64,bG9yYW4=')
+    fireEvent.error(customPortrait)
+
+    const builtInPortrait = screen.getByRole('img', { name: '村长洛岚立绘' })
+    expect(builtInPortrait).toHaveAttribute('src', './assets/portraits/generated/loran.png')
+    fireEvent.error(builtInPortrait)
+    expect(screen.getByRole('img', { name: '村长洛岚立绘加载失败' })).toHaveTextContent('洛岚')
   })
 })
