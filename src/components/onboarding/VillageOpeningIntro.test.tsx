@@ -50,12 +50,13 @@ describe('全屏村庄 GAL 开场', () => {
     expect(screen.getByTestId('village-opening-speaker')).toHaveTextContent('旁白')
     expect(screen.getByLabelText('剧情进度')).toHaveTextContent(`1 / ${VILLAGE_OPENING_BEATS.length}`)
     expect(screen.getByTestId('village-opening-camera')).toHaveAttribute('data-camera-scale', '1')
+    expect(screen.queryByTestId('village-opening-advance')).not.toBeInTheDocument()
 
-    await user.click(screen.getByTestId('village-opening-advance'))
+    await user.click(screen.getByTestId('village-opening-camera'))
     expect(screen.getByText(/欢迎来到性撸谷/)).toHaveTextContent('<云岚>')
     expect(screen.getByTestId('village-opening-speaker')).toHaveTextContent('洛岚')
 
-    await user.click(screen.getByTestId('village-opening-advance'))
+    await user.click(screen.getByText(/欢迎来到性撸谷/))
     expect(screen.getAllByText('苔灯农场')).toHaveLength(2)
     expect(screen.getByTestId('village-opening-camera')).toHaveAttribute('data-focus-location', 'farm')
   })
@@ -67,6 +68,7 @@ describe('全屏村庄 GAL 开场', () => {
 
     await user.click(skip)
     expect(screen.getByRole('dialog', { name: '跳过村庄介绍' })).toBeVisible()
+    expect(screen.getByLabelText('剧情进度')).toHaveTextContent(`1 / ${VILLAGE_OPENING_BEATS.length}`)
     const continueWatching = screen.getByRole('button', { name: '继续观看' })
     const confirmSkip = screen.getByRole('button', { name: '确认跳过' })
     expect(continueWatching).toHaveFocus()
@@ -75,6 +77,8 @@ describe('全屏村庄 GAL 开场', () => {
     expect(confirmSkip).toHaveFocus()
     await user.tab({ shift: true })
     expect(continueWatching).toHaveFocus()
+    await user.click(screen.getByRole('dialog', { name: '跳过村庄介绍' }))
+    expect(screen.getByLabelText('剧情进度')).toHaveTextContent(`1 / ${VILLAGE_OPENING_BEATS.length}`)
     fireEvent.keyDown(window, { key: ' ' })
     expect(screen.getByLabelText('剧情进度')).toHaveTextContent(`1 / ${VILLAGE_OPENING_BEATS.length}`)
 
@@ -114,7 +118,7 @@ describe('全屏村庄 GAL 开场', () => {
     expect(screen.getByRole('img', { name: '村长洛岚立绘加载失败' })).toHaveTextContent('洛岚')
 
     for (let index = 0; index < VILLAGE_OPENING_BEATS.length; index += 1) {
-      await user.click(screen.getByTestId('village-opening-advance'))
+      await user.click(screen.getByTestId('village-opening-intro'))
     }
     expect(screen.getByLabelText('开场完成状态')).toHaveTextContent('true')
   })

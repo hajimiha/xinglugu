@@ -139,20 +139,16 @@ export function VillageOpeningIntro() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [advance, cancelSkip, confirmingSkip])
 
-  const handleDialogueClick = (event: MouseEvent<HTMLElement>) => {
-    if (!isInteractiveTarget(event.target)) advance()
+  const handleSceneClick = (event: MouseEvent<HTMLElement>) => {
+    if (!confirmingSkip && !isInteractiveTarget(event.target)) advance()
   }
-  const advanceLabel = beatIndex === 0
-    ? '开始村庄介绍'
-    : beatIndex === VILLAGE_OPENING_BEATS.length - 1
-      ? '进入性撸谷'
-      : '继续'
 
   return (
     <section
       className={`village-intro ${beat.speaker === 'loran' ? 'is-loran-speaking' : 'is-narrating'}`}
       data-testid="village-opening-intro"
       aria-labelledby="village-opening-title"
+      onClick={handleSceneClick}
     >
       <div className="village-intro__ambient" style={{ backgroundImage: `url(${villageMapDay})` }} aria-hidden="true" />
       <div
@@ -209,7 +205,7 @@ export function VillageOpeningIntro() {
           : <div className="village-intro__portrait-fallback" role="img" aria-label="村长洛岚立绘加载失败"><span>洛岚</span></div>}
       </figure>
 
-      <article className="village-intro__dialogue" onClick={handleDialogueClick}>
+      <article className="village-intro__dialogue">
         <header className="village-intro__speaker-row">
           <div>
             <small>{beat.speaker === 'narrator' ? 'SCENE NARRATION' : 'VILLAGE MAYOR'}</small>
@@ -219,10 +215,6 @@ export function VillageOpeningIntro() {
         </header>
         {location && <span className="village-intro__place-name">{location.name}</span>}
         <p key={beat.id}>{formatVillageOpeningText(beat.text, state.playerProfile.name)}</p>
-        <button className="village-intro__advance" data-testid="village-opening-advance" type="button" onClick={advance}>
-          {advanceLabel}
-          <GameIcon name="panRight" size={18} weight="bold" />
-        </button>
       </article>
 
       {confirmingSkip && <div className="village-intro__confirm-scrim">
