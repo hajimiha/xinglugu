@@ -9,6 +9,28 @@ export type ImageGenerationProvider = typeof IMAGE_GENERATION_PROVIDERS[number]
 export type ImagePromptMode = 'llm' | 'tagged' | 'manual'
 export type ImagePromptReplacementKind = 'replace' | 'delete' | 'prepend' | 'append'
 
+export interface ImageLlmEntry {
+  id: string
+  name: string
+  role: 'system' | 'user' | 'assistant'
+  content: string
+  enabled: boolean
+  triggerMode: 'always' | 'trigger'
+  triggerWords: string
+  andTriggerWords: string
+}
+
+export interface ImageLlmPreset {
+  id: string
+  name: string
+  entries: ImageLlmEntry[]
+}
+
+/** Credentials deliberately live outside serializable settings. */
+export interface ImagePromptApiSettings extends Omit<TavernApiConfig, 'persistedApiKey'> {
+  enabled: boolean
+}
+
 export interface ImagePromptPreset {
   id: string
   name: string
@@ -36,6 +58,9 @@ export interface ImageGenerationSettings {
     triggerEnd: string
     historyDepth: number
     systemTemplate: string
+    activeLlmPresetId: string
+    llmPresets: ImageLlmPreset[]
+    api: ImagePromptApiSettings
     activePresetId: string
     presets: ImagePromptPreset[]
     replacements: ImagePromptReplacementRule[]
@@ -203,3 +228,4 @@ export interface ImageGenerationCacheBudget {
   maxBytes: number
   retentionDays: number
 }
+import type { TavernApiConfig } from '../types'

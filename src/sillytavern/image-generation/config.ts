@@ -7,6 +7,8 @@ import {
   type ImagePromptReplacementKind,
   type ImagePromptReplacementRule,
 } from './types'
+import { createImageLlmPreset, normalizeImageLlmPresets } from './llm-presets'
+import { normalizeImagePromptApi } from './prompt-api'
 
 const DEFAULT_PROMPT_TEMPLATE = `你是游戏场景绘图提示词编辑器。根据当前角色、地点、时间、天气、最近对话、世界书资料和玩家要求，输出一幅连贯画面的绘图提示词。
 只输出以下结构，不要解释：
@@ -36,6 +38,9 @@ export function createDefaultImageGenerationSettings(): ImageGenerationSettings 
       triggerEnd: '###',
       historyDepth: 6,
       systemTemplate: DEFAULT_PROMPT_TEMPLATE,
+      activeLlmPresetId: 'image-llm-default',
+      llmPresets: [createImageLlmPreset(DEFAULT_PROMPT_TEMPLATE)],
+      api: normalizeImagePromptApi(undefined),
       activePresetId: DEFAULT_PRESET.id,
       presets: [{ ...DEFAULT_PRESET }],
       replacements: [],
@@ -142,6 +147,7 @@ export function normalizeImageGenerationSettings(value: unknown): ImageGeneratio
     ? prompt.replacements.map(normalizeReplacement).filter((item): item is ImagePromptReplacementRule => Boolean(item))
     : []
   const activePresetId = string(prompt.activePresetId, presets[0].id, 120)
+  const llmPresets = normalizeImageLlmPresets(prompt.llmPresets, string(prompt.systemTemplate, defaults.prompt.systemTemplate))
 
   return {
     version: 1,
@@ -154,6 +160,9 @@ export function normalizeImageGenerationSettings(value: unknown): ImageGeneratio
       triggerEnd: string(prompt.triggerEnd, defaults.prompt.triggerEnd, 80) || defaults.prompt.triggerEnd,
       historyDepth: Math.round(clamp(prompt.historyDepth, defaults.prompt.historyDepth, 0, 30)),
       systemTemplate: string(prompt.systemTemplate, defaults.prompt.systemTemplate, 24000) || defaults.prompt.systemTemplate,
+      activeLlmPresetId: llmPresets.some((preset) => preset.id === prompt.activeLlmPresetId) ? prompt.activeLlmPresetId as string : llmPresets[0].id,
+      llmPresets,
+      api: normalizeImagePromptApi(prompt.api),
       activePresetId: presets.some((preset) => preset.id === activePresetId) ? activePresetId : presets[0].id,
       presets,
       replacements,
@@ -206,7 +215,7 @@ export function normalizeImageGenerationSettings(value: unknown): ImageGeneratio
     },
     novelAI: {
       baseUrl: normalizeBaseUrl(novel.baseUrl, defaults.novelAI.baseUrl),
-      model: string(novel.model, defaults.novelAI.model, 500), sampler: string(novel.sampler, defaults.novelAI.sampler, 200),
+      model: string(novel.model, defaults.novelAI.model, 500) || defaults.novelAI.model, sampler: string(novel.sampler, defaults.novelAI.sampler, 200),
       scheduler: string(novel.scheduler, defaults.novelAI.scheduler, 200), width: integer(novel.width, defaults.novelAI.width),
       height: integer(novel.height, defaults.novelAI.height), steps: Math.round(clamp(novel.steps, defaults.novelAI.steps, 1, 50)),
       scale: clamp(novel.scale, defaults.novelAI.scale, 0, 20), cfgRescale: clamp(novel.cfgRescale, defaults.novelAI.cfgRescale, 0, 1),
@@ -247,6 +256,7 @@ function validateUrl(value: string, label: string): string | undefined {
 
 export function validateImageGenerationSettings(settings: ImageGenerationSettings): ImageGenerationFieldErrors {
   const errors: ImageGenerationFieldErrors = {}
+  if (settings.provider === 'novelai' && !settings.novelAI.model.trim()) errors['novelAI.model'] = '请选择 NovelAI 模型或填写自定义模型 ID。'
   const endpoints: Array<[string, string]> = [
     ['stableDiffusion.baseUrl', settings.stableDiffusion.baseUrl],
     ['comfyUI.baseUrl', settings.comfyUI.baseUrl],

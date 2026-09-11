@@ -121,6 +121,40 @@ describe('酒馆绘图供应商适配器', () => {
     })
   })
 
+  it.each([
+    ['nai-diffusion-3', 3, false],
+    ['nai-diffusion-4-full', 3, true],
+    ['nai-diffusion-4-5-curated', 3, true],
+    ['nai-diffusion-5-full', 4, true],
+  ])('选择 %s 后发送该代模型所需的提示词结构', async (model, version, structured) => {
+    const settings = createDefaultImageGenerationSettings()
+    settings.novelAI.model = model as string
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body))
+      expect(body.model).toBe(model)
+      expect(body.parameters.params_version).toBe(version)
+      if (structured) {
+        expect(body.parameters.v4_prompt.caption).toEqual({ base_caption: 'village', char_captions: [] })
+        expect(body.parameters.v4_negative_prompt.caption.base_caption).toBe('blur')
+        expect(body.parameters.sm).toBe(false)
+      } else {
+        expect(body.parameters.v4_prompt).toBeUndefined()
+        expect(body.parameters.sm).toBe(true)
+      }
+      if (model === 'nai-diffusion-5-full') expect(body.parameters.skip_cfg_above_sigma).toBeUndefined()
+      return pngResponse()
+    })
+    await createNovelAIAdapter(fetchMock).generate({ settings, positivePrompt: 'village', negativePrompt: 'blur', credential: 'nai-test' })
+  })
+
+  it('NAI 验证当前配置的服务而不是忽略自定义根地址', async () => {
+    const settings = createDefaultImageGenerationSettings()
+    settings.novelAI.baseUrl = 'https://nai-proxy.test/'
+    const fetchMock = vi.fn(async () => Response.json({ tier: 3, active: true }))
+    await createNovelAIAdapter(fetchMock).testConnection(settings, 'nai-test')
+    expect(fetchMock).toHaveBeenCalledWith('https://nai-proxy.test/user/subscription', expect.any(Object))
+  })
+
   it('兼容 OpenAI/Grok 图片接口的 b64_json 与远程 URL 响应', async () => {
     const settings = createDefaultImageGenerationSettings()
     const b64Fetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {

@@ -10,6 +10,18 @@ import type { ImageGenerationReference, ImageGenerationSettings } from '../types
 
 const MAX_ZIP_BYTES = 96 * 1024 * 1024
 
+// Official model documentation + st-chatu8 model IDs, verified 2026-09-11.
+// NovelAI publishes no image-model discovery endpoint; do not use the text /models API.
+export const NOVELAI_MODELS = [
+  { id: 'nai-diffusion-4-5-full', label: 'NovelAI Diffusion V4.5 Full' },
+  { id: 'nai-diffusion-4-5-curated', label: 'NovelAI Diffusion V4.5 Curated' },
+  { id: 'nai-diffusion-5-full', label: 'NovelAI Diffusion V5 Full' },
+  { id: 'nai-diffusion-5-curated', label: 'NovelAI Diffusion V5 Curated' },
+  { id: 'nai-diffusion-4-full', label: 'NovelAI Diffusion V4 Full' },
+  { id: 'nai-diffusion-4-curated-preview', label: 'NovelAI Diffusion V4 Curated' },
+  { id: 'nai-diffusion-3', label: 'NovelAI Diffusion Anime V3' },
+]
+
 async function blobToBase64(blob: Blob): Promise<string> {
   const buffer = typeof blob.arrayBuffer === 'function' ? await blob.arrayBuffer() : await new Promise<ArrayBuffer>((resolve, reject) => {
     const reader = new FileReader()
@@ -136,6 +148,9 @@ export function createNovelAIAdapter(
     async generate({ settings, positivePrompt, negativePrompt, credential, signal, onProgress, references = [] }) {
       const config = settings.novelAI
       const token = requireCredential(credential, 'NovelAI')
+      if (!config.model.trim()) throw new ImageProviderError('请选择 NovelAI 模型。', 'IMAGE_INVALID_RESPONSE')
+      const modern = /^nai-diffusion-[45](?:-|$)/.test(config.model)
+      const v5 = config.model.startsWith('nai-diffusion-5-')
       onProgress?.(0.1, '正在提交 NovelAI 绘图请求')
       const referenceParameters = await buildReferenceParameters(settings, references, token, fetchImpl, signal)
       const response = await fetchProvider(fetchImpl, `${config.baseUrl.replace(/\/+$/, '')}/ai/generate-image`, {
@@ -146,12 +161,19 @@ export function createNovelAIAdapter(
           input: positivePrompt,
           model: config.model,
           parameters: {
+            params_version: v5 ? 4 : 3,
             negative_prompt: negativePrompt,
             width: config.width, height: config.height, steps: config.steps, scale: config.scale,
             sampler: config.sampler, noise_schedule: config.scheduler, seed: config.seed,
             n_samples: 1, qualityToggle: true, ucPreset: 0,
-            sm: config.sm, sm_dyn: config.dyn, dynamic_thresholding: config.dyn,
-            cfg_rescale: config.cfgRescale, variety_boost: config.variety, decrisper: config.decrisper,
+            sm: !modern && config.sm, sm_dyn: !modern && config.sm && config.dyn, dynamic_thresholding: !modern && config.decrisper,
+            cfg_rescale: config.cfgRescale,
+            ...(!v5 && config.variety ? { skip_cfg_above_sigma: Math.sqrt(config.width * config.height / 1011712) * (config.model.includes('4-5') ? 58 : 19) } : {}),
+            ...(modern ? {
+              v4_prompt: { caption: { base_caption: positivePrompt, char_captions: [] }, use_coords: false, use_order: true },
+              v4_negative_prompt: { caption: { base_caption: negativePrompt, char_captions: [] }, legacy_uc: false },
+              legacy: false, legacy_uc: false, characterPrompts: [],
+            } : {}),
             ...referenceParameters,
           },
         }),
@@ -167,10 +189,10 @@ export function createNovelAIAdapter(
     },
     async testConnection(settings, credential, signal) {
       const token = requireCredential(credential, 'NovelAI')
-      await fetchProvider(fetchImpl, 'https://api.novelai.net/user/subscription', {
+      await fetchProvider(fetchImpl, `${settings.novelAI.baseUrl.replace(/\/+$/, '')}/user/subscription`, {
         headers: { authorization: `Bearer ${token}` }, signal,
       })
-      return { label: 'NovelAI 已连接', details: [settings.novelAI.model] }
+      return { label: 'NovelAI 密钥验证成功', details: ['模型使用内置目录；生成权限以服务端为准', settings.novelAI.model] }
     },
   }
 }

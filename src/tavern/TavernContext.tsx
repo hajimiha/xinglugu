@@ -24,6 +24,7 @@ import { installWorkshopPackage as installPackage, type WorkshopInstallResult } 
 import type { WorkshopPackage } from '../workshop/types'
 import { assembleImagePrompt, extractTaggedImagePrompt, type StructuredImagePrompt } from '../sillytavern/image-generation/prompt'
 import { generateStructuredImagePrompt } from '../sillytavern/image-generation/prompt-service'
+import { createImagePromptApi } from '../sillytavern/image-generation/prompt-api'
 import { createImageProviderAdapters } from '../sillytavern/image-generation/providers'
 import type { ImageProviderResources } from '../sillytavern/image-generation/providers'
 import { ImageGenerationService } from '../sillytavern/image-generation/service'
@@ -110,7 +111,7 @@ interface TavernContextValue {
   addImageReference(file: File, kind: ImageReferenceKind): Promise<void>
   updateImageReference(referenceId: string, patch: Partial<Pick<ImageGenerationReference, 'name' | 'kind' | 'strength' | 'informationExtracted' | 'enabled'>>): Promise<void>
   deleteImageReference(referenceId: string): Promise<void>
-  testImageProvider(provider?: ImageGenerationProvider, signal?: AbortSignal): Promise<string>
+  testImageProvider(provider?: ImageGenerationProvider, signal?: AbortSignal, settingsOverride?: ImageGenerationSettings, credentialOverride?: string): Promise<string>
   listImageProviderResources(settingsOverride?: ImageGenerationSettings, signal?: AbortSignal): Promise<ImageProviderResources>
   saveImageProviderCredential(provider: ImageGenerationProvider, value: string, remember: boolean): void
   clearImageProviderCredential(provider: ImageGenerationProvider): void
@@ -535,7 +536,7 @@ export function TavernProvider({ children, repository = tavernRepository, player
     } else {
       const resources = resolveSessionResources(session, currentSettings, presets.length ? presets : await repository.listPresets(), lorebooks)
       const effectiveApiConfig = applyPresetGenerationSettings(currentSettings.api, resources.preset.settings)
-      const api = createRemoteTavernApi(effectiveApiConfig, resolveApiKey(currentSettings))
+      const api = createImagePromptApi(effectiveApiConfig, resolveApiKey(currentSettings), imageSettings.prompt.api)
       const structured = await generateStructuredImagePrompt(api, {
         session, character, lorebooks: resources.lorebooks, settings: imageSettings,
         instruction: input.instruction, sourceText, variables: session.variables,
@@ -657,11 +658,11 @@ export function TavernProvider({ children, repository = tavernRepository, player
     await refreshImageArchive()
   }, [imageReferences, imageRepository, refreshImageArchive])
 
-  const testImageProvider = useCallback(async (provider?: ImageGenerationProvider, signal?: AbortSignal) => {
-    const currentSettings = settings ?? await repository.getSettings()
-    const selected = provider ?? currentSettings.imageGeneration.provider
+  const testImageProvider = useCallback(async (provider?: ImageGenerationProvider, signal?: AbortSignal, settingsOverride?: ImageGenerationSettings, credentialOverride?: string) => {
+    const currentSettings = settingsOverride ?? (settings ?? await repository.getSettings()).imageGeneration
+    const selected = provider ?? currentSettings.provider
     const adapter = createImageProviderAdapters()[selected]
-    const result = await adapter.testConnection(currentSettings.imageGeneration, resolveImageProviderCredential(selected), signal)
+    const result = await adapter.testConnection(currentSettings, credentialOverride ?? resolveImageProviderCredential(selected), signal)
     return [result.label, ...(result.details ?? [])].join(' · ')
   }, [settings, repository])
 

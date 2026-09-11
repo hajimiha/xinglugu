@@ -10,6 +10,10 @@ import type {
 } from '../../../sillytavern/image-generation/types'
 import { useTavern } from '../../../tavern/TavernContext'
 import { GameIcon } from '../../icons/GameIcon'
+import { ImagePromptControls } from './ImagePromptControls'
+import { NovelAIModelPicker } from './NovelAIModelPicker'
+import { resolveImagePromptCredential, setImagePromptCredential } from '../../../sillytavern/image-generation/credentials'
+import { validateTavernApiConfig } from '../../../sillytavern/api-config'
 
 const providerLabels: Record<ImageGenerationProvider, string> = {
   'stable-diffusion': 'Stable Diffusion WebUI / Forge',
@@ -37,28 +41,39 @@ function NumberField({ id, label, value, min, max, step = 1, onCommit }: {
   return <label htmlFor={id}><span>{label}</span><input id={id} type="number" inputMode="decimal" value={draft} min={min} max={max} step={step} onChange={(event) => setDraft(event.target.value)} onBlur={commit} /></label>
 }
 
-function Toggle({ id, label, checked, note, onChange }: { id: string; label: string; checked: boolean; note?: string; onChange(value: boolean): void }) {
-  return <label className="image-toggle" htmlFor={id}><input id={id} type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} /><span><strong>{label}</strong>{note && <small>{note}</small>}</span></label>
+function Toggle({ id, label, checked, note, disabled = false, onChange }: { id: string; label: string; checked: boolean; note?: string; disabled?: boolean; onChange(value: boolean): void }) {
+  return <label className="image-toggle" htmlFor={id}><input id={id} type="checkbox" checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} /><span><strong>{label}</strong>{note && <small>{note}</small>}</span></label>
 }
 
 export function ImageGenerationPanel() {
   const tavern = useTavern()
   const [draft, setDraft] = useState<ImageGenerationSettings>(createDefaultImageGenerationSettings)
   const [credential, setCredential] = useState('')
+  const [promptCredential, setPromptCredential] = useState('')
   const [rememberCredential, setRememberCredential] = useState(false)
   const [showCredential, setShowCredential] = useState(false)
-  const [feedback, setFeedback] = useState<{ tone: 'idle' | 'working' | 'success' | 'error'; text: string }>({ tone: 'idle', text: '尚未测试当前绘图服务。' })
+  const [feedback, setFeedback] = useState<{ tone: 'idle' | 'working' | 'success' | 'error'; text: string; source?: 'connection' }>({ tone: 'idle', text: '尚未测试当前绘图服务。' })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [referenceKind, setReferenceKind] = useState<ImageReferenceKind>('vibe')
   const [clearArmed, setClearArmed] = useState(false)
   const [resources, setResources] = useState<ImageProviderResources | null>(null)
   const presetImportRef = useRef<HTMLInputElement>(null)
+  const connectionRef = useRef<AbortController | null>(null)
+  const connectionScope = JSON.stringify([draft.provider, draft.stableDiffusion.baseUrl, draft.comfyUI.baseUrl, draft.novelAI.baseUrl, draft.openAIImage.baseUrl, credential])
+
+  useEffect(() => {
+    connectionRef.current?.abort()
+    setFeedback((current) => current.source === 'connection' ? { tone: 'idle', text: '配置已切换，可测试当前绘图服务。' } : current)
+    return () => connectionRef.current?.abort()
+  }, [connectionScope])
 
   useEffect(() => {
     if (!tavern.settings) return
     setDraft(structuredClone(tavern.settings.imageGeneration))
     setCredential('')
-    setFeedback({ tone: 'idle', text: tavern.hasImageProviderCredential(tavern.settings.imageGeneration.provider) ? '当前供应商已有本机密钥。' : '尚未测试当前绘图服务。' })
+    setPromptCredential('')
+    const text = tavern.hasImageProviderCredential(tavern.settings.imageGeneration.provider) ? '当前供应商已有本机密钥。' : '尚未测试当前绘图服务。'
+    setFeedback((current) => current.tone === 'idle' ? { tone: 'idle', text } : current)
   }, [tavern.settings])
 
   const activePreset = useMemo(() => draft.prompt.presets.find((preset) => preset.id === draft.prompt.activePresetId) ?? draft.prompt.presets[0], [draft.prompt])
@@ -75,13 +90,21 @@ export function ImageGenerationPanel() {
   const save = async (event: FormEvent) => {
     event.preventDefault()
     const nextErrors = validateImageGenerationSettings(draft)
+    if (draft.prompt.api.enabled) {
+      Object.assign(nextErrors, Object.fromEntries(Object.entries(validateTavernApiConfig(draft.prompt.api)).map(([key, value]) => [`prompt.api.${key}`, value])))
+      if (!promptCredential.trim() && !resolveImagePromptCredential(draft.prompt.api)) nextErrors['prompt.api.key'] = '请填写绘图提示词独立 API 密钥。'
+    }
+    if (draft.prompt.llmPresets.some((preset) => !preset.name.trim())) nextErrors['prompt.llmPresets'] = '提示词预设名称不能为空。'
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length) {
       setFeedback({ tone: 'error', text: '绘图配置仍有无效字段，请检查红色提示。' })
       return
     }
     try {
-      tavern.saveImageProviderCredential(draft.provider, credential, rememberCredential)
+      connectionRef.current?.abort()
+      if (credential.trim()) tavern.saveImageProviderCredential(draft.provider, credential, rememberCredential)
+      const promptKey = promptCredential.trim() || resolveImagePromptCredential(draft.prompt.api)
+      if (promptKey) setImagePromptCredential(draft.prompt.api, promptKey, draft.prompt.api.rememberKey)
       await tavern.updateSettings({ imageGeneration: structuredClone(draft) })
       setFeedback({ tone: 'success', text: '绘图配置、提示词预设与缓存规则已保存。' })
     } catch (caught) {
@@ -93,13 +116,15 @@ export function ImageGenerationPanel() {
     const nextErrors = validateImageGenerationSettings(draft)
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length) return setFeedback({ tone: 'error', text: '请先修正接口地址和参数。' })
-    tavern.saveImageProviderCredential(draft.provider, credential, rememberCredential)
-    await tavern.updateSettings({ imageGeneration: structuredClone(draft) })
-    setFeedback({ tone: 'working', text: '正在连接绘图服务……' })
+    connectionRef.current?.abort()
+    const controller = new AbortController()
+    connectionRef.current = controller
+    setFeedback({ tone: 'working', source: 'connection', text: '正在连接绘图服务……' })
     try {
-      setFeedback({ tone: 'success', text: await tavern.testImageProvider(draft.provider) })
+      const result = await tavern.testImageProvider(draft.provider, controller.signal, draft, credential.trim() || undefined)
+      if (!controller.signal.aborted) setFeedback({ tone: 'success', source: 'connection', text: `${result}。修改的配置请点击保存。` })
     } catch (caught) {
-      setFeedback({ tone: 'error', text: caught instanceof Error ? caught.message : '连接测试失败。' })
+      if (!controller.signal.aborted) setFeedback({ tone: 'error', source: 'connection', text: caught instanceof Error ? caught.message : '连接测试失败。' })
     }
   }
 
@@ -211,20 +236,21 @@ export function ImageGenerationPanel() {
 
       <article className="image-config-card">
         <div className="api-card-heading"><div><span className="panel-kicker">02 · 凭据</span><h4>接口与本机密钥</h4></div><GameIcon name="shield" size={20} /></div>
-        <label htmlFor="image-provider-credential"><span>供应商密钥（本地服务可留空）</span><div className="api-secret-input"><input id="image-provider-credential" type={showCredential ? 'text' : 'password'} autoComplete="off" value={credential} placeholder={tavern.hasImageProviderCredential(draft.provider) ? '已保存；留空会清除当前密钥' : '只保存在当前浏览器'} onChange={(event) => setCredential(event.target.value)} /><button id="image-provider-credential-visibility" type="button" aria-label={showCredential ? '隐藏绘图密钥' : '显示绘图密钥'} onClick={() => setShowCredential((current) => !current)}><GameIcon name={showCredential ? 'conceal' : 'reveal'} size={17} /></button></div></label>
+        <label htmlFor="image-provider-credential"><span>供应商密钥（本地服务可留空）</span><div className="api-secret-input"><input id="image-provider-credential" aria-label="供应商密钥（本地服务可留空）" type={showCredential ? 'text' : 'password'} autoComplete="off" value={credential} placeholder={tavern.hasImageProviderCredential(draft.provider) ? '已保存；留空保留现有密钥' : '只保存在当前浏览器'} onChange={(event) => setCredential(event.target.value)} /><button id="image-provider-credential-visibility" type="button" aria-label={showCredential ? '隐藏绘图密钥' : '显示绘图密钥'} onClick={() => setShowCredential((current) => !current)}><GameIcon name={showCredential ? 'conceal' : 'reveal'} size={17} /></button></div></label>
         <Toggle id="image-provider-remember" label="在这台设备记住密钥" checked={rememberCredential} onChange={setRememberCredential} />
+        <button type="button" className="danger-button" onClick={() => { connectionRef.current?.abort(); tavern.clearImageProviderCredential(draft.provider); setCredential(''); setFeedback({ tone: 'idle', text: '当前绘图密钥已从本机清除。' }) }}>清除绘图密钥</button>
         <p className="image-help">密钥不会进入世界书、预设、角色卡、云存档或创意工坊包。本地 A1111/Forge 需以 <code>--api</code> 启动并允许当前网页跨域。</p>
       </article>
 
-      <article className="image-config-card">
+      <article className="image-config-card is-wide">
         <div className="api-card-heading"><div><span className="panel-kicker">03 · 提示词</span><h4>智能整理与标记兼容</h4></div><GameIcon name="wand" size={20} /></div>
         <div className="image-field-grid">
           <label htmlFor="image-prompt-mode"><span>默认提示词来源</span><select id="image-prompt-mode" value={draft.prompt.mode} onChange={(event) => patch('prompt', { ...draft.prompt, mode: event.target.value as ImageGenerationSettings['prompt']['mode'] })}><option value="llm">AI 智能整理</option><option value="tagged">读取回复标记</option><option value="manual">玩家手动描述</option></select></label>
           <NumberField id="image-prompt-history-depth" label="读取最近消息数" value={draft.prompt.historyDepth} min={0} max={30} onCommit={(historyDepth) => patch('prompt', { ...draft.prompt, historyDepth: Math.round(historyDepth) })} />
           <label htmlFor="image-prompt-trigger-start"><span>标记开头</span><input id="image-prompt-trigger-start" value={draft.prompt.triggerStart} onChange={(event) => patch('prompt', { ...draft.prompt, triggerStart: event.target.value })} /></label>
           <label htmlFor="image-prompt-trigger-end"><span>标记结尾</span><input id="image-prompt-trigger-end" value={draft.prompt.triggerEnd} onChange={(event) => patch('prompt', { ...draft.prompt, triggerEnd: event.target.value })} /></label>
-          <label className="is-wide" htmlFor="image-prompt-system"><span>提示词模型系统指令</span><textarea id="image-prompt-system" rows={8} value={draft.prompt.systemTemplate} onChange={(event) => patch('prompt', { ...draft.prompt, systemTemplate: event.target.value })} /></label>
         </div>
+        <ImagePromptControls prompt={draft.prompt} onChange={(value) => patch('prompt', value)} apiKey={promptCredential} onKeyChange={setPromptCredential} />
       </article>
 
       <article className="image-config-card is-wide">
@@ -316,7 +342,7 @@ function ProviderSettings({ draft, patchProvider, errors }: {
   if (draft.provider === 'novelai') {
     const value = draft.novelAI
     const update = (next: typeof value) => patchProvider('novelAI', next)
-    return <article className="image-config-card is-wide"><div className="api-card-heading"><div><span className="panel-kicker">05 · NOVELAI</span><h4>采样、调度与质量增强</h4></div><GameIcon name="magic" size={20} /></div><div className="image-field-grid"><label className="is-wide" htmlFor="image-nai-url"><span>接口根地址</span><input id="image-nai-url" value={value.baseUrl} aria-invalid={Boolean(errors['novelAI.baseUrl'])} onChange={(event) => update({ ...value, baseUrl: event.target.value })} /></label><label htmlFor="image-nai-model"><span>模型</span><input id="image-nai-model" value={value.model} onChange={(event) => update({ ...value, model: event.target.value })} /></label><label htmlFor="image-nai-sampler"><span>采样器</span><input id="image-nai-sampler" value={value.sampler} onChange={(event) => update({ ...value, sampler: event.target.value })} /></label><label htmlFor="image-nai-scheduler"><span>噪声调度</span><input id="image-nai-scheduler" value={value.scheduler} onChange={(event) => update({ ...value, scheduler: event.target.value })} /></label>{commonDimensions('image-nai', value, (next) => update({ ...value, ...next }))}<NumberField id="image-nai-steps" label="采样步数" value={value.steps} min={1} max={50} onCommit={(steps) => update({ ...value, steps: Math.round(steps) })} /><NumberField id="image-nai-scale" label="提示词强度" value={value.scale} min={0} max={20} step={0.1} onCommit={(scale) => update({ ...value, scale })} /><NumberField id="image-nai-rescale" label="CFG Rescale" value={value.cfgRescale} min={0} max={1} step={0.01} onCommit={(cfgRescale) => update({ ...value, cfgRescale })} /><NumberField id="image-nai-seed" label="种子" value={value.seed} onCommit={(seed) => update({ ...value, seed: Math.round(seed) })} /><Toggle id="image-nai-sm" label="SMEA" checked={value.sm} onChange={(sm) => update({ ...value, sm })} /><Toggle id="image-nai-dyn" label="动态阈值" checked={value.dyn} onChange={(dyn) => update({ ...value, dyn })} /><Toggle id="image-nai-variety" label="Variety" checked={value.variety} onChange={(variety) => update({ ...value, variety })} /><Toggle id="image-nai-decrisper" label="Decrisper" checked={value.decrisper} onChange={(decrisper) => update({ ...value, decrisper })} /></div></article>
+    return <article className="image-config-card is-wide"><div className="api-card-heading"><div><span className="panel-kicker">05 · NOVELAI</span><h4>采样、调度与质量增强</h4></div><GameIcon name="magic" size={20} /></div><div className="image-field-grid"><label className="is-wide" htmlFor="image-nai-url"><span>接口根地址</span><input id="image-nai-url" value={value.baseUrl} aria-invalid={Boolean(errors['novelAI.baseUrl'])} onChange={(event) => update({ ...value, baseUrl: event.target.value })} /></label><NovelAIModelPicker value={value.model} onChange={(model) => update({ ...value, model })} /><label htmlFor="image-nai-sampler"><span>采样器</span><input id="image-nai-sampler" value={value.sampler} onChange={(event) => update({ ...value, sampler: event.target.value })} /></label><label htmlFor="image-nai-scheduler"><span>噪声调度</span><input id="image-nai-scheduler" value={value.scheduler} onChange={(event) => update({ ...value, scheduler: event.target.value })} /></label>{commonDimensions('image-nai', value, (next) => update({ ...value, ...next }))}<NumberField id="image-nai-steps" label="采样步数" value={value.steps} min={1} max={50} onCommit={(steps) => update({ ...value, steps: Math.round(steps) })} /><NumberField id="image-nai-scale" label="提示词强度" value={value.scale} min={0} max={20} step={0.1} onCommit={(scale) => update({ ...value, scale })} /><NumberField id="image-nai-rescale" label="CFG Rescale" value={value.cfgRescale} min={0} max={1} step={0.01} onCommit={(cfgRescale) => update({ ...value, cfgRescale })} /><NumberField id="image-nai-seed" label="种子" value={value.seed} onCommit={(seed) => update({ ...value, seed: Math.round(seed) })} /><Toggle id="image-nai-sm" label="SMEA" disabled={/^nai-diffusion-[45](?:-|$)/.test(value.model)} checked={value.sm} onChange={(sm) => update({ ...value, sm })} /><Toggle id="image-nai-dyn" label="SMEA DYN" disabled={/^nai-diffusion-[45](?:-|$)/.test(value.model)} checked={value.dyn} onChange={(dyn) => update({ ...value, dyn })} /><Toggle id="image-nai-variety" label="Variety" disabled={value.model.startsWith('nai-diffusion-5-')} checked={value.variety} onChange={(variety) => update({ ...value, variety })} /><Toggle id="image-nai-decrisper" label="Decrisper" disabled={/^nai-diffusion-[45](?:-|$)/.test(value.model)} checked={value.decrisper} onChange={(decrisper) => update({ ...value, decrisper })} /></div></article>
   }
   const value = draft.openAIImage
   const update = (next: typeof value) => patchProvider('openAIImage', next)
